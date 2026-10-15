@@ -1,0 +1,6 @@
+# Compatible runtime ranges. See ENVIRONMENT.md for the verified local versions.
+# Install into the project .venv, never system Python. Existing ROCm torch works;
+# a new environment should select a CPU/GPU torch build appropriate to its host.
+numpy>=2.0,<3
+scipy>=1.16,<2
+torch>=2.6,<3

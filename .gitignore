@@ -11,3 +11,10 @@ __pycache__/
 # PyTorch checkpoints
 *.pt
 *.pth
+
+# Local experiments and scratch work
+/.experiments/
+
+# Agent instruction files
+/AGENTS.md
+/CLAUDE.md
