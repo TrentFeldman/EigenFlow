@@ -1,8 +1,8 @@
-"""Real numerical checks against closed forms, without writing a dataset.
+"""Compare numerical references with independently specified closed forms.
 
-The suite checks both supported families, distinct and repeated roots, damped
-oscillations, higher orders and resonance. It validates these bounded examples,
-not every possible coefficient or time horizon. Model training is never run.
+These integration tests cover both equation families, repeated/distinct roots,
+damped oscillations, higher orders, resonance and shifted start times. Process
+worker checks also verify result ordering across the reference-solving pipeline.
 """
 
 from dataclasses import replace
@@ -22,6 +22,7 @@ class NumericalValidationTests(unittest.TestCase):
     """Independent closed-form expectations detect systematic solver mistakes."""
 
     def test_both_families_and_higher_orders_pass_closed_forms(self):
+        """Check benchmark success and coverage of both families, order six and resonance."""
         report = validate_reference(GeneratorConfig())
         self.assertTrue(report["passed"], report)
         self.assertEqual({case["family"] for case in report["cases"]},
@@ -30,6 +31,7 @@ class NumericalValidationTests(unittest.TestCase):
         self.assertTrue(any("resonance" in case["name"] for case in report["cases"]))
 
     def test_double_root_and_resonance_explicit_solutions(self):
+        """Verify matrix-exponential states against repeated-root and resonant formulas."""
         times = np.linspace(0, 5, 31)
         repeated = LinearODE((1., 2.), (1., 0.))
         states = linear_reference(repeated, times)
@@ -40,6 +42,7 @@ class NumericalValidationTests(unittest.TestCase):
         np.testing.assert_allclose(states[:, 0], -0.5 * times * np.cos(times), atol=1e-12)
 
     def test_nonzero_start_time_preserves_elapsed_forcing(self):
+        """Check that shifting absolute time preserves the elapsed-time solution."""
         equation = LinearODE((2., 3.), (0.4, -0.2), 0.7, 1.3, 0.4)
         job = SolveJob("time-shift-check", "fixture", "validation", equation)
         config = GeneratorConfig()
@@ -50,12 +53,14 @@ class NumericalValidationTests(unittest.TestCase):
         np.testing.assert_allclose(first.states, shifted.states, rtol=1e-7, atol=1e-9)
 
     def test_process_workers_solve_both_families(self):
-        # A tiny process-based numerical validation, not dataset generation.
+        """Verify ordered process results against closed forms for both families."""
         config = replace(GeneratorConfig(), backend="process", workers=2)
         cases = benchmark_cases(config)[:2]
         jobs = [SolveJob(case.name, case.name, "validation", case.equation) for case in cases]
         results = list(iter_results(jobs, config))
-        self.assertEqual([result.job.trajectory_id for result in results], [job.trajectory_id for job in jobs])
+        self.assertEqual([result.job.trajectory_id for result in results],
+                         [job.trajectory_id for job in jobs])
+
         for case, result in zip(cases, results):
             self.assertIsNone(result.error)
             np.testing.assert_allclose(result.states, case.expected(result.times - config.t_start),

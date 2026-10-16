@@ -1,30 +1,43 @@
-"""Describe an ODE without solving it.
+"""Describe linear ODEs and sample their coefficients for data generation.
 
-For order n, the initial state contains n values: y, y', ..., y^(n-1).
-The implemented family is
-
-    y^(n) + a[0]*y + a[1]*y' + ... + a[n-1]*y^(n-1)
-        = amplitude * sin(frequency * elapsed_time + phase).
-
-The coefficient of the highest derivative is normalized to 1 (a 'monic' ODE).
-All values are nondimensional for now. A zero forcing amplitude gives a
-homogeneous equation. The state conversion works for any positive order; high
-orders can still be numerically difficult and require independent validation.
+The generator builds these equations before reference solving. The dataset
+loader and predictor reuse the same equation identity and derivative ordering.
+See MATH_GUIDE.md for the connection between a scalar ODE and its state.
 """
 
 from dataclasses import dataclass
+from hashlib import sha256
+import json
 
 import numpy as np
 
 
+def fingerprint(values) -> str:
+    """Compute a stable content ID using the dataset's JSON serialization.
+
+    Args:
+        values: JSON-compatible parameters or initial conditions.
+    Returns:
+        Hexadecimal SHA-256 digest of the serialized values.
+    Raises:
+        ValueError: Values contain a non-finite number.
+        TypeError: Values cannot be serialized as JSON.
+    """
+    return sha256(json.dumps(values, sort_keys=True, allow_nan=False).encode()).hexdigest()
+
+
 @dataclass(frozen=True)
 class LinearODE:
-    """One constant-coefficient scalar ODE and its complete initial state.
+    """Describe y^(n) + sum(a[k] * y^(k)) = A * sin(omega*t + phase).
 
-    Coefficients are ordered by increasing derivative, NOT by polynomial
-    convention: (2, 3) means y'' + 3*y' + 2*y = forcing.
-    State and coefficient lengths must agree. Forcing uses time since t0,
-    allowing the same encoded equation to work at different absolute start times.
+    Args:
+        coefficients: n real values in increasing derivative order.
+        initial_state: n real initial values; (2, 3) means y=2, y'=3.
+        amplitude: Forcing strength A; zero selects the homogeneous family.
+        frequency: Nonnegative omega, in radians per elapsed time unit.
+        phase: Initial forcing phase in radians.
+    Raises:
+        ValueError: Values are non-finite, lengths disagree, or frequency < 0.
     """
 
     coefficients: tuple[float, ...]
@@ -34,68 +47,125 @@ class LinearODE:
     phase: float = 0.0
 
     def __post_init__(self):
-        """Canonicalize JSON lists to immutable numeric tuples and validate."""
-        object.__setattr__(self, "coefficients", tuple(float(x) for x in self.coefficients))
-        object.__setattr__(self, "initial_state", tuple(float(x) for x in self.initial_state))
+        """Canonicalize numeric values before validating the immutable equation."""
+        # A frozen dataclass blocks normal assignment, even during canonicalization.
+        object.__setattr__(
+            self, "coefficients", tuple(float(value) for value in self.coefficients)
+        )
+        object.__setattr__(
+            self, "initial_state", tuple(float(value) for value in self.initial_state)
+        )
+
+        for name in ("amplitude", "frequency", "phase"):
+            object.__setattr__(self, name, float(getattr(self, name)))
+
         if not self.coefficients or len(self.coefficients) != len(self.initial_state):
             raise ValueError("Need one initial value per derivative below the ODE order")
-        values = (*self.coefficients, *self.initial_state,
-                  self.amplitude, self.frequency, self.phase)
+
+        values = (
+            *self.coefficients,
+            *self.initial_state,
+            self.amplitude,
+            self.frequency,
+            self.phase,
+        )
+
         if not np.isfinite(values).all() or self.frequency < 0:
             raise ValueError("Equation values must be finite; frequency must be nonnegative")
 
     @property
     def order(self) -> int:
-        """Number of initial values needed, e.g. 3 for a third-order ODE."""
+        """Count the derivatives stored in the initial state.
+
+        Returns:
+            Positive order n, such as 3 for a third-order equation.
+        """
         return len(self.coefficients)
 
     @property
     def family(self) -> str:
-        """Human-readable family label, derived from the actual forcing."""
+        """Classify the equation by its forcing amplitude.
+
+        Returns:
+            'linear_homogeneous' for zero amplitude, else 'linear_sinusoidal'.
+        """
         return "linear_homogeneous" if self.amplitude == 0 else "linear_sinusoidal"
 
-    def rhs(self, elapsed_time: float, state: np.ndarray) -> np.ndarray:
-        """Return the time derivative of a state of shape (order,).
+    @property
+    def parameter_id(self) -> str:
+        """Identify coefficients and forcing independently of the initial state.
 
-        The first slots just shift derivatives: d(y)/dt = y', etc.
-        Only the last slot needs the original ODE, rearranged to isolate y^(n).
-        This is what lets a first-order numerical solver handle higher orders.
+        Returns:
+            SHA-256 string used to keep equation groups in one dataset split.
+        """
+        return fingerprint([self.coefficients, self.amplitude, self.frequency, self.phase])
+
+    def rhs(self, elapsed_time: float, state: np.ndarray) -> np.ndarray:
+        """Convert the scalar ODE into the derivative of its full state.
+
+        Args:
+            elapsed_time: Time since the initial condition.
+            state: Real array of shape (n,), converted to float64.
+        Returns:
+            Float64 array of shape (n,), ordered [y', ..., y^(n)].
+        Raises:
+            ValueError: The state shape differs from (n,).
         """
         state = np.asarray(state, dtype=np.float64)
+
         if state.shape != (self.order,):
             raise ValueError(f"Expected state shape {(self.order,)}, got {state.shape}")
+
         derivative = np.empty(self.order, dtype=np.float64)
+        # For y'' + 3y' + 2y = 0, state=[1, 4] gives derivative=[4, -14].
         derivative[:-1] = state[1:]
         forcing = self.amplitude * np.sin(self.frequency * elapsed_time + self.phase)
         derivative[-1] = forcing - np.dot(self.coefficients, state)
+
         return derivative
 
 
-def stable_coefficients(order: int, rng: np.random.Generator,
-                        decay_range: tuple[float, float],
-                        frequency_range: tuple[float, float]) -> tuple[float, ...]:
-    """Sample coefficients from decaying modes, without solving any ODE.
+def stable_coefficients(
+    order: int,
+    rng: np.random.Generator,
+    decay_range: tuple[float, float],
+    frequency_range: tuple[float, float],
+) -> tuple[float, ...]:
+    """Sample decaying real modes and complex-conjugate mode pairs.
 
-    A mode is a basic exponential or oscillation composing the solution.
-    Negative real parts make unforced modes decay. Complex-conjugate pairs
-    give real-valued coefficients and damped oscillations. Odd orders get one
-    extra purely decaying mode. Stability does NOT guarantee an easy problem:
-    transient growth, stiffness and high-order conditioning still need checks.
+    Args:
+        order: Positive equation order n.
+        rng: NumPy generator supplying the reproducible random stream.
+        decay_range: Positive decay bounds, in inverse time units.
+        frequency_range: Positive frequency bounds, in radians per time unit.
+    Returns:
+        Tuple of n floats, ordered from the coefficient of y to y^(n-1).
+    Raises:
+        ValueError: Order/ranges are invalid or coefficients are unusable.
+    Note: Decaying modes can still produce transient growth or stiff equations.
     """
     if isinstance(order, bool) or not isinstance(order, int) or order < 1:
         raise ValueError("order must be a positive integer")
+
     for bounds in (decay_range, frequency_range):
         if len(bounds) != 2 or not np.isfinite(bounds).all() or not 0 < bounds[0] <= bounds[1]:
             raise ValueError("Mode ranges must be finite, positive and increasing")
+
     roots = []
+
     for _ in range(order // 2):
         decay = rng.uniform(*decay_range)
         frequency = rng.uniform(*frequency_range)
         roots.extend([complex(-decay, frequency), complex(-decay, -frequency)])
+
     if order % 2:
         roots.append(-rng.uniform(*decay_range))
-    # np.poly uses descending powers. Our state uses ascending derivatives.
+
+    # Roots -1 +/- 2i give (s+1)^2 + 4 = s^2 + 2s + 5. np.poly returns
+    # [1, 2, 5]; [:0:-1] produces (5, 2), describing y'' + 2y' + 5y = 0.
     coefficients = np.real_if_close(np.poly(roots)[:0:-1])
+
     if np.iscomplexobj(coefficients) or not np.isfinite(coefficients).all():
         raise ValueError("Unusable coefficients; reduce order or mode ranges")
+
     return tuple(float(value) for value in coefficients)

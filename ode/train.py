@@ -1,14 +1,13 @@
-"""Train the mixed-order baseline only when --train is explicitly provided.
+"""Train the mixed-order trajectory model and select weights on validation data.
 
-Default execution prints a plan. Real training requires a completed dataset,
-a new run directory and the training flag. Test trajectories are never scored
-here; model selection uses validation data only.
+The trainer loads generated splits, fits training-only normalization, batches
+examples into the model, and saves weights plus preprocessing for prediction.
+The CLI prints a plan unless --train requests execution with data/run paths.
 """
 
 import argparse
-from dataclasses import asdict
+from dataclasses import asdict, replace
 from hashlib import sha256
-from importlib.metadata import version
 import json
 import os
 from pathlib import Path
@@ -20,64 +19,128 @@ import numpy as np
 import torch
 from torch.utils.data import DataLoader
 
-from .config import GeneratorConfig
+from .config import GeneratorConfig, provenance
 from .dataset import Normalizer, TrajectoryDataset
 from .model import OrderConditionedMLP, masked_mse
 
 
-def resolve_device(requested: str) -> torch.device:
-    """Resolve cpu/cuda/auto, rejecting unavailable explicitly requested GPUs.
+# Bound the combined gradient norm to limit unusually large optimizer updates.
+MAX_GRADIENT_NORM = 1.0
 
-    NVIDIA training needs a compatible CUDA-enabled PyTorch installation on
-    the GPU host. The existing local ROCm environment is left untouched.
+
+def resolve_device(requested: str) -> torch.device:
+    """Resolve the requested CPU/CUDA policy to a PyTorch device.
+
+    Args:
+        requested: 'cpu', 'cuda' or 'auto'.
+    Returns:
+        CPU device, or CUDA when available and requested by cuda/auto.
+    Raises:
+        ValueError: The policy is unknown.
+        RuntimeError: CUDA is explicitly requested but unavailable.
     """
     if requested not in ("cpu", "cuda", "auto"):
         raise ValueError("device must be cpu, cuda or auto")
+
     available = torch.cuda.is_available() if requested != "cpu" else False
+
     if requested == "cuda" and not available:
         raise RuntimeError("CUDA device unavailable; use a compatible GPU-host PyTorch build or --device cpu")
+
     return torch.device("cuda" if available else "cpu")
 
 
+def seed_everything(seed):
+    """Seed the training random streams and request deterministic algorithms.
+
+    Args:
+        seed: Nonnegative unsigned 64-bit seed from GeneratorConfig.
+    Note: Identical seeds do not guarantee identical results across devices/releases.
+    """
+    random.seed(seed)
+    np.random.seed(seed % (2**32))
+    torch.manual_seed(seed)
+    torch.use_deterministic_algorithms(True)
+
+
 def seed_worker(worker_id):
-    """Seed NumPy/Python from the distinct seed PyTorch assigns each worker."""
+    """Seed NumPy and Python from the worker seed assigned by PyTorch.
+
+    Args:
+        worker_id: DataLoader worker index; PyTorch has already set its own seed.
+    """
     seed = torch.initial_seed() % (2**32)
     np.random.seed(seed)
     random.seed(seed)
 
 
 def run_epoch(model, loader, device, optimizer=None):
-    """Return sample-weighted masked MSE; no optimizer means validation.
+    """Compute sample-weighted masked MSE, optionally updating model weights.
 
-    Targets are standardized. This loss is not the release's relative
-    trajectory L2 metric, which requires complete trajectory evaluation.
+    Args:
+        model: OrderConditionedMLP to train or validate.
+        loader: Batches of float32 features (B, feature_width(M)), target/mask (B, M).
+        device: PyTorch device receiving each batch.
+        optimizer: Optimizer for training; None evaluates without gradients.
+    Returns:
+        Float mean squared error in standardized state units.
+    Raises:
+        ValueError: The loader has no examples.
+        RuntimeError: Loss or gradients become non-finite.
     """
     model.train(optimizer is not None)
     total, count = 0.0, 0
+
     with torch.set_grad_enabled(optimizer is not None):
         for batch in loader:
-            features, target, mask = (batch[name].to(device, non_blocking=device.type == "cuda")
-                                      for name in ("features", "target", "mask"))
+            features, target, mask = (
+                batch[name].to(device, non_blocking=device.type == "cuda")
+                for name in ("features", "target", "mask")
+            )
+
             if optimizer is not None:
                 optimizer.zero_grad(set_to_none=True)
+
             loss = masked_mse(model(features), target, mask)
+
             if not torch.isfinite(loss):
                 raise RuntimeError("Non-finite loss; inspect data/scaling and optimization")
+
             if optimizer is not None:
                 loss.backward()
-                torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0, error_if_nonfinite=True)
+                torch.nn.utils.clip_grad_norm_(
+                    model.parameters(),
+                    MAX_GRADIENT_NORM,
+                    error_if_nonfinite=True,
+                )
                 optimizer.step()
+
+            # Weight by actual batch size: batches of 4 and 1 count as 4:1.
             total += float(loss.detach()) * len(features)
             count += len(features)
+
     if not count:
         raise ValueError("Cannot run an epoch with an empty dataset")
+
     return total / count
 
 
-def main(argv=None) -> int:
-    """Validate a training plan or train with explicit data/run destinations."""
+def parse_args(argv=None):
+    """Parse training options and validate counts, rates and required paths.
+
+    Args:
+        argv: CLI argument strings; None reads the process arguments.
+    Returns:
+        argparse.Namespace containing the validated CLI options.
+    Raises:
+        SystemExit: Options are invalid or requested training lacks data/run paths.
+    """
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--config", type=Path, default=Path(__file__).parent / "configs/generator.json")
+    parser.add_argument(
+        "--config",
+        type=Path,
+        default=Path(__file__).parent / "configs/generator.json",
+    )
     parser.add_argument("--data", type=Path)
     parser.add_argument("--run", type=Path)
     parser.add_argument("--train", action="store_true")
@@ -89,108 +152,252 @@ def main(argv=None) -> int:
     parser.add_argument("--loader-workers", type=int, default=0)
     parser.add_argument("--threads", type=int, default=4)
     parser.add_argument("--device", choices=("cpu", "cuda", "auto"), default="cpu")
-    parser.add_argument("--preload", action="store_true", help="Load standardized examples into host RAM")
-    parser.add_argument("--allow-failures", action="store_true", help="Opt in after inspecting failed reference solves")
+    parser.add_argument(
+        "--preload",
+        action="store_true",
+        help="Load standardized examples into host RAM",
+    )
+    parser.add_argument(
+        "--allow-failures",
+        action="store_true",
+        help="Opt in after inspecting failed reference solves",
+    )
     args = parser.parse_args(argv)
+
     if args.preload and args.loader_workers:
         parser.error("Use --loader-workers 0 with --preload to avoid duplicating the dataset")
-    config = GeneratorConfig.load(args.config)
-    if (min(args.epochs, args.batch_size, args.width, args.depth, args.threads) < 1
-            or args.loader_workers < 0 or not np.isfinite(args.learning_rate)
-            or args.learning_rate <= 0):
-        parser.error("Counts/rate must be positive; loader-workers may be zero")
-    if not args.train:
-        print(json.dumps({
-            "mode": "dry-run; no model trained or files written",
-            "architecture": {"max_order": config.max_order, "width": args.width, "depth": args.depth},
-            "epochs": args.epochs, "batch_size": args.batch_size,
-            "cpu_threads": args.threads, "loader_workers": args.loader_workers,
-            "requested_device": args.device, "preload": args.preload,
-            "selection": "validation masked MSE; test set remains reserved",
-        }, indent=2))
-        return 0
-    if args.data is None or args.run is None:
+
+    for name in ("epochs", "batch_size", "width", "depth", "threads"):
+        if getattr(args, name) < 1:
+            parser.error(f"--{name.replace('_', '-')} must be a positive integer")
+
+    if args.loader_workers < 0:
+        parser.error("--loader-workers must be a nonnegative integer")
+
+    if not np.isfinite(args.learning_rate):
+        parser.error("--learning-rate must be finite")
+
+    if args.learning_rate <= 0:
+        parser.error("--learning-rate must be positive")
+
+    if args.train and (args.data is None or args.run is None):
         parser.error("--train requires --data and a new --run directory")
-    # Must be set before initializing CUDA for deterministic cuBLAS operations.
-    # Keep a user/site-provided value rather than overriding it.
-    os.environ.setdefault("CUBLAS_WORKSPACE_CONFIG", ":4096:8")
-    device = resolve_device(args.device)
-    random.seed(config.seed)
-    np.random.seed(config.seed % (2**32))
-    torch.manual_seed(config.seed)
-    torch.set_num_threads(args.threads)
-    # Determinism is requested on both CPU and GPU. Reproducibility across
-    # different devices, library releases and CUDA builds is not guaranteed.
-    torch.use_deterministic_algorithms(True)
+
+    return args
+
+
+def _training_plan(args, config):
+    """Describe model sizes and execution choices using the dry-run JSON schema."""
+    return {
+        "mode": "dry-run; no model trained or files written",
+        "architecture": {
+            "max_order": config.max_order,
+            "width": args.width,
+            "depth": args.depth,
+        },
+        "epochs": args.epochs,
+        "batch_size": args.batch_size,
+        "cpu_threads": args.threads,
+        "loader_workers": args.loader_workers,
+        "requested_device": args.device,
+        "preload": args.preload,
+        "selection": "validation masked MSE; test set remains reserved",
+    }
+
+
+def _load_datasets(args, config):
+    """Check scientific settings, fit training statistics and optionally preload."""
     training = TrajectoryDataset(args.data, "train", config.max_order, args.allow_failures)
     validation = TrajectoryDataset(args.data, "validation", config.max_order, args.allow_failures)
-    # Round-trip tuples to JSON lists for comparison with the stored manifest.
-    requested_config = json.loads(json.dumps(asdict(config)))
-    execution_keys = {"backend", "workers"}
-    if ({key: value for key, value in requested_config.items() if key not in execution_keys}
-            != {key: value for key, value in training.manifest["config"].items() if key not in execution_keys}):
+    dataset_config = GeneratorConfig.from_dict(training.manifest["config"])
+
+    if replace(dataset_config, backend=config.backend, workers=config.workers) != config:
         raise ValueError("Scientific training config must match the dataset generation config")
+
     normalizer = Normalizer.fit(training)
     training.normalizer = validation.normalizer = normalizer
+
     if args.preload:
         training.preload()
         validation.preload()
-    model = OrderConditionedMLP(config.max_order, args.width, args.depth).to(device)
-    optimizer = torch.optim.AdamW(model.parameters(), lr=args.learning_rate)
-    generator = torch.Generator().manual_seed(config.seed)
-    loader_options = {"batch_size": args.batch_size, "num_workers": args.loader_workers,
-                      "worker_init_fn": seed_worker, "pin_memory": device.type == "cuda"}
+
+    return training, validation, normalizer
+
+
+def _build_loaders(training, validation, args, device, seed):
+    """Shuffle training reproducibly and preserve validation example order."""
+    generator = torch.Generator().manual_seed(seed)
+    loader_options = {
+        "batch_size": args.batch_size,
+        "num_workers": args.loader_workers,
+        "worker_init_fn": seed_worker,
+        "pin_memory": device.type == "cuda",
+    }
+
     if args.loader_workers:
         loader_options["multiprocessing_context"] = "spawn"
+
     train_loader = DataLoader(training, shuffle=True, generator=generator, **loader_options)
-    val_loader = DataLoader(validation, shuffle=False, **loader_options)
-    args.run.mkdir(parents=True, exist_ok=False)
-    report = {
-        "status": "incomplete", "config": asdict(config),
-        "architecture": model.architecture, "normalizer": normalizer.to_dict(),
-        "seed": config.seed, "device": str(device), "epochs": [],
-        "device_name": torch.cuda.get_device_name(device) if device.type == "cuda" else platform.processor(),
-        "cuda_build": torch.version.cuda, "hip_build": torch.version.hip,
-        "data": str(args.data.resolve()), "dataset_manifest_sha256": sha256(
-            (args.data / "manifest.json").read_bytes()).hexdigest(),
-        "python": platform.python_version(),
-        "dependencies": {name: version(name) for name in ("numpy", "scipy", "torch")},
-        "source_sha256": {path.name: sha256(path.read_bytes()).hexdigest()
-                          for path in sorted(Path(__file__).parent.glob("*.py"))},
-        "training_options": {key: str(value) if isinstance(value, Path) else value
-                             for key, value in vars(args).items()},
+    validation_loader = DataLoader(validation, shuffle=False, **loader_options)
+
+    return train_loader, validation_loader
+
+
+def build_report(args, config, model, normalizer, training, device):
+    """Initialize the run report with reproducibility and dataset evidence.
+
+    Args:
+        args: Parsed CLI options, including data/run paths.
+        config: Validated scientific configuration.
+        model: Model whose architecture will be saved.
+        normalizer: Training-fitted preprocessing vectors.
+        training: Training split supplying the manifest failure count.
+        device: Resolved PyTorch device.
+    Returns:
+        JSON-compatible report dict with incomplete status and an empty epoch list.
+    """
+    return {
+        "status": "incomplete",
+        "config": asdict(config),
+        "architecture": model.architecture,
+        "normalizer": normalizer.to_dict(),
+        "seed": config.seed,
+        "device": str(device),
+        "epochs": [],
+        "device_name": (
+            torch.cuda.get_device_name(device)
+            if device.type == "cuda"
+            else platform.processor()
+        ),
+        "cuda_build": torch.version.cuda,
+        "hip_build": torch.version.hip,
+        "data": str(args.data.resolve()),
+        "dataset_manifest_sha256": sha256(
+            (args.data / "manifest.json").read_bytes()
+        ).hexdigest(),
+        **provenance(("numpy", "scipy", "torch")),
+        "training_options": {
+            name: str(value) if isinstance(value, Path) else value
+            for name, value in vars(args).items()
+        },
         "reference_failures": training.manifest["failed"],
         "test_evaluated": False,
     }
+
+
+def save_checkpoint(run, model, normalizer, config, epoch, validation_mse, manifest_sha256):
+    """Atomically replace best.pt with the selected model and preprocessing.
+
+    Args:
+        run: Existing run directory as a Path.
+        model: Model with float32 parameter tensors to serialize.
+        normalizer: Fitted feature/target statistics saved alongside the weights.
+        config: Scientific configuration for the training data.
+        epoch: One-based epoch number selected by validation loss.
+        validation_mse: Selected scalar validation loss.
+        manifest_sha256: Dataset manifest digest identifying the training source.
+    Raises:
+        OSError: The checkpoint cannot be written or replaced.
+    """
+    checkpoint_path = run / "best.pt"
+    temporary_path = run / "best.pending.pt"
+    # A complete write precedes replacement so interruption preserves the old best.
+    torch.save(
+        {
+            "schema_version": 1,
+            "encoding": "linear-padded-v1",
+            "architecture": model.architecture,
+            "state_dict": model.state_dict(),
+            "normalizer": normalizer.to_dict(),
+            "epoch": epoch,
+            "config": asdict(config),
+            "validation_mse": validation_mse,
+            "dataset_manifest_sha256": manifest_sha256,
+        },
+        temporary_path,
+    )
+    temporary_path.replace(checkpoint_path)
+
+
+def _fit(model, optimizer, loaders, device, normalizer, config, args, report):
+    """Run epochs, save improvements and retain incomplete evidence on interruption."""
+    train_loader, validation_loader = loaders
     best = float("inf")
     report_path = args.run / "run.json"
     started = perf_counter()
+
     try:
         for epoch in range(1, args.epochs + 1):
             epoch_started = perf_counter()
             train_loss = run_epoch(model, train_loader, device, optimizer)
-            validation_loss = run_epoch(model, val_loader, device)
-            report["epochs"].append({"epoch": epoch, "train_mse": train_loss, "validation_mse": validation_loss,
-                                     "seconds": perf_counter() - epoch_started})
+            validation_loss = run_epoch(model, validation_loader, device)
+            report["epochs"].append(
+                {
+                    "epoch": epoch,
+                    "train_mse": train_loss,
+                    "validation_mse": validation_loss,
+                    "seconds": perf_counter() - epoch_started,
+                }
+            )
+
             if validation_loss < best:
                 best = validation_loss
-                checkpoint_path = args.run / "best.pt"
-                temporary_path = args.run / "best.pending.pt"
-                torch.save({
-                    "schema_version": 1, "encoding": "linear-padded-v1",
-                    "architecture": model.architecture, "state_dict": model.state_dict(),
-                    "normalizer": normalizer.to_dict(), "epoch": epoch,
-                    "config": asdict(config), "validation_mse": best,
-                    "dataset_manifest_sha256": report["dataset_manifest_sha256"],
-                }, temporary_path)
-                temporary_path.replace(checkpoint_path)
+                save_checkpoint(
+                    args.run,
+                    model,
+                    normalizer,
+                    config,
+                    epoch,
+                    best,
+                    report["dataset_manifest_sha256"],
+                )
                 report["best_epoch"] = epoch
+
             report_path.write_text(json.dumps(report, indent=2, allow_nan=False) + "\n")
+
         report["status"] = "complete"
         report["checkpoint_sha256"] = sha256((args.run / "best.pt").read_bytes()).hexdigest()
     finally:
         report["training_seconds"] = perf_counter() - started
         report_path.write_text(json.dumps(report, indent=2, allow_nan=False) + "\n")
+
+
+def main(argv=None) -> int:
+    """Print a training plan or execute the requested training run.
+
+    Args:
+        argv: CLI argument strings; None reads the process arguments.
+    Returns:
+        Exit code 0 after a successful dry run or completed training.
+    Raises:
+        ValueError: Configuration, dataset or normalization checks fail.
+        FileExistsError: The requested run directory already exists.
+        RuntimeError: The requested device or optimization fails.
+    """
+    args = parse_args(argv)
+    config = GeneratorConfig.load(args.config)
+
+    if not args.train:
+        print(json.dumps(_training_plan(args, config), indent=2))
+        return 0
+
+    # cuBLAS reads this before CUDA initialization; respect a site-provided value.
+    os.environ.setdefault("CUBLAS_WORKSPACE_CONFIG", ":4096:8")
+    device = resolve_device(args.device)
+    seed_everything(config.seed)
+    torch.set_num_threads(args.threads)
+
+    training, validation, normalizer = _load_datasets(args, config)
+
+    model = OrderConditionedMLP(config.max_order, args.width, args.depth).to(device)
+    optimizer = torch.optim.AdamW(model.parameters(), lr=args.learning_rate)
+    loaders = _build_loaders(training, validation, args, device, config.seed)
+
+    args.run.mkdir(parents=True, exist_ok=False)
+    report = build_report(args, config, model, normalizer, training, device)
+
+    _fit(model, optimizer, loaders, device, normalizer, config, args, report)
+
     return 0
 
 

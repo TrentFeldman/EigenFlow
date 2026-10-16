@@ -1,5 +1,7 @@
-"""EigenFlow ODE tools: explicit higher-order equations, data and model interfaces.
+"""EigenFlow tools for generating ODE references, training and prediction.
 
-Importing this package does not sample equations, solve trajectories or train a
-model. See README.md for commands and MATH_GUIDE.md for the mathematical language.
+Pipeline: config -> generate_data (equations/reference/analytic/validate_reference)
+-> dataset -> train (model) -> predict. T is time-point count, M is max_order
+(padding width), B is batch size, n is equation order; state=[y, y', ..., y^(n-1)].
+All values are nondimensional. See MATH_GUIDE.md for math and README.md for usage.
 """
