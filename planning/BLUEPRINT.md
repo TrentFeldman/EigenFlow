@@ -1,6 +1,6 @@
 # EigenFlow blueprint
 
-Status: initial ODE implementation is available with dry-run defaults; fluid implementation remains pending. No reference dataset or trained model exists, and scientific accuracy is unmeasured. The mission and deadlines in [AGENTS.md](../AGENTS.md) govern this plan.
+Status: ODE implementation is available with dry-run defaults and bounded closed-form reference checks; fluid implementation remains pending. No training dataset or trained model exists. Model accuracy and target-hardware throughput are unmeasured. The mission and deadlines in [AGENTS.md](../AGENTS.md) govern this plan.
 
 ## Project map
 

@@ -18,7 +18,7 @@ from ode.dataset import Normalizer
 from ode.equations import LinearODE
 from ode.model import OrderConditionedMLP, masked_mse
 from ode.predict import predict
-from ode.train import main
+from ode.train import main, resolve_device
 
 
 class InferenceContractTests(unittest.TestCase):
@@ -59,6 +59,15 @@ class InferenceContractTests(unittest.TestCase):
                 self.assertEqual(main([]), 0)
             dataset.assert_not_called()
             epoch.assert_not_called()
+
+    def test_device_selection_without_gpu_execution(self):
+        self.assertEqual(resolve_device("cpu"), torch.device("cpu"))
+        with patch("ode.train.torch.cuda.is_available", return_value=False):
+            self.assertEqual(resolve_device("auto"), torch.device("cpu"))
+            with self.assertRaisesRegex(RuntimeError, "unavailable"):
+                resolve_device("cuda")
+        with patch("ode.train.torch.cuda.is_available", return_value=True):
+            self.assertEqual(resolve_device("cuda"), torch.device("cuda"))
 
 
 if __name__ == "__main__":

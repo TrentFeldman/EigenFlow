@@ -18,8 +18,9 @@
   "refinement_factor": 10.0,
   "reference_rtol": 1e-6,
   "reference_atol": 1e-8,
+  "independent_check_points": 5,
   "max_abs_state": 1000000.0,
   "max_rhs_calls": 100000,
-  "backend": "thread",
-  "workers": 4
+  "backend": "process",
+  "workers": 12
 }

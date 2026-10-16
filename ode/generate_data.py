@@ -8,19 +8,21 @@ solve independent jobs; only the coordinator writes archives and the ledger.
 import argparse
 from collections import deque
 from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
-from dataclasses import asdict
+from dataclasses import asdict, replace
 from hashlib import sha256
 from importlib.metadata import version
 import json
 import multiprocessing
 from pathlib import Path
 import platform
+from time import perf_counter
 
 import numpy as np
 
 from .config import FAMILIES, SPLITS, GeneratorConfig
 from .equations import LinearODE, stable_coefficients
 from .reference import SolveJob, solve_job
+from .validate_reference import validate_reference
 
 
 def fingerprint(values) -> str:
@@ -100,6 +102,15 @@ def generate(config: GeneratorConfig, output: Path) -> dict:
     This function is intentionally never called during a dry-run.
     """
     output = Path(output)
+    if output.exists():
+        raise FileExistsError(f"Refusing to overwrite existing dataset: {output}")
+    started = perf_counter()
+    # Run deterministic closed-form checks before creating dataset output. Both
+    # configured families must pass; every later sample also gets its own checks.
+    validation = validate_reference(config)
+    if not validation["passed"]:
+        failed = [case["name"] for case in validation["cases"] if not case["passed"]]
+        raise RuntimeError(f"Reference preflight failed; no dataset created: {failed}")
     output.mkdir(parents=True, exist_ok=False)
     manifest = {
         "schema_version": 1, "status": "incomplete", "config": asdict(config),
@@ -108,7 +119,11 @@ def generate(config: GeneratorConfig, output: Path) -> dict:
         "dependencies": {name: version(name) for name in ("numpy", "scipy")},
         "source_sha256": {path.name: sha256(path.read_bytes()).hexdigest()
                           for path in sorted(Path(__file__).parent.glob("*.py"))},
-        "reference_validation": "per-trajectory tolerance refinement; analytic benchmark pending",
+        "reference_validation": {
+            "closed_form_preflight": validation,
+            "per_trajectory": "tolerance refinement plus matrix exponential at selected times",
+        },
+        "family_counts": {family: {"succeeded": 0, "failed": 0} for family in config.families},
         "split_policy": "joint holdout: equation parameters and initial states disjoint",
     }
     parameter_splits, initial_splits = {}, {}
@@ -133,10 +148,12 @@ def generate(config: GeneratorConfig, output: Path) -> dict:
                     "split": job.split, "family": job.equation.family,
                     "order": job.equation.order, "equation": asdict(job.equation),
                     "nfev": result.nfev, "refinement_error_ratio": result.refinement_error,
+                    "independent_error_ratio": result.independent_error,
                     "status": "failed" if result.error else "success", "error": result.error,
                 }
                 if result.error:
                     manifest["failed"] += 1
+                    manifest["family_counts"][job.equation.family]["failed"] += 1
                 else:
                     relative_path = Path(job.split) / f"{job.trajectory_id}.npz"
                     path = output / relative_path
@@ -144,6 +161,7 @@ def generate(config: GeneratorConfig, output: Path) -> dict:
                     np.savez_compressed(path, times=result.times, states=result.states)
                     record.update(path=relative_path.as_posix(), sha256=sha256(path.read_bytes()).hexdigest())
                     manifest["succeeded"] += 1
+                    manifest["family_counts"][job.equation.family]["succeeded"] += 1
                 ledger.write(json.dumps(record, allow_nan=False) + "\n")
                 ledger.flush()
         if manifest["succeeded"] + manifest["failed"] != manifest["planned"]:
@@ -151,6 +169,7 @@ def generate(config: GeneratorConfig, output: Path) -> dict:
         manifest["status"] = "complete" if not manifest["failed"] else "complete_with_failures"
         manifest["records_sha256"] = sha256((output / "records.jsonl").read_bytes()).hexdigest()
     finally:
+        manifest["seconds"] = perf_counter() - started
         write_manifest()
     return manifest
 
@@ -161,8 +180,13 @@ def main(argv=None) -> int:
     parser.add_argument("--config", type=Path, default=Path(__file__).parent / "configs/generator.json")
     parser.add_argument("--output", type=Path, help="New dataset directory; required for --generate")
     parser.add_argument("--generate", action="store_true", help="Explicitly enable numerical generation")
+    parser.add_argument("--workers", type=int, help="Override workers with the CPUs allocated to this job")
+    parser.add_argument("--backend", choices=("thread", "process", "serial"))
     args = parser.parse_args(argv)
     config = GeneratorConfig.load(args.config)
+    overrides = {name: getattr(args, name) for name in ("workers", "backend") if getattr(args, name) is not None}
+    if overrides:
+        config = replace(config, **overrides)
     if not args.generate:
         print(json.dumps(config.summary(), indent=2))
         return 0

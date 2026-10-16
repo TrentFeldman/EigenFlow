@@ -10,7 +10,7 @@ Verified local runtime:
 | NumPy | 2.5.2 |
 | SciPy | 1.18.1 |
 | PyTorch | 2.14.1+rocm7.14 |
-| GPU visible to PyTorch | No; the initial trainer uses CPU |
+| GPU visible to PyTorch | No locally; CPU path verified, CUDA option added but not hardware-tested |
 
 From the repository root:
 
@@ -33,4 +33,6 @@ python3 -m venv .venv
 
 `requirements.txt` gives compatible ranges, not a complete reproducible lock. The table records the tested local versions. Choose a PyTorch build appropriate to the machine; this host's ROCm build is not a portable dependency pin. A fresh installation on another machine has not yet been verified. Release packaging must record and exercise the full environment used for the actual model.
 
-Generation worker count and training CPU threads are separate controls. PyTorch DataLoader workers are processes, despite the name. Start with zero loader workers and four generation threads. A future throughput benchmark should compare threads, processes and native-library thread counts to avoid CPU oversubscription. No performance benchmark has been run. See [PyTorch reproducibility guidance](https://github.com/pytorch/pytorch/blob/main/docs/source/notes/randomness.md) for limits across platforms and releases.
+For the RTX PRO 6000 Blackwell, use a compatible NVIDIA CUDA PyTorch installation on that host and request `--device cuda`. The local ROCm installation is retained. Check [PyTorch's supported CUDA builds](https://github.com/pytorch/pytorch/blob/main/RELEASE.md) with the cluster's driver/module setup; installing the generic requirements does not by itself guarantee Blackwell compatibility. The trainer sets a default cuBLAS workspace configuration before CUDA initialization and requests deterministic operations, but equality across CPU/GPU or different library releases is not guaranteed.
+
+Generation worker count and training CPU threads are separate controls. The example generator configuration uses 12 spawned process workers for this host's Ryzen 5 5600 (6 physical cores, 12 logical CPUs). Processes allow Python-heavy solver callbacks to execute across cores; full utilization or optimal throughput is not guaranteed without benchmarking. The Python configuration class retains conservative thread-based fallback defaults. PyTorch DataLoader workers are also processes, despite the name; the trainer still starts with zero loader workers and four compute threads. A future throughput benchmark should compare worker counts and native-library thread counts to avoid CPU oversubscription. No performance benchmark has been run. See [PyTorch reproducibility guidance](https://github.com/pytorch/pytorch/blob/main/docs/source/notes/randomness.md) for limits across platforms and releases.

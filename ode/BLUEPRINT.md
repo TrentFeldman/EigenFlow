@@ -2,7 +2,7 @@
 
 Target: reproducible higher-order trajectory prediction release by October 31, 2026. Design choices below are proposals until the October 18 specification is frozen.
 
-Implementation update: the generator, data/model interfaces, trainer and checkpoint inference now exist; see [README.md](README.md) for their safe dry-runs and current limits. Numerical generation and real training have not run. Read [MATH_GUIDE.md](MATH_GUIDE.md) for the plain-language mathematical contract.
+Implementation update: the generator, data/model interfaces, CPU/CUDA trainer and checkpoint inference now exist; see [README.md](README.md) for safe dry-runs and current limits. Small numerical-reference benchmarks passed for both families, but bulk generation and real training have not run. Read [MATH_GUIDE.md](MATH_GUIDE.md) for the plain-language mathematical contract.
 
 ## Intended data flow
 
@@ -20,11 +20,12 @@ Family and sampling configuration → validated numerical trajectories → group
 | `evaluate.py` | Frozen-set metrics, failure analysis and evaluation report |
 | `predict.py` | Load model, configuration and preprocessing for independent inference |
 | `plot_results.py` | Reference/prediction overlays and error plots |
-| `tests/test_reference.py` | Future analytic and numerical-convergence checks |
+| `analytic.py`, `validate_reference.py` | Independent reference calculation and closed-form preflight |
+| `tests/test_reference.py`, `tests/test_validation.py` | Solver safeguard and real numerical-reference checks |
 | `tests/test_data.py` | Future partition isolation and data-contract checks |
 | `tests/test_inference.py` | Future saved-artifact inference and reproducibility checks |
 
-`configs/` contains a draft generator configuration. `data/` and `runs/` remain empty artifact locations for later generation/training. Evaluation and plotting modules remain documented placeholders. Test modules currently check software contracts using fabricated states and mocked solvers, not analytic numerical accuracy.
+`configs/` contains a draft generator configuration. `data/` remains empty; `runs/20261015-reference-validation-01/` holds a small numerical-validation report, not a trained model. Evaluation and plotting modules remain documented placeholders. Tests include software contracts and real closed-form numerical checks. HPC/GPU timings remain projections in [COMPUTE_ESTIMATES.md](COMPUTE_ESTIMATES.md).
 
 ## Proposed data contract
 

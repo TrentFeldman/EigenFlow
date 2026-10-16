@@ -10,9 +10,11 @@ from dataclasses import asdict
 from hashlib import sha256
 from importlib.metadata import version
 import json
+import os
 from pathlib import Path
 import platform
 import random
+from time import perf_counter
 
 import numpy as np
 import torch
@@ -21,6 +23,20 @@ from torch.utils.data import DataLoader
 from .config import GeneratorConfig
 from .dataset import Normalizer, TrajectoryDataset
 from .model import OrderConditionedMLP, masked_mse
+
+
+def resolve_device(requested: str) -> torch.device:
+    """Resolve cpu/cuda/auto, rejecting unavailable explicitly requested GPUs.
+
+    NVIDIA training needs a compatible CUDA-enabled PyTorch installation on
+    the GPU host. The existing local ROCm environment is left untouched.
+    """
+    if requested not in ("cpu", "cuda", "auto"):
+        raise ValueError("device must be cpu, cuda or auto")
+    available = torch.cuda.is_available() if requested != "cpu" else False
+    if requested == "cuda" and not available:
+        raise RuntimeError("CUDA device unavailable; use a compatible GPU-host PyTorch build or --device cpu")
+    return torch.device("cuda" if available else "cpu")
 
 
 def seed_worker(worker_id):
@@ -40,7 +56,8 @@ def run_epoch(model, loader, device, optimizer=None):
     total, count = 0.0, 0
     with torch.set_grad_enabled(optimizer is not None):
         for batch in loader:
-            features, target, mask = (batch[name].to(device) for name in ("features", "target", "mask"))
+            features, target, mask = (batch[name].to(device, non_blocking=device.type == "cuda")
+                                      for name in ("features", "target", "mask"))
             if optimizer is not None:
                 optimizer.zero_grad(set_to_none=True)
             loss = masked_mse(model(features), target, mask)
@@ -71,8 +88,12 @@ def main(argv=None) -> int:
     parser.add_argument("--learning-rate", type=float, default=1e-3)
     parser.add_argument("--loader-workers", type=int, default=0)
     parser.add_argument("--threads", type=int, default=4)
+    parser.add_argument("--device", choices=("cpu", "cuda", "auto"), default="cpu")
+    parser.add_argument("--preload", action="store_true", help="Load standardized examples into host RAM")
     parser.add_argument("--allow-failures", action="store_true", help="Opt in after inspecting failed reference solves")
     args = parser.parse_args(argv)
+    if args.preload and args.loader_workers:
+        parser.error("Use --loader-workers 0 with --preload to avoid duplicating the dataset")
     config = GeneratorConfig.load(args.config)
     if (min(args.epochs, args.batch_size, args.width, args.depth, args.threads) < 1
             or args.loader_workers < 0 or not np.isfinite(args.learning_rate)
@@ -84,31 +105,41 @@ def main(argv=None) -> int:
             "architecture": {"max_order": config.max_order, "width": args.width, "depth": args.depth},
             "epochs": args.epochs, "batch_size": args.batch_size,
             "cpu_threads": args.threads, "loader_workers": args.loader_workers,
+            "requested_device": args.device, "preload": args.preload,
             "selection": "validation masked MSE; test set remains reserved",
         }, indent=2))
         return 0
     if args.data is None or args.run is None:
         parser.error("--train requires --data and a new --run directory")
+    # Must be set before initializing CUDA for deterministic cuBLAS operations.
+    # Keep a user/site-provided value rather than overriding it.
+    os.environ.setdefault("CUBLAS_WORKSPACE_CONFIG", ":4096:8")
+    device = resolve_device(args.device)
     random.seed(config.seed)
     np.random.seed(config.seed % (2**32))
     torch.manual_seed(config.seed)
     torch.set_num_threads(args.threads)
-    # Start with CPU determinism. GPU-specific reproducibility needs separate
-    # validation of the installed backend and is not assumed by this baseline.
+    # Determinism is requested on both CPU and GPU. Reproducibility across
+    # different devices, library releases and CUDA builds is not guaranteed.
     torch.use_deterministic_algorithms(True)
-    device = torch.device("cpu")
     training = TrajectoryDataset(args.data, "train", config.max_order, args.allow_failures)
     validation = TrajectoryDataset(args.data, "validation", config.max_order, args.allow_failures)
     # Round-trip tuples to JSON lists for comparison with the stored manifest.
-    if json.loads(json.dumps(asdict(config))) != training.manifest["config"]:
-        raise ValueError("Training config must match the dataset generation config")
+    requested_config = json.loads(json.dumps(asdict(config)))
+    execution_keys = {"backend", "workers"}
+    if ({key: value for key, value in requested_config.items() if key not in execution_keys}
+            != {key: value for key, value in training.manifest["config"].items() if key not in execution_keys}):
+        raise ValueError("Scientific training config must match the dataset generation config")
     normalizer = Normalizer.fit(training)
     training.normalizer = validation.normalizer = normalizer
+    if args.preload:
+        training.preload()
+        validation.preload()
     model = OrderConditionedMLP(config.max_order, args.width, args.depth).to(device)
     optimizer = torch.optim.AdamW(model.parameters(), lr=args.learning_rate)
     generator = torch.Generator().manual_seed(config.seed)
     loader_options = {"batch_size": args.batch_size, "num_workers": args.loader_workers,
-                      "worker_init_fn": seed_worker}
+                      "worker_init_fn": seed_worker, "pin_memory": device.type == "cuda"}
     if args.loader_workers:
         loader_options["multiprocessing_context"] = "spawn"
     train_loader = DataLoader(training, shuffle=True, generator=generator, **loader_options)
@@ -118,6 +149,8 @@ def main(argv=None) -> int:
         "status": "incomplete", "config": asdict(config),
         "architecture": model.architecture, "normalizer": normalizer.to_dict(),
         "seed": config.seed, "device": str(device), "epochs": [],
+        "device_name": torch.cuda.get_device_name(device) if device.type == "cuda" else platform.processor(),
+        "cuda_build": torch.version.cuda, "hip_build": torch.version.hip,
         "data": str(args.data.resolve()), "dataset_manifest_sha256": sha256(
             (args.data / "manifest.json").read_bytes()).hexdigest(),
         "python": platform.python_version(),
@@ -131,11 +164,14 @@ def main(argv=None) -> int:
     }
     best = float("inf")
     report_path = args.run / "run.json"
+    started = perf_counter()
     try:
         for epoch in range(1, args.epochs + 1):
+            epoch_started = perf_counter()
             train_loss = run_epoch(model, train_loader, device, optimizer)
             validation_loss = run_epoch(model, val_loader, device)
-            report["epochs"].append({"epoch": epoch, "train_mse": train_loss, "validation_mse": validation_loss})
+            report["epochs"].append({"epoch": epoch, "train_mse": train_loss, "validation_mse": validation_loss,
+                                     "seconds": perf_counter() - epoch_started})
             if validation_loss < best:
                 best = validation_loss
                 checkpoint_path = args.run / "best.pt"
@@ -153,6 +189,7 @@ def main(argv=None) -> int:
         report["status"] = "complete"
         report["checkpoint_sha256"] = sha256((args.run / "best.pt").read_bytes()).hexdigest()
     finally:
+        report["training_seconds"] = perf_counter() - started
         report_path.write_text(json.dumps(report, indent=2, allow_nan=False) + "\n")
     return 0
 

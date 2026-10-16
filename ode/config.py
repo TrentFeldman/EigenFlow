@@ -44,6 +44,7 @@ class GeneratorConfig:
     refinement_factor: float = 10.0
     reference_rtol: float = 1e-6
     reference_atol: float = 1e-8
+    independent_check_points: int = 5
     max_abs_state: float = 1e6
     max_rhs_calls: int = 100000
     backend: str = "thread"
@@ -52,13 +53,15 @@ class GeneratorConfig:
     def __post_init__(self):
         """Reject unsafe or ambiguous experiment settings before any sampling."""
         for name in ("seed", "max_order", "initial_conditions_per_group", "time_points",
-                     "max_rhs_calls", "workers"):
+                     "max_rhs_calls", "workers", "independent_check_points"):
             value = getattr(self, name)
             minimum = 0 if name == "seed" else 1
             if isinstance(value, bool) or not isinstance(value, int) or value < minimum:
                 raise ValueError(f"{name} must be an integer >= {minimum}")
         if self.time_points < 2:
             raise ValueError("time_points must include at least start and end")
+        if self.independent_check_points < 2:
+            raise ValueError("independent_check_points must include start and end")
         if self.seed >= 2**64:
             raise ValueError("seed must fit in an unsigned 64-bit integer for PyTorch")
         if not self.orders or len(set(self.orders)) != len(self.orders):
@@ -130,5 +133,6 @@ class GeneratorConfig:
                                 * sum(self.groups_per_split)
                                 * self.initial_conditions_per_group * 8),
             "reference_solves_per_trajectory": 2,
+            "independent_checks_per_trajectory": min(self.independent_check_points, self.time_points),
             "split_policy": "disjoint equation groups and initial states; joint holdout",
         }

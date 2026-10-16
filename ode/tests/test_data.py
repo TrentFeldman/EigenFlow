@@ -92,7 +92,8 @@ class DataContractTests(unittest.TestCase):
         with TemporaryDirectory() as directory:
             output = Path(directory) / "fixture-metadata"
             with patch("ode.generate_data.iter_jobs", return_value=iter(jobs)), patch(
-                    "ode.generate_data.solve_job", side_effect=lambda job, cfg: SolveResult(job, error="fixture")):
+                    "ode.generate_data.solve_job", side_effect=lambda job, cfg: SolveResult(job, error="fixture")), patch(
+                    "ode.generate_data.validate_reference", return_value={"passed": True, "cases": []}):
                 manifest = generate(replace(config, backend="serial"), output)
             self.assertEqual(manifest["failed"], 3)
             self.assertEqual(manifest["status"], "complete_with_failures")
@@ -100,6 +101,17 @@ class DataContractTests(unittest.TestCase):
             self.assertFalse(list(output.rglob("*.npz")))
             with self.assertRaises(FileExistsError):
                 generate(config, output)
+
+    def test_failed_preflight_prevents_dataset_creation(self):
+        with TemporaryDirectory() as directory:
+            output = Path(directory) / "must-not-exist"
+            with patch("ode.generate_data.validate_reference", return_value={
+                    "passed": False, "cases": [{"name": "fixture", "passed": False}]}), patch(
+                    "ode.generate_data.iter_jobs") as sampler:
+                with self.assertRaisesRegex(RuntimeError, "preflight"):
+                    generate(GeneratorConfig(), output)
+                sampler.assert_not_called()
+            self.assertFalse(output.exists())
 
     def test_encoding_masks_and_training_only_scaling(self):
         equation = LinearODE((2, 3), (1, -1))
@@ -165,9 +177,16 @@ class DataContractTests(unittest.TestCase):
                 np.testing.assert_array_equal(dataset[0]["target"], [1, 0, 0, 0])
                 np.testing.assert_allclose(dataset[2]["target"], [0.2, -0.1, 0, 0])
                 self.assertEqual(loader.call_count, 1)
+                dataset.normalizer = Normalizer.fit(dataset)
+                before = dataset[2]
+                dataset.preload()
+                for name, values in before.items():
+                    np.testing.assert_allclose(dataset[2][name], values)
+                self.assertEqual(loader.call_count, 1)
             with self.assertRaises(IndexError):
                 dataset[3]
             dataset._cache.clear()
+            del dataset._preloaded
             (root / "empty-fixture.npz").write_bytes(b"changed")
             with self.assertRaisesRegex(ValueError, "checksum"):
                 dataset[0]

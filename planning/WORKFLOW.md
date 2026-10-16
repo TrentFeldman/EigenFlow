@@ -41,7 +41,7 @@ Update `STATUS.md` with the review date, task states, measured progress, risks, 
 - Examples, metrics and plots correspond to the released checkpoint.
 - A release report states whether accuracy targets passed, failed or were not evaluated.
 
-Runnable ODE checks and dependency specifications are documented in `ode/README.md` and `ode/ENVIRONMENT.md`. The generator and trainer default to dry-run; reference generation and model training are explicitly deferred for the current task. No automated workflow or experiment service is required at this stage.
+Runnable ODE checks and dependency specifications are documented in `ode/README.md` and `ode/ENVIRONMENT.md`. The generator and trainer default to dry-run; bulk dataset generation and model training are explicitly deferred for the current task. Small numerical validation cases are authorized and recorded separately from dataset/model runs. No automated workflow or experiment service is required at this stage.
 
 ## Documentation handoff
 

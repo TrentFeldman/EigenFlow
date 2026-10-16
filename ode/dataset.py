@@ -113,6 +113,31 @@ class TrajectoryDataset(Dataset):
         """Number of time-point examples in this split, not trajectories."""
         return len(self.records) * self.time_points
 
+    def preload(self):
+        """Keep standardized float32 examples in host RAM for faster training.
+
+        Call after assigning a fitted normalizer. This avoids repeatedly reading
+        compressed archives when training shuffles individual time points. With
+        max_order M, storage is about len(dataset)*(5*M+5)*4 bytes. A 96 GB GPU
+        does not remove this host-RAM requirement. Use zero loader workers to
+        avoid duplicating these arrays in spawned workers.
+        """
+        if self.normalizer is None:
+            raise ValueError("Assign training-fitted normalization before preloading")
+        preloaded = {
+            "features": np.empty((len(self), 3 * self.max_order + 5), dtype=np.float32),
+            "target": np.empty((len(self), self.max_order), dtype=np.float32),
+            "mask": np.empty((len(self), self.max_order), dtype=np.float32),
+        }
+        for index in range(len(self.records)):
+            features, target, mask = self.raw_trajectory(index)
+            features, target = self.normalizer.transform(features, target, mask)
+            rows = slice(index * self.time_points, (index + 1) * self.time_points)
+            for name, array in (("features", features), ("target", target), ("mask", mask)):
+                preloaded[name][rows] = array
+        self._preloaded = preloaded
+        self._cache.clear()
+
     def raw_trajectory(self, index):
         """Read one trajectory as (features, padded targets, mask), all float64.
 
@@ -152,6 +177,8 @@ class TrajectoryDataset(Dataset):
         """Return a float32 dict suitable for PyTorch's default batch collator."""
         if index < 0 or index >= len(self):
             raise IndexError(index)
+        if hasattr(self, "_preloaded"):
+            return {name: array[index] for name, array in self._preloaded.items()}
         trajectory_index = bisect_right(self._ends, index)
         time_index = index - trajectory_index * self.time_points
         features, target, mask = self.raw_trajectory(trajectory_index)

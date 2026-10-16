@@ -1,7 +1,7 @@
-"""Check derivative conversion and solver safeguards WITHOUT numerical solving.
+"""Check derivative conversion and solver safeguards with fabricated replies.
 
 Fabricated solver replies exercise failure handling. Analytic integration
-benchmarks are deliberately pending until reference generation is authorized.
+benchmarks are tested separately in test_validation.py using real integration.
 """
 
 from dataclasses import replace
@@ -51,7 +51,8 @@ class ReferenceContractTests(unittest.TestCase):
         times = np.linspace(config.t_start, config.t_stop, 3)
         fabricated = np.array([[1., 0.], [0.5, -0.2], [0.2, -0.1]])
         reply = SimpleNamespace(success=True, y=fabricated.T, t=times)
-        with patch("ode.reference.solve_ivp", return_value=reply) as solver:
+        with patch("ode.reference.solve_ivp", return_value=reply) as solver, patch(
+                "ode.reference.linear_reference", return_value=fabricated):
             result = solve_job(job, config)
             self.assertIsNone(result.error)
             self.assertEqual(solver.call_count, 2)
@@ -79,6 +80,18 @@ class ReferenceContractTests(unittest.TestCase):
 
         with patch("ode.reference.solve_ivp", side_effect=excessive_calls):
             self.assertIn("budget", solve_job(job, config).error)
+
+    def test_independent_check_catches_consistently_wrong_solves(self):
+        # Two identical answers can agree with each other and still be wrong.
+        config = replace(GeneratorConfig(), time_points=3)
+        job = SolveJob("fixture", "parameters", "train", LinearODE((1,), (1,)))
+        reply = SimpleNamespace(success=True, t=np.linspace(0, 5, 3), y=np.ones((1, 3)))
+        with patch("ode.reference.solve_ivp", return_value=reply):
+            result = solve_job(job, config)
+        self.assertIn("Independent", result.error)
+        self.assertEqual(result.refinement_error, 0)
+        self.assertGreater(result.independent_error, 1)
+        self.assertIsNone(result.states)
 
 
 if __name__ == "__main__":

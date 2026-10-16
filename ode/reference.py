@@ -1,7 +1,8 @@
 """Numerical reference solving, isolated from sampling and file writing.
 
-A successful solve is checked again at tighter tolerances. Agreement is useful
-evidence, not proof of correctness: analytic benchmarks remain a separate gate.
+A successful solve is checked again at tighter tolerances and against an
+independent matrix-exponential calculation at selected times. Closed-form
+benchmarks in validate_reference.py additionally check both numerical methods.
 Importing this module never integrates an equation.
 """
 
@@ -10,6 +11,7 @@ from dataclasses import dataclass
 import numpy as np
 from scipy.integrate import solve_ivp
 
+from .analytic import linear_reference
 from .config import GeneratorConfig
 from .equations import LinearODE
 
@@ -42,10 +44,11 @@ class SolveResult:
     error: str | None = None
     nfev: int = 0
     refinement_error: float | None = None
+    independent_error: float | None = None
 
 
 def solve_job(job: SolveJob, config: GeneratorConfig) -> SolveResult:
-    """Integrate one job twice, enforcing shape, finiteness and resource bounds.
+    """Integrate twice and independently check selected reference points.
 
     max_rhs_calls caps calls per solve (not wall time); max_abs_state rejects
     runaway intermediate states as well as stored points. Solver exceptions
@@ -94,8 +97,17 @@ def solve_job(job: SolveJob, config: GeneratorConfig) -> SolveResult:
         allowed = (config.reference_atol * np.sqrt(config.time_points)
                    + config.reference_rtol * reference)
         result.refinement_error = float(np.max(difference / allowed))
-        if result.refinement_error > 1:
+        if not np.isfinite(result.refinement_error) or result.refinement_error > 1:
             raise RuntimeError("Tolerance-refinement agreement check failed")
+        indices = np.linspace(0, config.time_points - 1,
+                              min(config.independent_check_points, config.time_points), dtype=int)
+        independent = linear_reference(job.equation, times[indices] - config.t_start)
+        # Pointwise checks catch a bad component even when its trajectory norm
+        # is small. This ratio is distinct from the refinement L2 ratio above.
+        allowance = config.reference_atol + config.reference_rtol * np.abs(independent)
+        result.independent_error = float(np.max(np.abs(refined[indices] - independent) / allowance))
+        if not np.isfinite(result.independent_error) or result.independent_error > 1:
+            raise RuntimeError("Independent matrix-exponential agreement check failed")
         result.times, result.states = times, refined
     except Exception as error:
         result.error = f"{type(error).__name__}: {error}"

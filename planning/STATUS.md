@@ -2,17 +2,22 @@
 
 Updated: October 15, 2026.
 
-Current phase: documented ODE generator and mixed-order training framework, before reference generation. The virtual environment is ready and software-contract tests pass. No reference trajectories have been generated, no model has been trained, and no scientific accuracy/throughput claims have been validated.
+Current phase: both-family numerical-reference validation and CPU/CUDA training preparation. Small numerical benchmarks have passed; no training dataset has been generated and no model has been trained. Model accuracy and actual HPC/GPU throughput remain unmeasured.
 
 ## Verified foundation
 
 - Configurable positive-order state conversion and stable linear-family parameter sampler.
-- Dry-run-by-default generator, bounded thread/process/serial coordination, deterministic job seeds, failure ledger and integrity manifest.
-- Mixed-order padded features, masked loss, training-only normalization, CPU trainer and independent checkpoint inference interface.
+- Dry-run-by-default generator, bounded thread/process/serial coordination, deterministic job seeds, failure ledger and integrity manifest. CLI worker/backend overrides support a single-node allocation.
+- Both configured families pass closed-form preflight. Each future trajectory must additionally pass tolerance refinement and matrix-exponential checks at five configured times.
+- Mixed-order padded features, masked loss, training-only normalization, CPU/CUDA trainer, optional host-RAM preloading and independent checkpoint inference. GPU execution is not hardware-tested locally.
 - Existing isolated Python environment checked; SciPy added; NumPy/PyTorch retained; dependency compatibility check passed.
+- Generator example configured for the local Ryzen 5 5600 with 12 process workers; numerical generation and performance benchmarking remain deferred.
 - Team documentation rules, plain-language math guide and documented roles for every Python file, including fluid placeholders.
-- All 17 unit checks passed using fabricated states and mocked solvers; analytic numerical-reference checks are still pending.
-- Parsed all 27 Python modules successfully and confirmed explanatory module docstrings throughout. Local documentation links and whitespace checks passed; ODE data/run directories contain no generated artifacts.
+- All 24 unit checks passed, including real closed-form numerical checks, process-worker execution, dry-run safety, independent-check failure detection and preload/device contracts.
+- All 13 deterministic benchmark cases passed across homogeneous/sine-forced equations, repeated/distinct roots, damped oscillations, orders 2/3/6 and resonance. Worst absolute state-component error was about 5.6e-10; this is reference accuracy on these cases, not neural accuracy.
+- Validation evidence: `ode/runs/20261015-reference-validation-01/report.json` and its run note. No dataset or trained checkpoint was produced.
+- `ode/COMPUTE_ESTIMATES.md` records explicitly unmeasured single-node HPC / RTX PRO 6000 Blackwell projections, including queue/I/O and hardware assumptions.
+- Added `ode/configs/generator_full.json` and root/ODE README instructions for 100,032 planned trajectories (66,688 train; 16,672 validation; 16,672 test). Only the preset dry-run was checked; full generation remains user-triggered.
 
 ## Immediate milestone — October 18
 
@@ -24,7 +29,7 @@ Current phase: documented ODE generator and mixed-order training framework, befo
 | Freeze evaluation protocol | planned | Split recipe, metrics, near-zero handling and target scope recorded |
 | Estimate initial experiment size | planned | Hardware budget, dataset sizes and training budget recorded |
 
-Next action: review draft configuration and equation scope, finalize analytic reference checks and freeze the October 18 evaluation specification. Actual numerical generation and training remain deferred until a subsequent task.
+Next action: freeze the October 18 data/evaluation specification and determine the actual HPC CPU allocation. Bulk dataset generation and training remain deferred by the user's explicit clarification; the current task performed only code changes and small validation cases.
 
 ## Later milestones
 
@@ -44,7 +49,7 @@ Next action: review draft configuration and equation scope, finalize analytic re
 
 - Equation ranges, compute budget and numerical tolerances are not yet settled.
 - Reference quality and leakage-free splits must be established before model results are meaningful.
-- The 5% ODE accuracy goal is untested. No runtime or accuracy measurements are available.
+- The 5% model accuracy goal is untested. Only small local reference benchmarks are measured; HPC generation and Blackwell training estimates still need target-hardware benchmarks.
 - If timing becomes threatened, reduce family scope explicitly before reducing validation or documentation.
 
 ## Review entry template
