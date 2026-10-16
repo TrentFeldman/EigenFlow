@@ -1,0 +1,3609 @@
+{
+  "kind": "generation",
+  "hardware": {
+    "host": "arch",
+    "platform": "Linux-7.2.9-arch1-1-x86_64-with-glibc2.44",
+    "cpu": "AMD Ryzen 5 5600 6-Core Processor",
+    "logical_cpus": 12,
+    "affinity_cpus": 12,
+    "scheduler": {},
+    "native_threads": {
+      "OMP_NUM_THREADS": "1",
+      "OPENBLAS_NUM_THREADS": "1",
+      "MKL_NUM_THREADS": "1"
+    }
+  },
+  "runs": [
+    {
+      "workers": 1,
+      "repeat": 0,
+      "manifest": {
+        "schema_version": 1,
+        "status": "complete",
+        "config": {
+          "seed": 20261015,
+          "orders": [
+            2,
+            3
+          ],
+          "max_order": 6,
+          "families": [
+            "linear_homogeneous",
+            "linear_sinusoidal"
+          ],
+          "groups_per_split": [
+            16,
+            4,
+            4
+          ],
+          "initial_conditions_per_group": 4,
+          "diagnostic_groups": 0,
+          "decay_range": [
+            0.1,
+            1.0
+          ],
+          "frequency_range": [
+            0.5,
+            2.0
+          ],
+          "initial_state_range": [
+            -1.0,
+            1.0
+          ],
+          "amplitude_range": [
+            0.1,
+            1.0
+          ],
+          "t_start": 0.0,
+          "t_stop": 5.0,
+          "time_points": 101,
+          "method": "DOP853",
+          "rtol": 1e-09,
+          "atol": 1e-11,
+          "refinement_factor": 10.0,
+          "reference_rtol": 1e-06,
+          "reference_atol": 1e-08,
+          "independent_check_points": 5,
+          "max_abs_state": 1000000.0,
+          "max_rhs_calls": 100000,
+          "backend": "serial",
+          "workers": 1
+        },
+        "planned": 384,
+        "succeeded": 384,
+        "failed": 0,
+        "python": "3.14.8",
+        "dependencies": {
+          "numpy": "2.5.2",
+          "scipy": "1.18.1"
+        },
+        "source_sha256": {
+          "__init__.py": "4038ce67d84b663b59696296565206bc21471556b979c8f211a755e8a1464b8f",
+          "analytic.py": "6ed50598634923cf2819b21a15efd47013d1cd56b8a0eb24d5bf0c5382324aca",
+          "benchmark.py": "d7cd0ac9039f51c15aca6a8e21b01c393ae211c384f73883d3645c0f1a88d875",
+          "check_environment.py": "38af69a56835f9db3e57e302bfeda2b1b609c8c8582d083efaf9a2b4b8b3cde9",
+          "config.py": "ae70992112ef314058553e2813148c180856a55a4921f6027ae5c753e972aa4e",
+          "dataset.py": "f68d2c1b063a31372093eb838af7fc0f8335837108838aecbf187a0b3afafa3b",
+          "equations.py": "d08d51d57c2616c068b484dd6c5637420636d66a2536e517985623dbfa05c04e",
+          "evaluate.py": "4f07d878870f20ec8424841c3b4bebb953214646a2b0fb68bae4cd9ab47c5e00",
+          "generate_data.py": "9039a88e0e86f56050f04f05632a6274bf9f9629086b268088e018b3581f6e4f",
+          "model.py": "6041965303c587ae8351f9344f22dc9485c7184d1c729008ce9381899b7d6505",
+          "plot_results.py": "82d1e14f2935e8d7add2733c9e9ff0cc3c6fc651c8f28cffbd55e1247b63e696",
+          "predict.py": "cc3532c32777b7399bd70e4834f7490cd39570995150bea6f60b769522f5710a",
+          "reference.py": "ed0b4aa08f7a56594cc0014b7f8c14c06929c4592446ee987d1e84173a5e2377",
+          "train.py": "d067da02ccc060644d98223ab9600f39897543b9208d0e5b6391c4e716a28fff",
+          "validate_reference.py": "fbdbb1d4300321cb7652c5355e3a438b31d5822a0353d48423f90bd3de6280de"
+        },
+        "reference_validation": {
+          "closed_form_preflight": {
+            "passed": true,
+            "cases": [
+              {
+                "name": "linear_homogeneous-repeated_real_order2",
+                "family": "linear_homogeneous",
+                "order": 2,
+                "passed": true,
+                "seconds": 0.006259982999836211,
+                "nfev": 391,
+                "error": null,
+                "max_abs_error": 2.452266723018681e-10,
+                "error_ratio": 0.0017300059907770255,
+                "per_component_max_abs_error": [
+                  1.2146450512062756e-10,
+                  2.452266723018681e-10
+                ],
+                "matrix_exponential_error_ratio": 5.983516971735435e-09
+              },
+              {
+                "name": "linear_sinusoidal-repeated_real_order2",
+                "family": "linear_sinusoidal",
+                "order": 2,
+                "passed": true,
+                "seconds": 0.012449516000060612,
+                "nfev": 943,
+                "error": null,
+                "max_abs_error": 3.7221337123583e-11,
+                "error_ratio": 8.056117163742869e-05,
+                "per_component_max_abs_error": [
+                  2.457434256086799e-11,
+                  3.7221337123583e-11
+                ],
+                "matrix_exponential_error_ratio": 1.9250406086100086e-08
+              },
+              {
+                "name": "linear_homogeneous-repeated_real_order3",
+                "family": "linear_homogeneous",
+                "order": 3,
+                "passed": true,
+                "seconds": 0.005701834000092276,
+                "nfev": 409,
+                "error": null,
+                "max_abs_error": 1.0659295668347113e-10,
+                "error_ratio": 0.00020813790724679207,
+                "per_component_max_abs_error": [
+                  6.9469763275265e-11,
+                  8.527811790060014e-11,
+                  1.0659295668347113e-10
+                ],
+                "matrix_exponential_error_ratio": 8.76953735646784e-09
+              },
+              {
+                "name": "linear_sinusoidal-repeated_real_order3",
+                "family": "linear_sinusoidal",
+                "order": 3,
+                "passed": true,
+                "seconds": 0.01378720999991856,
+                "nfev": 1039,
+                "error": null,
+                "max_abs_error": 1.8303958349008553e-10,
+                "error_ratio": 0.00027287965887381826,
+                "per_component_max_abs_error": [
+                  4.699551858777795e-11,
+                  9.996292682501462e-11,
+                  1.8303958349008553e-10
+                ],
+                "matrix_exponential_error_ratio": 1.5077929640199444e-08
+              },
+              {
+                "name": "linear_homogeneous-repeated_real_order6",
+                "family": "linear_homogeneous",
+                "order": 6,
+                "passed": true,
+                "seconds": 0.005457139000100142,
+                "nfev": 379,
+                "error": null,
+                "max_abs_error": 8.096523451683879e-11,
+                "error_ratio": 0.00013930483932723763,
+                "per_component_max_abs_error": [
+                  8.096523451683879e-11,
+                  6.398981344801769e-11,
+                  4.9119708300793263e-11,
+                  3.4716673980028645e-11,
+                  1.878724953385813e-11,
+                  6.594252921487964e-12
+                ],
+                "matrix_exponential_error_ratio": 8.249277250419876e-08
+              },
+              {
+                "name": "linear_sinusoidal-repeated_real_order6",
+                "family": "linear_sinusoidal",
+                "order": 6,
+                "passed": true,
+                "seconds": 0.01950097500002812,
+                "nfev": 1468,
+                "error": null,
+                "max_abs_error": 3.6212416398839764e-10,
+                "error_ratio": 0.001320515352547554,
+                "per_component_max_abs_error": [
+                  1.2973733198862192e-11,
+                  1.6983414674598407e-11,
+                  1.2819523220741758e-11,
+                  1.548883243884802e-11,
+                  1.1139777988944388e-10,
+                  3.6212416398839764e-10
+                ],
+                "matrix_exponential_error_ratio": 6.624046650633675e-08
+              },
+              {
+                "name": "linear_homogeneous-distinct_real_order2",
+                "family": "linear_homogeneous",
+                "order": 2,
+                "passed": true,
+                "seconds": 0.00846513400006188,
+                "nfev": 619,
+                "error": null,
+                "max_abs_error": 4.9866499818307375e-11,
+                "error_ratio": 0.001651035447076652,
+                "per_component_max_abs_error": [
+                  2.4757307315326216e-11,
+                  4.9866499818307375e-11
+                ],
+                "matrix_exponential_error_ratio": 7.478233410498445e-09
+              },
+              {
+                "name": "linear_sinusoidal-distinct_real_order2",
+                "family": "linear_sinusoidal",
+                "order": 2,
+                "passed": true,
+                "seconds": 0.015389679999998407,
+                "nfev": 1174,
+                "error": null,
+                "max_abs_error": 4.9936166313102603e-11,
+                "error_ratio": 0.00014548896847110457,
+                "per_component_max_abs_error": [
+                  2.4668600495658666e-11,
+                  4.9936166313102603e-11
+                ],
+                "matrix_exponential_error_ratio": 1.2313535421584508e-08
+              },
+              {
+                "name": "linear_homogeneous-damped_complex_order2",
+                "family": "linear_homogeneous",
+                "order": 2,
+                "passed": true,
+                "seconds": 0.007258641000134958,
+                "nfev": 526,
+                "error": null,
+                "max_abs_error": 2.2581675418464897e-10,
+                "error_ratio": 0.0005316487784528919,
+                "per_component_max_abs_error": [
+                  1.734723475976807e-10,
+                  2.2581675418464897e-10
+                ],
+                "matrix_exponential_error_ratio": 5.047447656756363e-07
+              },
+              {
+                "name": "linear_sinusoidal-damped_complex_order2",
+                "family": "linear_sinusoidal",
+                "order": 2,
+                "passed": true,
+                "seconds": 0.008905342000161909,
+                "nfev": 670,
+                "error": null,
+                "max_abs_error": 3.753525268379576e-11,
+                "error_ratio": 0.0006135847710321997,
+                "per_component_max_abs_error": [
+                  3.157679673293501e-11,
+                  3.753525268379576e-11
+                ],
+                "matrix_exponential_error_ratio": 4.3970422311308924e-07
+              },
+              {
+                "name": "linear_homogeneous-distinct_real_order3",
+                "family": "linear_homogeneous",
+                "order": 3,
+                "passed": true,
+                "seconds": 0.009498021999888806,
+                "nfev": 709,
+                "error": null,
+                "max_abs_error": 1.3431838974398147e-10,
+                "error_ratio": 0.0015208483651789608,
+                "per_component_max_abs_error": [
+                  1.1289441603778982e-11,
+                  2.536089394045149e-11,
+                  1.3431838974398147e-10
+                ],
+                "matrix_exponential_error_ratio": 8.993146238663719e-09
+              },
+              {
+                "name": "linear_sinusoidal-distinct_real_order3",
+                "family": "linear_sinusoidal",
+                "order": 3,
+                "passed": true,
+                "seconds": 0.02089696999996704,
+                "nfev": 1612,
+                "error": null,
+                "max_abs_error": 5.601122343712461e-10,
+                "error_ratio": 0.001313371963581701,
+                "per_component_max_abs_error": [
+                  5.3023807566887626e-11,
+                  1.7566509358246662e-10,
+                  5.601122343712461e-10
+                ],
+                "matrix_exponential_error_ratio": 8.037149603526032e-09
+              },
+              {
+                "name": "linear_sinusoidal-resonance",
+                "family": "linear_sinusoidal",
+                "order": 2,
+                "passed": true,
+                "seconds": 0.007920394999928249,
+                "nfev": 589,
+                "error": null,
+                "max_abs_error": 1.554683048965444e-10,
+                "error_ratio": 0.0020321022297601033,
+                "per_component_max_abs_error": [
+                  1.554683048965444e-10,
+                  1.1616463346797445e-10
+                ],
+                "matrix_exponential_error_ratio": 1.0539354545043864e-06
+              }
+            ],
+            "method": "DOP853",
+            "reference_rtol": 1e-06,
+            "reference_atol": 1e-08,
+            "families": [
+              "linear_homogeneous",
+              "linear_sinusoidal"
+            ],
+            "config": {
+              "seed": 20261015,
+              "orders": [
+                2,
+                3
+              ],
+              "max_order": 6,
+              "families": [
+                "linear_homogeneous",
+                "linear_sinusoidal"
+              ],
+              "groups_per_split": [
+                16,
+                4,
+                4
+              ],
+              "initial_conditions_per_group": 4,
+              "diagnostic_groups": 0,
+              "decay_range": [
+                0.1,
+                1.0
+              ],
+              "frequency_range": [
+                0.5,
+                2.0
+              ],
+              "initial_state_range": [
+                -1.0,
+                1.0
+              ],
+              "amplitude_range": [
+                0.1,
+                1.0
+              ],
+              "t_start": 0.0,
+              "t_stop": 5.0,
+              "time_points": 101,
+              "method": "DOP853",
+              "rtol": 1e-09,
+              "atol": 1e-11,
+              "refinement_factor": 10.0,
+              "reference_rtol": 1e-06,
+              "reference_atol": 1e-08,
+              "independent_check_points": 5,
+              "max_abs_state": 1000000.0,
+              "max_rhs_calls": 100000,
+              "backend": "serial",
+              "workers": 1
+            },
+            "python": "3.14.8",
+            "machine": "x86_64",
+            "dependencies": {
+              "numpy": "2.5.2",
+              "scipy": "1.18.1"
+            },
+            "source_sha256": {
+              "equations.py": "d08d51d57c2616c068b484dd6c5637420636d66a2536e517985623dbfa05c04e",
+              "reference.py": "ed0b4aa08f7a56594cc0014b7f8c14c06929c4592446ee987d1e84173a5e2377",
+              "analytic.py": "6ed50598634923cf2819b21a15efd47013d1cd56b8a0eb24d5bf0c5382324aca",
+              "validate_reference.py": "fbdbb1d4300321cb7652c5355e3a438b31d5822a0353d48423f90bd3de6280de"
+            },
+            "seconds": 0.1551900710001064
+          },
+          "per_trajectory": "tolerance refinement plus matrix exponential at selected times"
+        },
+        "family_counts": {
+          "linear_homogeneous": {
+            "succeeded": 192,
+            "failed": 0
+          },
+          "linear_sinusoidal": {
+            "succeeded": 192,
+            "failed": 0
+          }
+        },
+        "split_policy": "core joint holdout; diagnostics cross train and validation identities only",
+        "records_sha256": "83a19f6ba24f4a59953b0f1b9b3cde88254917c437450979372f51d8f4d0436f",
+        "seconds": 4.039746861999902
+      },
+      "trajectories_per_second": 95.05546092803904,
+      "stage_worker_seconds": {
+        "coarse": 1.5947050010022394,
+        "refined": 2.064039958000876,
+        "matrix_exponential": 0.0391795939997337
+      },
+      "archive_bytes": 1016303
+    },
+    {
+      "workers": 1,
+      "repeat": 1,
+      "manifest": {
+        "schema_version": 1,
+        "status": "complete",
+        "config": {
+          "seed": 20261015,
+          "orders": [
+            2,
+            3
+          ],
+          "max_order": 6,
+          "families": [
+            "linear_homogeneous",
+            "linear_sinusoidal"
+          ],
+          "groups_per_split": [
+            16,
+            4,
+            4
+          ],
+          "initial_conditions_per_group": 4,
+          "diagnostic_groups": 0,
+          "decay_range": [
+            0.1,
+            1.0
+          ],
+          "frequency_range": [
+            0.5,
+            2.0
+          ],
+          "initial_state_range": [
+            -1.0,
+            1.0
+          ],
+          "amplitude_range": [
+            0.1,
+            1.0
+          ],
+          "t_start": 0.0,
+          "t_stop": 5.0,
+          "time_points": 101,
+          "method": "DOP853",
+          "rtol": 1e-09,
+          "atol": 1e-11,
+          "refinement_factor": 10.0,
+          "reference_rtol": 1e-06,
+          "reference_atol": 1e-08,
+          "independent_check_points": 5,
+          "max_abs_state": 1000000.0,
+          "max_rhs_calls": 100000,
+          "backend": "serial",
+          "workers": 1
+        },
+        "planned": 384,
+        "succeeded": 384,
+        "failed": 0,
+        "python": "3.14.8",
+        "dependencies": {
+          "numpy": "2.5.2",
+          "scipy": "1.18.1"
+        },
+        "source_sha256": {
+          "__init__.py": "4038ce67d84b663b59696296565206bc21471556b979c8f211a755e8a1464b8f",
+          "analytic.py": "6ed50598634923cf2819b21a15efd47013d1cd56b8a0eb24d5bf0c5382324aca",
+          "benchmark.py": "d7cd0ac9039f51c15aca6a8e21b01c393ae211c384f73883d3645c0f1a88d875",
+          "check_environment.py": "38af69a56835f9db3e57e302bfeda2b1b609c8c8582d083efaf9a2b4b8b3cde9",
+          "config.py": "ae70992112ef314058553e2813148c180856a55a4921f6027ae5c753e972aa4e",
+          "dataset.py": "f68d2c1b063a31372093eb838af7fc0f8335837108838aecbf187a0b3afafa3b",
+          "equations.py": "d08d51d57c2616c068b484dd6c5637420636d66a2536e517985623dbfa05c04e",
+          "evaluate.py": "4f07d878870f20ec8424841c3b4bebb953214646a2b0fb68bae4cd9ab47c5e00",
+          "generate_data.py": "9039a88e0e86f56050f04f05632a6274bf9f9629086b268088e018b3581f6e4f",
+          "model.py": "6041965303c587ae8351f9344f22dc9485c7184d1c729008ce9381899b7d6505",
+          "plot_results.py": "82d1e14f2935e8d7add2733c9e9ff0cc3c6fc651c8f28cffbd55e1247b63e696",
+          "predict.py": "cc3532c32777b7399bd70e4834f7490cd39570995150bea6f60b769522f5710a",
+          "reference.py": "ed0b4aa08f7a56594cc0014b7f8c14c06929c4592446ee987d1e84173a5e2377",
+          "train.py": "d067da02ccc060644d98223ab9600f39897543b9208d0e5b6391c4e716a28fff",
+          "validate_reference.py": "fbdbb1d4300321cb7652c5355e3a438b31d5822a0353d48423f90bd3de6280de"
+        },
+        "reference_validation": {
+          "closed_form_preflight": {
+            "passed": true,
+            "cases": [
+              {
+                "name": "linear_homogeneous-repeated_real_order2",
+                "family": "linear_homogeneous",
+                "order": 2,
+                "passed": true,
+                "seconds": 0.005570019999822762,
+                "nfev": 391,
+                "error": null,
+                "max_abs_error": 2.452266723018681e-10,
+                "error_ratio": 0.0017300059907770255,
+                "per_component_max_abs_error": [
+                  1.2146450512062756e-10,
+                  2.452266723018681e-10
+                ],
+                "matrix_exponential_error_ratio": 5.983516971735435e-09
+              },
+              {
+                "name": "linear_sinusoidal-repeated_real_order2",
+                "family": "linear_sinusoidal",
+                "order": 2,
+                "passed": true,
+                "seconds": 0.011986925999963205,
+                "nfev": 943,
+                "error": null,
+                "max_abs_error": 3.7221337123583e-11,
+                "error_ratio": 8.056117163742869e-05,
+                "per_component_max_abs_error": [
+                  2.457434256086799e-11,
+                  3.7221337123583e-11
+                ],
+                "matrix_exponential_error_ratio": 1.9250406086100086e-08
+              },
+              {
+                "name": "linear_homogeneous-repeated_real_order3",
+                "family": "linear_homogeneous",
+                "order": 3,
+                "passed": true,
+                "seconds": 0.005579580000130591,
+                "nfev": 409,
+                "error": null,
+                "max_abs_error": 1.0659295668347113e-10,
+                "error_ratio": 0.00020813790724679207,
+                "per_component_max_abs_error": [
+                  6.9469763275265e-11,
+                  8.527811790060014e-11,
+                  1.0659295668347113e-10
+                ],
+                "matrix_exponential_error_ratio": 8.76953735646784e-09
+              },
+              {
+                "name": "linear_sinusoidal-repeated_real_order3",
+                "family": "linear_sinusoidal",
+                "order": 3,
+                "passed": true,
+                "seconds": 0.01332324999998491,
+                "nfev": 1039,
+                "error": null,
+                "max_abs_error": 1.8303958349008553e-10,
+                "error_ratio": 0.00027287965887381826,
+                "per_component_max_abs_error": [
+                  4.699551858777795e-11,
+                  9.996292682501462e-11,
+                  1.8303958349008553e-10
+                ],
+                "matrix_exponential_error_ratio": 1.5077929640199444e-08
+              },
+              {
+                "name": "linear_homogeneous-repeated_real_order6",
+                "family": "linear_homogeneous",
+                "order": 6,
+                "passed": true,
+                "seconds": 0.005258994999849165,
+                "nfev": 379,
+                "error": null,
+                "max_abs_error": 8.096523451683879e-11,
+                "error_ratio": 0.00013930483932723763,
+                "per_component_max_abs_error": [
+                  8.096523451683879e-11,
+                  6.398981344801769e-11,
+                  4.9119708300793263e-11,
+                  3.4716673980028645e-11,
+                  1.878724953385813e-11,
+                  6.594252921487964e-12
+                ],
+                "matrix_exponential_error_ratio": 8.249277250419876e-08
+              },
+              {
+                "name": "linear_sinusoidal-repeated_real_order6",
+                "family": "linear_sinusoidal",
+                "order": 6,
+                "passed": true,
+                "seconds": 0.018965481000122963,
+                "nfev": 1468,
+                "error": null,
+                "max_abs_error": 3.6212416398839764e-10,
+                "error_ratio": 0.001320515352547554,
+                "per_component_max_abs_error": [
+                  1.2973733198862192e-11,
+                  1.6983414674598407e-11,
+                  1.2819523220741758e-11,
+                  1.548883243884802e-11,
+                  1.1139777988944388e-10,
+                  3.6212416398839764e-10
+                ],
+                "matrix_exponential_error_ratio": 6.624046650633675e-08
+              },
+              {
+                "name": "linear_homogeneous-distinct_real_order2",
+                "family": "linear_homogeneous",
+                "order": 2,
+                "passed": true,
+                "seconds": 0.008216197999900032,
+                "nfev": 619,
+                "error": null,
+                "max_abs_error": 4.9866499818307375e-11,
+                "error_ratio": 0.001651035447076652,
+                "per_component_max_abs_error": [
+                  2.4757307315326216e-11,
+                  4.9866499818307375e-11
+                ],
+                "matrix_exponential_error_ratio": 7.478233410498445e-09
+              },
+              {
+                "name": "linear_sinusoidal-distinct_real_order2",
+                "family": "linear_sinusoidal",
+                "order": 2,
+                "passed": true,
+                "seconds": 0.014981369999986782,
+                "nfev": 1174,
+                "error": null,
+                "max_abs_error": 4.9936166313102603e-11,
+                "error_ratio": 0.00014548896847110457,
+                "per_component_max_abs_error": [
+                  2.4668600495658666e-11,
+                  4.9936166313102603e-11
+                ],
+                "matrix_exponential_error_ratio": 1.2313535421584508e-08
+              },
+              {
+                "name": "linear_homogeneous-damped_complex_order2",
+                "family": "linear_homogeneous",
+                "order": 2,
+                "passed": true,
+                "seconds": 0.007024676000128238,
+                "nfev": 526,
+                "error": null,
+                "max_abs_error": 2.2581675418464897e-10,
+                "error_ratio": 0.0005316487784528919,
+                "per_component_max_abs_error": [
+                  1.734723475976807e-10,
+                  2.2581675418464897e-10
+                ],
+                "matrix_exponential_error_ratio": 5.047447656756363e-07
+              },
+              {
+                "name": "linear_sinusoidal-damped_complex_order2",
+                "family": "linear_sinusoidal",
+                "order": 2,
+                "passed": true,
+                "seconds": 0.00875992800001768,
+                "nfev": 670,
+                "error": null,
+                "max_abs_error": 3.753525268379576e-11,
+                "error_ratio": 0.0006135847710321997,
+                "per_component_max_abs_error": [
+                  3.157679673293501e-11,
+                  3.753525268379576e-11
+                ],
+                "matrix_exponential_error_ratio": 4.3970422311308924e-07
+              },
+              {
+                "name": "linear_homogeneous-distinct_real_order3",
+                "family": "linear_homogeneous",
+                "order": 3,
+                "passed": true,
+                "seconds": 0.009330118000207221,
+                "nfev": 709,
+                "error": null,
+                "max_abs_error": 1.3431838974398147e-10,
+                "error_ratio": 0.0015208483651789608,
+                "per_component_max_abs_error": [
+                  1.1289441603778982e-11,
+                  2.536089394045149e-11,
+                  1.3431838974398147e-10
+                ],
+                "matrix_exponential_error_ratio": 8.993146238663719e-09
+              },
+              {
+                "name": "linear_sinusoidal-distinct_real_order3",
+                "family": "linear_sinusoidal",
+                "order": 3,
+                "passed": true,
+                "seconds": 0.02052300000013929,
+                "nfev": 1612,
+                "error": null,
+                "max_abs_error": 5.601122343712461e-10,
+                "error_ratio": 0.001313371963581701,
+                "per_component_max_abs_error": [
+                  5.3023807566887626e-11,
+                  1.7566509358246662e-10,
+                  5.601122343712461e-10
+                ],
+                "matrix_exponential_error_ratio": 8.037149603526032e-09
+              },
+              {
+                "name": "linear_sinusoidal-resonance",
+                "family": "linear_sinusoidal",
+                "order": 2,
+                "passed": true,
+                "seconds": 0.007826140000133819,
+                "nfev": 589,
+                "error": null,
+                "max_abs_error": 1.554683048965444e-10,
+                "error_ratio": 0.0020321022297601033,
+                "per_component_max_abs_error": [
+                  1.554683048965444e-10,
+                  1.1616463346797445e-10
+                ],
+                "matrix_exponential_error_ratio": 1.0539354545043864e-06
+              }
+            ],
+            "method": "DOP853",
+            "reference_rtol": 1e-06,
+            "reference_atol": 1e-08,
+            "families": [
+              "linear_homogeneous",
+              "linear_sinusoidal"
+            ],
+            "config": {
+              "seed": 20261015,
+              "orders": [
+                2,
+                3
+              ],
+              "max_order": 6,
+              "families": [
+                "linear_homogeneous",
+                "linear_sinusoidal"
+              ],
+              "groups_per_split": [
+                16,
+                4,
+                4
+              ],
+              "initial_conditions_per_group": 4,
+              "diagnostic_groups": 0,
+              "decay_range": [
+                0.1,
+                1.0
+              ],
+              "frequency_range": [
+                0.5,
+                2.0
+              ],
+              "initial_state_range": [
+                -1.0,
+                1.0
+              ],
+              "amplitude_range": [
+                0.1,
+                1.0
+              ],
+              "t_start": 0.0,
+              "t_stop": 5.0,
+              "time_points": 101,
+              "method": "DOP853",
+              "rtol": 1e-09,
+              "atol": 1e-11,
+              "refinement_factor": 10.0,
+              "reference_rtol": 1e-06,
+              "reference_atol": 1e-08,
+              "independent_check_points": 5,
+              "max_abs_state": 1000000.0,
+              "max_rhs_calls": 100000,
+              "backend": "serial",
+              "workers": 1
+            },
+            "python": "3.14.8",
+            "machine": "x86_64",
+            "dependencies": {
+              "numpy": "2.5.2",
+              "scipy": "1.18.1"
+            },
+            "source_sha256": {
+              "equations.py": "d08d51d57c2616c068b484dd6c5637420636d66a2536e517985623dbfa05c04e",
+              "reference.py": "ed0b4aa08f7a56594cc0014b7f8c14c06929c4592446ee987d1e84173a5e2377",
+              "analytic.py": "6ed50598634923cf2819b21a15efd47013d1cd56b8a0eb24d5bf0c5382324aca",
+              "validate_reference.py": "fbdbb1d4300321cb7652c5355e3a438b31d5822a0353d48423f90bd3de6280de"
+            },
+            "seconds": 0.15059754000003522
+          },
+          "per_trajectory": "tolerance refinement plus matrix exponential at selected times"
+        },
+        "family_counts": {
+          "linear_homogeneous": {
+            "succeeded": 192,
+            "failed": 0
+          },
+          "linear_sinusoidal": {
+            "succeeded": 192,
+            "failed": 0
+          }
+        },
+        "split_policy": "core joint holdout; diagnostics cross train and validation identities only",
+        "records_sha256": "730e6ca7e6a28f1c404501070f52498c9530239b90d5baceca5ec63be1f572b2",
+        "seconds": 4.039226626000072
+      },
+      "trajectories_per_second": 95.06770368570875,
+      "stage_worker_seconds": {
+        "coarse": 1.6047894519992951,
+        "refined": 2.065699050001058,
+        "matrix_exponential": 0.03886641600161056
+      },
+      "archive_bytes": 1016303
+    },
+    {
+      "workers": 1,
+      "repeat": 2,
+      "manifest": {
+        "schema_version": 1,
+        "status": "complete",
+        "config": {
+          "seed": 20261015,
+          "orders": [
+            2,
+            3
+          ],
+          "max_order": 6,
+          "families": [
+            "linear_homogeneous",
+            "linear_sinusoidal"
+          ],
+          "groups_per_split": [
+            16,
+            4,
+            4
+          ],
+          "initial_conditions_per_group": 4,
+          "diagnostic_groups": 0,
+          "decay_range": [
+            0.1,
+            1.0
+          ],
+          "frequency_range": [
+            0.5,
+            2.0
+          ],
+          "initial_state_range": [
+            -1.0,
+            1.0
+          ],
+          "amplitude_range": [
+            0.1,
+            1.0
+          ],
+          "t_start": 0.0,
+          "t_stop": 5.0,
+          "time_points": 101,
+          "method": "DOP853",
+          "rtol": 1e-09,
+          "atol": 1e-11,
+          "refinement_factor": 10.0,
+          "reference_rtol": 1e-06,
+          "reference_atol": 1e-08,
+          "independent_check_points": 5,
+          "max_abs_state": 1000000.0,
+          "max_rhs_calls": 100000,
+          "backend": "serial",
+          "workers": 1
+        },
+        "planned": 384,
+        "succeeded": 384,
+        "failed": 0,
+        "python": "3.14.8",
+        "dependencies": {
+          "numpy": "2.5.2",
+          "scipy": "1.18.1"
+        },
+        "source_sha256": {
+          "__init__.py": "4038ce67d84b663b59696296565206bc21471556b979c8f211a755e8a1464b8f",
+          "analytic.py": "6ed50598634923cf2819b21a15efd47013d1cd56b8a0eb24d5bf0c5382324aca",
+          "benchmark.py": "d7cd0ac9039f51c15aca6a8e21b01c393ae211c384f73883d3645c0f1a88d875",
+          "check_environment.py": "38af69a56835f9db3e57e302bfeda2b1b609c8c8582d083efaf9a2b4b8b3cde9",
+          "config.py": "ae70992112ef314058553e2813148c180856a55a4921f6027ae5c753e972aa4e",
+          "dataset.py": "f68d2c1b063a31372093eb838af7fc0f8335837108838aecbf187a0b3afafa3b",
+          "equations.py": "d08d51d57c2616c068b484dd6c5637420636d66a2536e517985623dbfa05c04e",
+          "evaluate.py": "4f07d878870f20ec8424841c3b4bebb953214646a2b0fb68bae4cd9ab47c5e00",
+          "generate_data.py": "9039a88e0e86f56050f04f05632a6274bf9f9629086b268088e018b3581f6e4f",
+          "model.py": "6041965303c587ae8351f9344f22dc9485c7184d1c729008ce9381899b7d6505",
+          "plot_results.py": "82d1e14f2935e8d7add2733c9e9ff0cc3c6fc651c8f28cffbd55e1247b63e696",
+          "predict.py": "cc3532c32777b7399bd70e4834f7490cd39570995150bea6f60b769522f5710a",
+          "reference.py": "ed0b4aa08f7a56594cc0014b7f8c14c06929c4592446ee987d1e84173a5e2377",
+          "train.py": "d067da02ccc060644d98223ab9600f39897543b9208d0e5b6391c4e716a28fff",
+          "validate_reference.py": "fbdbb1d4300321cb7652c5355e3a438b31d5822a0353d48423f90bd3de6280de"
+        },
+        "reference_validation": {
+          "closed_form_preflight": {
+            "passed": true,
+            "cases": [
+              {
+                "name": "linear_homogeneous-repeated_real_order2",
+                "family": "linear_homogeneous",
+                "order": 2,
+                "passed": true,
+                "seconds": 0.005900696000026073,
+                "nfev": 391,
+                "error": null,
+                "max_abs_error": 2.452266723018681e-10,
+                "error_ratio": 0.0017300059907770255,
+                "per_component_max_abs_error": [
+                  1.2146450512062756e-10,
+                  2.452266723018681e-10
+                ],
+                "matrix_exponential_error_ratio": 5.983516971735435e-09
+              },
+              {
+                "name": "linear_sinusoidal-repeated_real_order2",
+                "family": "linear_sinusoidal",
+                "order": 2,
+                "passed": true,
+                "seconds": 0.012161765999962881,
+                "nfev": 943,
+                "error": null,
+                "max_abs_error": 3.7221337123583e-11,
+                "error_ratio": 8.056117163742869e-05,
+                "per_component_max_abs_error": [
+                  2.457434256086799e-11,
+                  3.7221337123583e-11
+                ],
+                "matrix_exponential_error_ratio": 1.9250406086100086e-08
+              },
+              {
+                "name": "linear_homogeneous-repeated_real_order3",
+                "family": "linear_homogeneous",
+                "order": 3,
+                "passed": true,
+                "seconds": 0.005664949999982127,
+                "nfev": 409,
+                "error": null,
+                "max_abs_error": 1.0659295668347113e-10,
+                "error_ratio": 0.00020813790724679207,
+                "per_component_max_abs_error": [
+                  6.9469763275265e-11,
+                  8.527811790060014e-11,
+                  1.0659295668347113e-10
+                ],
+                "matrix_exponential_error_ratio": 8.76953735646784e-09
+              },
+              {
+                "name": "linear_sinusoidal-repeated_real_order3",
+                "family": "linear_sinusoidal",
+                "order": 3,
+                "passed": true,
+                "seconds": 0.013363709000032031,
+                "nfev": 1039,
+                "error": null,
+                "max_abs_error": 1.8303958349008553e-10,
+                "error_ratio": 0.00027287965887381826,
+                "per_component_max_abs_error": [
+                  4.699551858777795e-11,
+                  9.996292682501462e-11,
+                  1.8303958349008553e-10
+                ],
+                "matrix_exponential_error_ratio": 1.5077929640199444e-08
+              },
+              {
+                "name": "linear_homogeneous-repeated_real_order6",
+                "family": "linear_homogeneous",
+                "order": 6,
+                "passed": true,
+                "seconds": 0.005329114999994999,
+                "nfev": 379,
+                "error": null,
+                "max_abs_error": 8.096523451683879e-11,
+                "error_ratio": 0.00013930483932723763,
+                "per_component_max_abs_error": [
+                  8.096523451683879e-11,
+                  6.398981344801769e-11,
+                  4.9119708300793263e-11,
+                  3.4716673980028645e-11,
+                  1.878724953385813e-11,
+                  6.594252921487964e-12
+                ],
+                "matrix_exponential_error_ratio": 8.249277250419876e-08
+              },
+              {
+                "name": "linear_sinusoidal-repeated_real_order6",
+                "family": "linear_sinusoidal",
+                "order": 6,
+                "passed": true,
+                "seconds": 0.019436827000163248,
+                "nfev": 1468,
+                "error": null,
+                "max_abs_error": 3.6212416398839764e-10,
+                "error_ratio": 0.001320515352547554,
+                "per_component_max_abs_error": [
+                  1.2973733198862192e-11,
+                  1.6983414674598407e-11,
+                  1.2819523220741758e-11,
+                  1.548883243884802e-11,
+                  1.1139777988944388e-10,
+                  3.6212416398839764e-10
+                ],
+                "matrix_exponential_error_ratio": 6.624046650633675e-08
+              },
+              {
+                "name": "linear_homogeneous-distinct_real_order2",
+                "family": "linear_homogeneous",
+                "order": 2,
+                "passed": true,
+                "seconds": 0.008360979000144653,
+                "nfev": 619,
+                "error": null,
+                "max_abs_error": 4.9866499818307375e-11,
+                "error_ratio": 0.001651035447076652,
+                "per_component_max_abs_error": [
+                  2.4757307315326216e-11,
+                  4.9866499818307375e-11
+                ],
+                "matrix_exponential_error_ratio": 7.478233410498445e-09
+              },
+              {
+                "name": "linear_sinusoidal-distinct_real_order2",
+                "family": "linear_sinusoidal",
+                "order": 2,
+                "passed": true,
+                "seconds": 0.015145379999921715,
+                "nfev": 1174,
+                "error": null,
+                "max_abs_error": 4.9936166313102603e-11,
+                "error_ratio": 0.00014548896847110457,
+                "per_component_max_abs_error": [
+                  2.4668600495658666e-11,
+                  4.9936166313102603e-11
+                ],
+                "matrix_exponential_error_ratio": 1.2313535421584508e-08
+              },
+              {
+                "name": "linear_homogeneous-damped_complex_order2",
+                "family": "linear_homogeneous",
+                "order": 2,
+                "passed": true,
+                "seconds": 0.00715129800005343,
+                "nfev": 526,
+                "error": null,
+                "max_abs_error": 2.2581675418464897e-10,
+                "error_ratio": 0.0005316487784528919,
+                "per_component_max_abs_error": [
+                  1.734723475976807e-10,
+                  2.2581675418464897e-10
+                ],
+                "matrix_exponential_error_ratio": 5.047447656756363e-07
+              },
+              {
+                "name": "linear_sinusoidal-damped_complex_order2",
+                "family": "linear_sinusoidal",
+                "order": 2,
+                "passed": true,
+                "seconds": 0.008849587999975483,
+                "nfev": 670,
+                "error": null,
+                "max_abs_error": 3.753525268379576e-11,
+                "error_ratio": 0.0006135847710321997,
+                "per_component_max_abs_error": [
+                  3.157679673293501e-11,
+                  3.753525268379576e-11
+                ],
+                "matrix_exponential_error_ratio": 4.3970422311308924e-07
+              },
+              {
+                "name": "linear_homogeneous-distinct_real_order3",
+                "family": "linear_homogeneous",
+                "order": 3,
+                "passed": true,
+                "seconds": 0.009504228999958286,
+                "nfev": 709,
+                "error": null,
+                "max_abs_error": 1.3431838974398147e-10,
+                "error_ratio": 0.0015208483651789608,
+                "per_component_max_abs_error": [
+                  1.1289441603778982e-11,
+                  2.536089394045149e-11,
+                  1.3431838974398147e-10
+                ],
+                "matrix_exponential_error_ratio": 8.993146238663719e-09
+              },
+              {
+                "name": "linear_sinusoidal-distinct_real_order3",
+                "family": "linear_sinusoidal",
+                "order": 3,
+                "passed": true,
+                "seconds": 0.02096930299990163,
+                "nfev": 1612,
+                "error": null,
+                "max_abs_error": 5.601122343712461e-10,
+                "error_ratio": 0.001313371963581701,
+                "per_component_max_abs_error": [
+                  5.3023807566887626e-11,
+                  1.7566509358246662e-10,
+                  5.601122343712461e-10
+                ],
+                "matrix_exponential_error_ratio": 8.037149603526032e-09
+              },
+              {
+                "name": "linear_sinusoidal-resonance",
+                "family": "linear_sinusoidal",
+                "order": 2,
+                "passed": true,
+                "seconds": 0.008019302999855427,
+                "nfev": 589,
+                "error": null,
+                "max_abs_error": 1.554683048965444e-10,
+                "error_ratio": 0.0020321022297601033,
+                "per_component_max_abs_error": [
+                  1.554683048965444e-10,
+                  1.1616463346797445e-10
+                ],
+                "matrix_exponential_error_ratio": 1.0539354545043864e-06
+              }
+            ],
+            "method": "DOP853",
+            "reference_rtol": 1e-06,
+            "reference_atol": 1e-08,
+            "families": [
+              "linear_homogeneous",
+              "linear_sinusoidal"
+            ],
+            "config": {
+              "seed": 20261015,
+              "orders": [
+                2,
+                3
+              ],
+              "max_order": 6,
+              "families": [
+                "linear_homogeneous",
+                "linear_sinusoidal"
+              ],
+              "groups_per_split": [
+                16,
+                4,
+                4
+              ],
+              "initial_conditions_per_group": 4,
+              "diagnostic_groups": 0,
+              "decay_range": [
+                0.1,
+                1.0
+              ],
+              "frequency_range": [
+                0.5,
+                2.0
+              ],
+              "initial_state_range": [
+                -1.0,
+                1.0
+              ],
+              "amplitude_range": [
+                0.1,
+                1.0
+              ],
+              "t_start": 0.0,
+              "t_stop": 5.0,
+              "time_points": 101,
+              "method": "DOP853",
+              "rtol": 1e-09,
+              "atol": 1e-11,
+              "refinement_factor": 10.0,
+              "reference_rtol": 1e-06,
+              "reference_atol": 1e-08,
+              "independent_check_points": 5,
+              "max_abs_state": 1000000.0,
+              "max_rhs_calls": 100000,
+              "backend": "serial",
+              "workers": 1
+            },
+            "python": "3.14.8",
+            "machine": "x86_64",
+            "dependencies": {
+              "numpy": "2.5.2",
+              "scipy": "1.18.1"
+            },
+            "source_sha256": {
+              "equations.py": "d08d51d57c2616c068b484dd6c5637420636d66a2536e517985623dbfa05c04e",
+              "reference.py": "ed0b4aa08f7a56594cc0014b7f8c14c06929c4592446ee987d1e84173a5e2377",
+              "analytic.py": "6ed50598634923cf2819b21a15efd47013d1cd56b8a0eb24d5bf0c5382324aca",
+              "validate_reference.py": "fbdbb1d4300321cb7652c5355e3a438b31d5822a0353d48423f90bd3de6280de"
+            },
+            "seconds": 0.15353656599995702
+          },
+          "per_trajectory": "tolerance refinement plus matrix exponential at selected times"
+        },
+        "family_counts": {
+          "linear_homogeneous": {
+            "succeeded": 192,
+            "failed": 0
+          },
+          "linear_sinusoidal": {
+            "succeeded": 192,
+            "failed": 0
+          }
+        },
+        "split_policy": "core joint holdout; diagnostics cross train and validation identities only",
+        "records_sha256": "e8b774fa2930f1c1f944a4f00bf3a05745595450b9dcac47053aebc074cb6863",
+        "seconds": 4.029008830999828
+      },
+      "trajectories_per_second": 95.30880077637049,
+      "stage_worker_seconds": {
+        "coarse": 1.5989754839990837,
+        "refined": 2.0588574550001795,
+        "matrix_exponential": 0.038692907998893133
+      },
+      "archive_bytes": 1016303
+    },
+    {
+      "workers": 6,
+      "repeat": 0,
+      "manifest": {
+        "schema_version": 1,
+        "status": "complete",
+        "config": {
+          "seed": 20261015,
+          "orders": [
+            2,
+            3
+          ],
+          "max_order": 6,
+          "families": [
+            "linear_homogeneous",
+            "linear_sinusoidal"
+          ],
+          "groups_per_split": [
+            16,
+            4,
+            4
+          ],
+          "initial_conditions_per_group": 4,
+          "diagnostic_groups": 0,
+          "decay_range": [
+            0.1,
+            1.0
+          ],
+          "frequency_range": [
+            0.5,
+            2.0
+          ],
+          "initial_state_range": [
+            -1.0,
+            1.0
+          ],
+          "amplitude_range": [
+            0.1,
+            1.0
+          ],
+          "t_start": 0.0,
+          "t_stop": 5.0,
+          "time_points": 101,
+          "method": "DOP853",
+          "rtol": 1e-09,
+          "atol": 1e-11,
+          "refinement_factor": 10.0,
+          "reference_rtol": 1e-06,
+          "reference_atol": 1e-08,
+          "independent_check_points": 5,
+          "max_abs_state": 1000000.0,
+          "max_rhs_calls": 100000,
+          "backend": "process",
+          "workers": 6
+        },
+        "planned": 384,
+        "succeeded": 384,
+        "failed": 0,
+        "python": "3.14.8",
+        "dependencies": {
+          "numpy": "2.5.2",
+          "scipy": "1.18.1"
+        },
+        "source_sha256": {
+          "__init__.py": "4038ce67d84b663b59696296565206bc21471556b979c8f211a755e8a1464b8f",
+          "analytic.py": "6ed50598634923cf2819b21a15efd47013d1cd56b8a0eb24d5bf0c5382324aca",
+          "benchmark.py": "d7cd0ac9039f51c15aca6a8e21b01c393ae211c384f73883d3645c0f1a88d875",
+          "check_environment.py": "38af69a56835f9db3e57e302bfeda2b1b609c8c8582d083efaf9a2b4b8b3cde9",
+          "config.py": "ae70992112ef314058553e2813148c180856a55a4921f6027ae5c753e972aa4e",
+          "dataset.py": "f68d2c1b063a31372093eb838af7fc0f8335837108838aecbf187a0b3afafa3b",
+          "equations.py": "d08d51d57c2616c068b484dd6c5637420636d66a2536e517985623dbfa05c04e",
+          "evaluate.py": "4f07d878870f20ec8424841c3b4bebb953214646a2b0fb68bae4cd9ab47c5e00",
+          "generate_data.py": "9039a88e0e86f56050f04f05632a6274bf9f9629086b268088e018b3581f6e4f",
+          "model.py": "6041965303c587ae8351f9344f22dc9485c7184d1c729008ce9381899b7d6505",
+          "plot_results.py": "82d1e14f2935e8d7add2733c9e9ff0cc3c6fc651c8f28cffbd55e1247b63e696",
+          "predict.py": "cc3532c32777b7399bd70e4834f7490cd39570995150bea6f60b769522f5710a",
+          "reference.py": "ed0b4aa08f7a56594cc0014b7f8c14c06929c4592446ee987d1e84173a5e2377",
+          "train.py": "d067da02ccc060644d98223ab9600f39897543b9208d0e5b6391c4e716a28fff",
+          "validate_reference.py": "fbdbb1d4300321cb7652c5355e3a438b31d5822a0353d48423f90bd3de6280de"
+        },
+        "reference_validation": {
+          "closed_form_preflight": {
+            "passed": true,
+            "cases": [
+              {
+                "name": "linear_homogeneous-repeated_real_order2",
+                "family": "linear_homogeneous",
+                "order": 2,
+                "passed": true,
+                "seconds": 0.005586468999808858,
+                "nfev": 391,
+                "error": null,
+                "max_abs_error": 2.452266723018681e-10,
+                "error_ratio": 0.0017300059907770255,
+                "per_component_max_abs_error": [
+                  1.2146450512062756e-10,
+                  2.452266723018681e-10
+                ],
+                "matrix_exponential_error_ratio": 5.983516971735435e-09
+              },
+              {
+                "name": "linear_sinusoidal-repeated_real_order2",
+                "family": "linear_sinusoidal",
+                "order": 2,
+                "passed": true,
+                "seconds": 0.012072192999994513,
+                "nfev": 943,
+                "error": null,
+                "max_abs_error": 3.7221337123583e-11,
+                "error_ratio": 8.056117163742869e-05,
+                "per_component_max_abs_error": [
+                  2.457434256086799e-11,
+                  3.7221337123583e-11
+                ],
+                "matrix_exponential_error_ratio": 1.9250406086100086e-08
+              },
+              {
+                "name": "linear_homogeneous-repeated_real_order3",
+                "family": "linear_homogeneous",
+                "order": 3,
+                "passed": true,
+                "seconds": 0.005858154000179638,
+                "nfev": 409,
+                "error": null,
+                "max_abs_error": 1.0659295668347113e-10,
+                "error_ratio": 0.00020813790724679207,
+                "per_component_max_abs_error": [
+                  6.9469763275265e-11,
+                  8.527811790060014e-11,
+                  1.0659295668347113e-10
+                ],
+                "matrix_exponential_error_ratio": 8.76953735646784e-09
+              },
+              {
+                "name": "linear_sinusoidal-repeated_real_order3",
+                "family": "linear_sinusoidal",
+                "order": 3,
+                "passed": true,
+                "seconds": 0.013788282999939838,
+                "nfev": 1039,
+                "error": null,
+                "max_abs_error": 1.8303958349008553e-10,
+                "error_ratio": 0.00027287965887381826,
+                "per_component_max_abs_error": [
+                  4.699551858777795e-11,
+                  9.996292682501462e-11,
+                  1.8303958349008553e-10
+                ],
+                "matrix_exponential_error_ratio": 1.5077929640199444e-08
+              },
+              {
+                "name": "linear_homogeneous-repeated_real_order6",
+                "family": "linear_homogeneous",
+                "order": 6,
+                "passed": true,
+                "seconds": 0.005300734000002194,
+                "nfev": 379,
+                "error": null,
+                "max_abs_error": 8.096523451683879e-11,
+                "error_ratio": 0.00013930483932723763,
+                "per_component_max_abs_error": [
+                  8.096523451683879e-11,
+                  6.398981344801769e-11,
+                  4.9119708300793263e-11,
+                  3.4716673980028645e-11,
+                  1.878724953385813e-11,
+                  6.594252921487964e-12
+                ],
+                "matrix_exponential_error_ratio": 8.249277250419876e-08
+              },
+              {
+                "name": "linear_sinusoidal-repeated_real_order6",
+                "family": "linear_sinusoidal",
+                "order": 6,
+                "passed": true,
+                "seconds": 0.019378211999992345,
+                "nfev": 1468,
+                "error": null,
+                "max_abs_error": 3.6212416398839764e-10,
+                "error_ratio": 0.001320515352547554,
+                "per_component_max_abs_error": [
+                  1.2973733198862192e-11,
+                  1.6983414674598407e-11,
+                  1.2819523220741758e-11,
+                  1.548883243884802e-11,
+                  1.1139777988944388e-10,
+                  3.6212416398839764e-10
+                ],
+                "matrix_exponential_error_ratio": 6.624046650633675e-08
+              },
+              {
+                "name": "linear_homogeneous-distinct_real_order2",
+                "family": "linear_homogeneous",
+                "order": 2,
+                "passed": true,
+                "seconds": 0.008345416999873123,
+                "nfev": 619,
+                "error": null,
+                "max_abs_error": 4.9866499818307375e-11,
+                "error_ratio": 0.001651035447076652,
+                "per_component_max_abs_error": [
+                  2.4757307315326216e-11,
+                  4.9866499818307375e-11
+                ],
+                "matrix_exponential_error_ratio": 7.478233410498445e-09
+              },
+              {
+                "name": "linear_sinusoidal-distinct_real_order2",
+                "family": "linear_sinusoidal",
+                "order": 2,
+                "passed": true,
+                "seconds": 0.015341770000077304,
+                "nfev": 1174,
+                "error": null,
+                "max_abs_error": 4.9936166313102603e-11,
+                "error_ratio": 0.00014548896847110457,
+                "per_component_max_abs_error": [
+                  2.4668600495658666e-11,
+                  4.9936166313102603e-11
+                ],
+                "matrix_exponential_error_ratio": 1.2313535421584508e-08
+              },
+              {
+                "name": "linear_homogeneous-damped_complex_order2",
+                "family": "linear_homogeneous",
+                "order": 2,
+                "passed": true,
+                "seconds": 0.007148636000010811,
+                "nfev": 526,
+                "error": null,
+                "max_abs_error": 2.2581675418464897e-10,
+                "error_ratio": 0.0005316487784528919,
+                "per_component_max_abs_error": [
+                  1.734723475976807e-10,
+                  2.2581675418464897e-10
+                ],
+                "matrix_exponential_error_ratio": 5.047447656756363e-07
+              },
+              {
+                "name": "linear_sinusoidal-damped_complex_order2",
+                "family": "linear_sinusoidal",
+                "order": 2,
+                "passed": true,
+                "seconds": 0.00895537799988233,
+                "nfev": 670,
+                "error": null,
+                "max_abs_error": 3.753525268379576e-11,
+                "error_ratio": 0.0006135847710321997,
+                "per_component_max_abs_error": [
+                  3.157679673293501e-11,
+                  3.753525268379576e-11
+                ],
+                "matrix_exponential_error_ratio": 4.3970422311308924e-07
+              },
+              {
+                "name": "linear_homogeneous-distinct_real_order3",
+                "family": "linear_homogeneous",
+                "order": 3,
+                "passed": true,
+                "seconds": 0.00959392899994782,
+                "nfev": 709,
+                "error": null,
+                "max_abs_error": 1.3431838974398147e-10,
+                "error_ratio": 0.0015208483651789608,
+                "per_component_max_abs_error": [
+                  1.1289441603778982e-11,
+                  2.536089394045149e-11,
+                  1.3431838974398147e-10
+                ],
+                "matrix_exponential_error_ratio": 8.993146238663719e-09
+              },
+              {
+                "name": "linear_sinusoidal-distinct_real_order3",
+                "family": "linear_sinusoidal",
+                "order": 3,
+                "passed": true,
+                "seconds": 0.020905848999973387,
+                "nfev": 1612,
+                "error": null,
+                "max_abs_error": 5.601122343712461e-10,
+                "error_ratio": 0.001313371963581701,
+                "per_component_max_abs_error": [
+                  5.3023807566887626e-11,
+                  1.7566509358246662e-10,
+                  5.601122343712461e-10
+                ],
+                "matrix_exponential_error_ratio": 8.037149603526032e-09
+              },
+              {
+                "name": "linear_sinusoidal-resonance",
+                "family": "linear_sinusoidal",
+                "order": 2,
+                "passed": true,
+                "seconds": 0.008013980999976411,
+                "nfev": 589,
+                "error": null,
+                "max_abs_error": 1.554683048965444e-10,
+                "error_ratio": 0.0020321022297601033,
+                "per_component_max_abs_error": [
+                  1.554683048965444e-10,
+                  1.1616463346797445e-10
+                ],
+                "matrix_exponential_error_ratio": 1.0539354545043864e-06
+              }
+            ],
+            "method": "DOP853",
+            "reference_rtol": 1e-06,
+            "reference_atol": 1e-08,
+            "families": [
+              "linear_homogeneous",
+              "linear_sinusoidal"
+            ],
+            "config": {
+              "seed": 20261015,
+              "orders": [
+                2,
+                3
+              ],
+              "max_order": 6,
+              "families": [
+                "linear_homogeneous",
+                "linear_sinusoidal"
+              ],
+              "groups_per_split": [
+                16,
+                4,
+                4
+              ],
+              "initial_conditions_per_group": 4,
+              "diagnostic_groups": 0,
+              "decay_range": [
+                0.1,
+                1.0
+              ],
+              "frequency_range": [
+                0.5,
+                2.0
+              ],
+              "initial_state_range": [
+                -1.0,
+                1.0
+              ],
+              "amplitude_range": [
+                0.1,
+                1.0
+              ],
+              "t_start": 0.0,
+              "t_stop": 5.0,
+              "time_points": 101,
+              "method": "DOP853",
+              "rtol": 1e-09,
+              "atol": 1e-11,
+              "refinement_factor": 10.0,
+              "reference_rtol": 1e-06,
+              "reference_atol": 1e-08,
+              "independent_check_points": 5,
+              "max_abs_state": 1000000.0,
+              "max_rhs_calls": 100000,
+              "backend": "process",
+              "workers": 6
+            },
+            "python": "3.14.8",
+            "machine": "x86_64",
+            "dependencies": {
+              "numpy": "2.5.2",
+              "scipy": "1.18.1"
+            },
+            "source_sha256": {
+              "equations.py": "d08d51d57c2616c068b484dd6c5637420636d66a2536e517985623dbfa05c04e",
+              "reference.py": "ed0b4aa08f7a56594cc0014b7f8c14c06929c4592446ee987d1e84173a5e2377",
+              "analytic.py": "6ed50598634923cf2819b21a15efd47013d1cd56b8a0eb24d5bf0c5382324aca",
+              "validate_reference.py": "fbdbb1d4300321cb7652c5355e3a438b31d5822a0353d48423f90bd3de6280de"
+            },
+            "seconds": 0.15376925300006405
+          },
+          "per_trajectory": "tolerance refinement plus matrix exponential at selected times"
+        },
+        "family_counts": {
+          "linear_homogeneous": {
+            "succeeded": 192,
+            "failed": 0
+          },
+          "linear_sinusoidal": {
+            "succeeded": 192,
+            "failed": 0
+          }
+        },
+        "split_policy": "core joint holdout; diagnostics cross train and validation identities only",
+        "records_sha256": "ff768cf7b530c13cf2d046c2706c6236985ef78651f2541ee26da4aace50781e",
+        "seconds": 1.1743734300000597
+      },
+      "trajectories_per_second": 326.982874604018,
+      "stage_worker_seconds": {
+        "coarse": 1.7503796290013725,
+        "refined": 2.173543511998105,
+        "matrix_exponential": 0.041991308001797734
+      },
+      "archive_bytes": 1016303
+    },
+    {
+      "workers": 6,
+      "repeat": 1,
+      "manifest": {
+        "schema_version": 1,
+        "status": "complete",
+        "config": {
+          "seed": 20261015,
+          "orders": [
+            2,
+            3
+          ],
+          "max_order": 6,
+          "families": [
+            "linear_homogeneous",
+            "linear_sinusoidal"
+          ],
+          "groups_per_split": [
+            16,
+            4,
+            4
+          ],
+          "initial_conditions_per_group": 4,
+          "diagnostic_groups": 0,
+          "decay_range": [
+            0.1,
+            1.0
+          ],
+          "frequency_range": [
+            0.5,
+            2.0
+          ],
+          "initial_state_range": [
+            -1.0,
+            1.0
+          ],
+          "amplitude_range": [
+            0.1,
+            1.0
+          ],
+          "t_start": 0.0,
+          "t_stop": 5.0,
+          "time_points": 101,
+          "method": "DOP853",
+          "rtol": 1e-09,
+          "atol": 1e-11,
+          "refinement_factor": 10.0,
+          "reference_rtol": 1e-06,
+          "reference_atol": 1e-08,
+          "independent_check_points": 5,
+          "max_abs_state": 1000000.0,
+          "max_rhs_calls": 100000,
+          "backend": "process",
+          "workers": 6
+        },
+        "planned": 384,
+        "succeeded": 384,
+        "failed": 0,
+        "python": "3.14.8",
+        "dependencies": {
+          "numpy": "2.5.2",
+          "scipy": "1.18.1"
+        },
+        "source_sha256": {
+          "__init__.py": "4038ce67d84b663b59696296565206bc21471556b979c8f211a755e8a1464b8f",
+          "analytic.py": "6ed50598634923cf2819b21a15efd47013d1cd56b8a0eb24d5bf0c5382324aca",
+          "benchmark.py": "d7cd0ac9039f51c15aca6a8e21b01c393ae211c384f73883d3645c0f1a88d875",
+          "check_environment.py": "38af69a56835f9db3e57e302bfeda2b1b609c8c8582d083efaf9a2b4b8b3cde9",
+          "config.py": "ae70992112ef314058553e2813148c180856a55a4921f6027ae5c753e972aa4e",
+          "dataset.py": "f68d2c1b063a31372093eb838af7fc0f8335837108838aecbf187a0b3afafa3b",
+          "equations.py": "d08d51d57c2616c068b484dd6c5637420636d66a2536e517985623dbfa05c04e",
+          "evaluate.py": "4f07d878870f20ec8424841c3b4bebb953214646a2b0fb68bae4cd9ab47c5e00",
+          "generate_data.py": "9039a88e0e86f56050f04f05632a6274bf9f9629086b268088e018b3581f6e4f",
+          "model.py": "6041965303c587ae8351f9344f22dc9485c7184d1c729008ce9381899b7d6505",
+          "plot_results.py": "82d1e14f2935e8d7add2733c9e9ff0cc3c6fc651c8f28cffbd55e1247b63e696",
+          "predict.py": "cc3532c32777b7399bd70e4834f7490cd39570995150bea6f60b769522f5710a",
+          "reference.py": "ed0b4aa08f7a56594cc0014b7f8c14c06929c4592446ee987d1e84173a5e2377",
+          "train.py": "d067da02ccc060644d98223ab9600f39897543b9208d0e5b6391c4e716a28fff",
+          "validate_reference.py": "fbdbb1d4300321cb7652c5355e3a438b31d5822a0353d48423f90bd3de6280de"
+        },
+        "reference_validation": {
+          "closed_form_preflight": {
+            "passed": true,
+            "cases": [
+              {
+                "name": "linear_homogeneous-repeated_real_order2",
+                "family": "linear_homogeneous",
+                "order": 2,
+                "passed": true,
+                "seconds": 0.005764211000041541,
+                "nfev": 391,
+                "error": null,
+                "max_abs_error": 2.452266723018681e-10,
+                "error_ratio": 0.0017300059907770255,
+                "per_component_max_abs_error": [
+                  1.2146450512062756e-10,
+                  2.452266723018681e-10
+                ],
+                "matrix_exponential_error_ratio": 5.983516971735435e-09
+              },
+              {
+                "name": "linear_sinusoidal-repeated_real_order2",
+                "family": "linear_sinusoidal",
+                "order": 2,
+                "passed": true,
+                "seconds": 0.012061413000083121,
+                "nfev": 943,
+                "error": null,
+                "max_abs_error": 3.7221337123583e-11,
+                "error_ratio": 8.056117163742869e-05,
+                "per_component_max_abs_error": [
+                  2.457434256086799e-11,
+                  3.7221337123583e-11
+                ],
+                "matrix_exponential_error_ratio": 1.9250406086100086e-08
+              },
+              {
+                "name": "linear_homogeneous-repeated_real_order3",
+                "family": "linear_homogeneous",
+                "order": 3,
+                "passed": true,
+                "seconds": 0.0056858299999476,
+                "nfev": 409,
+                "error": null,
+                "max_abs_error": 1.0659295668347113e-10,
+                "error_ratio": 0.00020813790724679207,
+                "per_component_max_abs_error": [
+                  6.9469763275265e-11,
+                  8.527811790060014e-11,
+                  1.0659295668347113e-10
+                ],
+                "matrix_exponential_error_ratio": 8.76953735646784e-09
+              },
+              {
+                "name": "linear_sinusoidal-repeated_real_order3",
+                "family": "linear_sinusoidal",
+                "order": 3,
+                "passed": true,
+                "seconds": 0.013434836999977051,
+                "nfev": 1039,
+                "error": null,
+                "max_abs_error": 1.8303958349008553e-10,
+                "error_ratio": 0.00027287965887381826,
+                "per_component_max_abs_error": [
+                  4.699551858777795e-11,
+                  9.996292682501462e-11,
+                  1.8303958349008553e-10
+                ],
+                "matrix_exponential_error_ratio": 1.5077929640199444e-08
+              },
+              {
+                "name": "linear_homogeneous-repeated_real_order6",
+                "family": "linear_homogeneous",
+                "order": 6,
+                "passed": true,
+                "seconds": 0.005339743999911661,
+                "nfev": 379,
+                "error": null,
+                "max_abs_error": 8.096523451683879e-11,
+                "error_ratio": 0.00013930483932723763,
+                "per_component_max_abs_error": [
+                  8.096523451683879e-11,
+                  6.398981344801769e-11,
+                  4.9119708300793263e-11,
+                  3.4716673980028645e-11,
+                  1.878724953385813e-11,
+                  6.594252921487964e-12
+                ],
+                "matrix_exponential_error_ratio": 8.249277250419876e-08
+              },
+              {
+                "name": "linear_sinusoidal-repeated_real_order6",
+                "family": "linear_sinusoidal",
+                "order": 6,
+                "passed": true,
+                "seconds": 0.019041726000068593,
+                "nfev": 1468,
+                "error": null,
+                "max_abs_error": 3.6212416398839764e-10,
+                "error_ratio": 0.001320515352547554,
+                "per_component_max_abs_error": [
+                  1.2973733198862192e-11,
+                  1.6983414674598407e-11,
+                  1.2819523220741758e-11,
+                  1.548883243884802e-11,
+                  1.1139777988944388e-10,
+                  3.6212416398839764e-10
+                ],
+                "matrix_exponential_error_ratio": 6.624046650633675e-08
+              },
+              {
+                "name": "linear_homogeneous-distinct_real_order2",
+                "family": "linear_homogeneous",
+                "order": 2,
+                "passed": true,
+                "seconds": 0.00826875600000676,
+                "nfev": 619,
+                "error": null,
+                "max_abs_error": 4.9866499818307375e-11,
+                "error_ratio": 0.001651035447076652,
+                "per_component_max_abs_error": [
+                  2.4757307315326216e-11,
+                  4.9866499818307375e-11
+                ],
+                "matrix_exponential_error_ratio": 7.478233410498445e-09
+              },
+              {
+                "name": "linear_sinusoidal-distinct_real_order2",
+                "family": "linear_sinusoidal",
+                "order": 2,
+                "passed": true,
+                "seconds": 0.015026345000023866,
+                "nfev": 1174,
+                "error": null,
+                "max_abs_error": 4.9936166313102603e-11,
+                "error_ratio": 0.00014548896847110457,
+                "per_component_max_abs_error": [
+                  2.4668600495658666e-11,
+                  4.9936166313102603e-11
+                ],
+                "matrix_exponential_error_ratio": 1.2313535421584508e-08
+              },
+              {
+                "name": "linear_homogeneous-damped_complex_order2",
+                "family": "linear_homogeneous",
+                "order": 2,
+                "passed": true,
+                "seconds": 0.007054485000026034,
+                "nfev": 526,
+                "error": null,
+                "max_abs_error": 2.2581675418464897e-10,
+                "error_ratio": 0.0005316487784528919,
+                "per_component_max_abs_error": [
+                  1.734723475976807e-10,
+                  2.2581675418464897e-10
+                ],
+                "matrix_exponential_error_ratio": 5.047447656756363e-07
+              },
+              {
+                "name": "linear_sinusoidal-damped_complex_order2",
+                "family": "linear_sinusoidal",
+                "order": 2,
+                "passed": true,
+                "seconds": 0.008833924999862575,
+                "nfev": 670,
+                "error": null,
+                "max_abs_error": 3.753525268379576e-11,
+                "error_ratio": 0.0006135847710321997,
+                "per_component_max_abs_error": [
+                  3.157679673293501e-11,
+                  3.753525268379576e-11
+                ],
+                "matrix_exponential_error_ratio": 4.3970422311308924e-07
+              },
+              {
+                "name": "linear_homogeneous-distinct_real_order3",
+                "family": "linear_homogeneous",
+                "order": 3,
+                "passed": true,
+                "seconds": 0.009435635999807346,
+                "nfev": 709,
+                "error": null,
+                "max_abs_error": 1.3431838974398147e-10,
+                "error_ratio": 0.0015208483651789608,
+                "per_component_max_abs_error": [
+                  1.1289441603778982e-11,
+                  2.536089394045149e-11,
+                  1.3431838974398147e-10
+                ],
+                "matrix_exponential_error_ratio": 8.993146238663719e-09
+              },
+              {
+                "name": "linear_sinusoidal-distinct_real_order3",
+                "family": "linear_sinusoidal",
+                "order": 3,
+                "passed": true,
+                "seconds": 0.02076166500000909,
+                "nfev": 1612,
+                "error": null,
+                "max_abs_error": 5.601122343712461e-10,
+                "error_ratio": 0.001313371963581701,
+                "per_component_max_abs_error": [
+                  5.3023807566887626e-11,
+                  1.7566509358246662e-10,
+                  5.601122343712461e-10
+                ],
+                "matrix_exponential_error_ratio": 8.037149603526032e-09
+              },
+              {
+                "name": "linear_sinusoidal-resonance",
+                "family": "linear_sinusoidal",
+                "order": 2,
+                "passed": true,
+                "seconds": 0.007926370000177485,
+                "nfev": 589,
+                "error": null,
+                "max_abs_error": 1.554683048965444e-10,
+                "error_ratio": 0.0020321022297601033,
+                "per_component_max_abs_error": [
+                  1.554683048965444e-10,
+                  1.1616463346797445e-10
+                ],
+                "matrix_exponential_error_ratio": 1.0539354545043864e-06
+              }
+            ],
+            "method": "DOP853",
+            "reference_rtol": 1e-06,
+            "reference_atol": 1e-08,
+            "families": [
+              "linear_homogeneous",
+              "linear_sinusoidal"
+            ],
+            "config": {
+              "seed": 20261015,
+              "orders": [
+                2,
+                3
+              ],
+              "max_order": 6,
+              "families": [
+                "linear_homogeneous",
+                "linear_sinusoidal"
+              ],
+              "groups_per_split": [
+                16,
+                4,
+                4
+              ],
+              "initial_conditions_per_group": 4,
+              "diagnostic_groups": 0,
+              "decay_range": [
+                0.1,
+                1.0
+              ],
+              "frequency_range": [
+                0.5,
+                2.0
+              ],
+              "initial_state_range": [
+                -1.0,
+                1.0
+              ],
+              "amplitude_range": [
+                0.1,
+                1.0
+              ],
+              "t_start": 0.0,
+              "t_stop": 5.0,
+              "time_points": 101,
+              "method": "DOP853",
+              "rtol": 1e-09,
+              "atol": 1e-11,
+              "refinement_factor": 10.0,
+              "reference_rtol": 1e-06,
+              "reference_atol": 1e-08,
+              "independent_check_points": 5,
+              "max_abs_state": 1000000.0,
+              "max_rhs_calls": 100000,
+              "backend": "process",
+              "workers": 6
+            },
+            "python": "3.14.8",
+            "machine": "x86_64",
+            "dependencies": {
+              "numpy": "2.5.2",
+              "scipy": "1.18.1"
+            },
+            "source_sha256": {
+              "equations.py": "d08d51d57c2616c068b484dd6c5637420636d66a2536e517985623dbfa05c04e",
+              "reference.py": "ed0b4aa08f7a56594cc0014b7f8c14c06929c4592446ee987d1e84173a5e2377",
+              "analytic.py": "6ed50598634923cf2819b21a15efd47013d1cd56b8a0eb24d5bf0c5382324aca",
+              "validate_reference.py": "fbdbb1d4300321cb7652c5355e3a438b31d5822a0353d48423f90bd3de6280de"
+            },
+            "seconds": 0.15202535699995678
+          },
+          "per_trajectory": "tolerance refinement plus matrix exponential at selected times"
+        },
+        "family_counts": {
+          "linear_homogeneous": {
+            "succeeded": 192,
+            "failed": 0
+          },
+          "linear_sinusoidal": {
+            "succeeded": 192,
+            "failed": 0
+          }
+        },
+        "split_policy": "core joint holdout; diagnostics cross train and validation identities only",
+        "records_sha256": "d96073c72aaad1b8b838f61303ba97638b3e721ff4f21c38195d0be4e39cb37f",
+        "seconds": 1.166175697999961
+      },
+      "trajectories_per_second": 329.2814287406055,
+      "stage_worker_seconds": {
+        "coarse": 1.742818337999779,
+        "refined": 2.1734647729990684,
+        "matrix_exponential": 0.041903360998276185
+      },
+      "archive_bytes": 1016303
+    },
+    {
+      "workers": 6,
+      "repeat": 2,
+      "manifest": {
+        "schema_version": 1,
+        "status": "complete",
+        "config": {
+          "seed": 20261015,
+          "orders": [
+            2,
+            3
+          ],
+          "max_order": 6,
+          "families": [
+            "linear_homogeneous",
+            "linear_sinusoidal"
+          ],
+          "groups_per_split": [
+            16,
+            4,
+            4
+          ],
+          "initial_conditions_per_group": 4,
+          "diagnostic_groups": 0,
+          "decay_range": [
+            0.1,
+            1.0
+          ],
+          "frequency_range": [
+            0.5,
+            2.0
+          ],
+          "initial_state_range": [
+            -1.0,
+            1.0
+          ],
+          "amplitude_range": [
+            0.1,
+            1.0
+          ],
+          "t_start": 0.0,
+          "t_stop": 5.0,
+          "time_points": 101,
+          "method": "DOP853",
+          "rtol": 1e-09,
+          "atol": 1e-11,
+          "refinement_factor": 10.0,
+          "reference_rtol": 1e-06,
+          "reference_atol": 1e-08,
+          "independent_check_points": 5,
+          "max_abs_state": 1000000.0,
+          "max_rhs_calls": 100000,
+          "backend": "process",
+          "workers": 6
+        },
+        "planned": 384,
+        "succeeded": 384,
+        "failed": 0,
+        "python": "3.14.8",
+        "dependencies": {
+          "numpy": "2.5.2",
+          "scipy": "1.18.1"
+        },
+        "source_sha256": {
+          "__init__.py": "4038ce67d84b663b59696296565206bc21471556b979c8f211a755e8a1464b8f",
+          "analytic.py": "6ed50598634923cf2819b21a15efd47013d1cd56b8a0eb24d5bf0c5382324aca",
+          "benchmark.py": "d7cd0ac9039f51c15aca6a8e21b01c393ae211c384f73883d3645c0f1a88d875",
+          "check_environment.py": "38af69a56835f9db3e57e302bfeda2b1b609c8c8582d083efaf9a2b4b8b3cde9",
+          "config.py": "ae70992112ef314058553e2813148c180856a55a4921f6027ae5c753e972aa4e",
+          "dataset.py": "f68d2c1b063a31372093eb838af7fc0f8335837108838aecbf187a0b3afafa3b",
+          "equations.py": "d08d51d57c2616c068b484dd6c5637420636d66a2536e517985623dbfa05c04e",
+          "evaluate.py": "4f07d878870f20ec8424841c3b4bebb953214646a2b0fb68bae4cd9ab47c5e00",
+          "generate_data.py": "9039a88e0e86f56050f04f05632a6274bf9f9629086b268088e018b3581f6e4f",
+          "model.py": "6041965303c587ae8351f9344f22dc9485c7184d1c729008ce9381899b7d6505",
+          "plot_results.py": "82d1e14f2935e8d7add2733c9e9ff0cc3c6fc651c8f28cffbd55e1247b63e696",
+          "predict.py": "cc3532c32777b7399bd70e4834f7490cd39570995150bea6f60b769522f5710a",
+          "reference.py": "ed0b4aa08f7a56594cc0014b7f8c14c06929c4592446ee987d1e84173a5e2377",
+          "train.py": "d067da02ccc060644d98223ab9600f39897543b9208d0e5b6391c4e716a28fff",
+          "validate_reference.py": "fbdbb1d4300321cb7652c5355e3a438b31d5822a0353d48423f90bd3de6280de"
+        },
+        "reference_validation": {
+          "closed_form_preflight": {
+            "passed": true,
+            "cases": [
+              {
+                "name": "linear_homogeneous-repeated_real_order2",
+                "family": "linear_homogeneous",
+                "order": 2,
+                "passed": true,
+                "seconds": 0.0073040579998178146,
+                "nfev": 391,
+                "error": null,
+                "max_abs_error": 2.452266723018681e-10,
+                "error_ratio": 0.0017300059907770255,
+                "per_component_max_abs_error": [
+                  1.2146450512062756e-10,
+                  2.452266723018681e-10
+                ],
+                "matrix_exponential_error_ratio": 5.983516971735435e-09
+              },
+              {
+                "name": "linear_sinusoidal-repeated_real_order2",
+                "family": "linear_sinusoidal",
+                "order": 2,
+                "passed": true,
+                "seconds": 0.012690111999972942,
+                "nfev": 943,
+                "error": null,
+                "max_abs_error": 3.7221337123583e-11,
+                "error_ratio": 8.056117163742869e-05,
+                "per_component_max_abs_error": [
+                  2.457434256086799e-11,
+                  3.7221337123583e-11
+                ],
+                "matrix_exponential_error_ratio": 1.9250406086100086e-08
+              },
+              {
+                "name": "linear_homogeneous-repeated_real_order3",
+                "family": "linear_homogeneous",
+                "order": 3,
+                "passed": true,
+                "seconds": 0.005869993000032991,
+                "nfev": 409,
+                "error": null,
+                "max_abs_error": 1.0659295668347113e-10,
+                "error_ratio": 0.00020813790724679207,
+                "per_component_max_abs_error": [
+                  6.9469763275265e-11,
+                  8.527811790060014e-11,
+                  1.0659295668347113e-10
+                ],
+                "matrix_exponential_error_ratio": 8.76953735646784e-09
+              },
+              {
+                "name": "linear_sinusoidal-repeated_real_order3",
+                "family": "linear_sinusoidal",
+                "order": 3,
+                "passed": true,
+                "seconds": 0.014157819000047311,
+                "nfev": 1039,
+                "error": null,
+                "max_abs_error": 1.8303958349008553e-10,
+                "error_ratio": 0.00027287965887381826,
+                "per_component_max_abs_error": [
+                  4.699551858777795e-11,
+                  9.996292682501462e-11,
+                  1.8303958349008553e-10
+                ],
+                "matrix_exponential_error_ratio": 1.5077929640199444e-08
+              },
+              {
+                "name": "linear_homogeneous-repeated_real_order6",
+                "family": "linear_homogeneous",
+                "order": 6,
+                "passed": true,
+                "seconds": 0.005515217000038319,
+                "nfev": 379,
+                "error": null,
+                "max_abs_error": 8.096523451683879e-11,
+                "error_ratio": 0.00013930483932723763,
+                "per_component_max_abs_error": [
+                  8.096523451683879e-11,
+                  6.398981344801769e-11,
+                  4.9119708300793263e-11,
+                  3.4716673980028645e-11,
+                  1.878724953385813e-11,
+                  6.594252921487964e-12
+                ],
+                "matrix_exponential_error_ratio": 8.249277250419876e-08
+              },
+              {
+                "name": "linear_sinusoidal-repeated_real_order6",
+                "family": "linear_sinusoidal",
+                "order": 6,
+                "passed": true,
+                "seconds": 0.019879008999851067,
+                "nfev": 1468,
+                "error": null,
+                "max_abs_error": 3.6212416398839764e-10,
+                "error_ratio": 0.001320515352547554,
+                "per_component_max_abs_error": [
+                  1.2973733198862192e-11,
+                  1.6983414674598407e-11,
+                  1.2819523220741758e-11,
+                  1.548883243884802e-11,
+                  1.1139777988944388e-10,
+                  3.6212416398839764e-10
+                ],
+                "matrix_exponential_error_ratio": 6.624046650633675e-08
+              },
+              {
+                "name": "linear_homogeneous-distinct_real_order2",
+                "family": "linear_homogeneous",
+                "order": 2,
+                "passed": true,
+                "seconds": 0.008372316999839313,
+                "nfev": 619,
+                "error": null,
+                "max_abs_error": 4.9866499818307375e-11,
+                "error_ratio": 0.001651035447076652,
+                "per_component_max_abs_error": [
+                  2.4757307315326216e-11,
+                  4.9866499818307375e-11
+                ],
+                "matrix_exponential_error_ratio": 7.478233410498445e-09
+              },
+              {
+                "name": "linear_sinusoidal-distinct_real_order2",
+                "family": "linear_sinusoidal",
+                "order": 2,
+                "passed": true,
+                "seconds": 0.015479250999987926,
+                "nfev": 1174,
+                "error": null,
+                "max_abs_error": 4.9936166313102603e-11,
+                "error_ratio": 0.00014548896847110457,
+                "per_component_max_abs_error": [
+                  2.4668600495658666e-11,
+                  4.9936166313102603e-11
+                ],
+                "matrix_exponential_error_ratio": 1.2313535421584508e-08
+              },
+              {
+                "name": "linear_homogeneous-damped_complex_order2",
+                "family": "linear_homogeneous",
+                "order": 2,
+                "passed": true,
+                "seconds": 0.007424700000001394,
+                "nfev": 526,
+                "error": null,
+                "max_abs_error": 2.2581675418464897e-10,
+                "error_ratio": 0.0005316487784528919,
+                "per_component_max_abs_error": [
+                  1.734723475976807e-10,
+                  2.2581675418464897e-10
+                ],
+                "matrix_exponential_error_ratio": 5.047447656756363e-07
+              },
+              {
+                "name": "linear_sinusoidal-damped_complex_order2",
+                "family": "linear_sinusoidal",
+                "order": 2,
+                "passed": true,
+                "seconds": 0.009133990000009362,
+                "nfev": 670,
+                "error": null,
+                "max_abs_error": 3.753525268379576e-11,
+                "error_ratio": 0.0006135847710321997,
+                "per_component_max_abs_error": [
+                  3.157679673293501e-11,
+                  3.753525268379576e-11
+                ],
+                "matrix_exponential_error_ratio": 4.3970422311308924e-07
+              },
+              {
+                "name": "linear_homogeneous-distinct_real_order3",
+                "family": "linear_homogeneous",
+                "order": 3,
+                "passed": true,
+                "seconds": 0.009714080999856378,
+                "nfev": 709,
+                "error": null,
+                "max_abs_error": 1.3431838974398147e-10,
+                "error_ratio": 0.0015208483651789608,
+                "per_component_max_abs_error": [
+                  1.1289441603778982e-11,
+                  2.536089394045149e-11,
+                  1.3431838974398147e-10
+                ],
+                "matrix_exponential_error_ratio": 8.993146238663719e-09
+              },
+              {
+                "name": "linear_sinusoidal-distinct_real_order3",
+                "family": "linear_sinusoidal",
+                "order": 3,
+                "passed": true,
+                "seconds": 0.021023738999929265,
+                "nfev": 1612,
+                "error": null,
+                "max_abs_error": 5.601122343712461e-10,
+                "error_ratio": 0.001313371963581701,
+                "per_component_max_abs_error": [
+                  5.3023807566887626e-11,
+                  1.7566509358246662e-10,
+                  5.601122343712461e-10
+                ],
+                "matrix_exponential_error_ratio": 8.037149603526032e-09
+              },
+              {
+                "name": "linear_sinusoidal-resonance",
+                "family": "linear_sinusoidal",
+                "order": 2,
+                "passed": true,
+                "seconds": 0.007966360000182249,
+                "nfev": 589,
+                "error": null,
+                "max_abs_error": 1.554683048965444e-10,
+                "error_ratio": 0.0020321022297601033,
+                "per_component_max_abs_error": [
+                  1.554683048965444e-10,
+                  1.1616463346797445e-10
+                ],
+                "matrix_exponential_error_ratio": 1.0539354545043864e-06
+              }
+            ],
+            "method": "DOP853",
+            "reference_rtol": 1e-06,
+            "reference_atol": 1e-08,
+            "families": [
+              "linear_homogeneous",
+              "linear_sinusoidal"
+            ],
+            "config": {
+              "seed": 20261015,
+              "orders": [
+                2,
+                3
+              ],
+              "max_order": 6,
+              "families": [
+                "linear_homogeneous",
+                "linear_sinusoidal"
+              ],
+              "groups_per_split": [
+                16,
+                4,
+                4
+              ],
+              "initial_conditions_per_group": 4,
+              "diagnostic_groups": 0,
+              "decay_range": [
+                0.1,
+                1.0
+              ],
+              "frequency_range": [
+                0.5,
+                2.0
+              ],
+              "initial_state_range": [
+                -1.0,
+                1.0
+              ],
+              "amplitude_range": [
+                0.1,
+                1.0
+              ],
+              "t_start": 0.0,
+              "t_stop": 5.0,
+              "time_points": 101,
+              "method": "DOP853",
+              "rtol": 1e-09,
+              "atol": 1e-11,
+              "refinement_factor": 10.0,
+              "reference_rtol": 1e-06,
+              "reference_atol": 1e-08,
+              "independent_check_points": 5,
+              "max_abs_state": 1000000.0,
+              "max_rhs_calls": 100000,
+              "backend": "process",
+              "workers": 6
+            },
+            "python": "3.14.8",
+            "machine": "x86_64",
+            "dependencies": {
+              "numpy": "2.5.2",
+              "scipy": "1.18.1"
+            },
+            "source_sha256": {
+              "equations.py": "d08d51d57c2616c068b484dd6c5637420636d66a2536e517985623dbfa05c04e",
+              "reference.py": "ed0b4aa08f7a56594cc0014b7f8c14c06929c4592446ee987d1e84173a5e2377",
+              "analytic.py": "6ed50598634923cf2819b21a15efd47013d1cd56b8a0eb24d5bf0c5382324aca",
+              "validate_reference.py": "fbdbb1d4300321cb7652c5355e3a438b31d5822a0353d48423f90bd3de6280de"
+            },
+            "seconds": 0.1592762570001014
+          },
+          "per_trajectory": "tolerance refinement plus matrix exponential at selected times"
+        },
+        "family_counts": {
+          "linear_homogeneous": {
+            "succeeded": 192,
+            "failed": 0
+          },
+          "linear_sinusoidal": {
+            "succeeded": 192,
+            "failed": 0
+          }
+        },
+        "split_policy": "core joint holdout; diagnostics cross train and validation identities only",
+        "records_sha256": "8cbd2687b14b92e0a44715bd68e6f029b69670c5b7586add35794171b6e7d6a1",
+        "seconds": 1.181873074999885
+      },
+      "trajectories_per_second": 324.9079855720018,
+      "stage_worker_seconds": {
+        "coarse": 1.7734036199997263,
+        "refined": 2.206922993997523,
+        "matrix_exponential": 0.042513443001780615
+      },
+      "archive_bytes": 1016303
+    },
+    {
+      "workers": 12,
+      "repeat": 0,
+      "manifest": {
+        "schema_version": 1,
+        "status": "complete",
+        "config": {
+          "seed": 20261015,
+          "orders": [
+            2,
+            3
+          ],
+          "max_order": 6,
+          "families": [
+            "linear_homogeneous",
+            "linear_sinusoidal"
+          ],
+          "groups_per_split": [
+            16,
+            4,
+            4
+          ],
+          "initial_conditions_per_group": 4,
+          "diagnostic_groups": 0,
+          "decay_range": [
+            0.1,
+            1.0
+          ],
+          "frequency_range": [
+            0.5,
+            2.0
+          ],
+          "initial_state_range": [
+            -1.0,
+            1.0
+          ],
+          "amplitude_range": [
+            0.1,
+            1.0
+          ],
+          "t_start": 0.0,
+          "t_stop": 5.0,
+          "time_points": 101,
+          "method": "DOP853",
+          "rtol": 1e-09,
+          "atol": 1e-11,
+          "refinement_factor": 10.0,
+          "reference_rtol": 1e-06,
+          "reference_atol": 1e-08,
+          "independent_check_points": 5,
+          "max_abs_state": 1000000.0,
+          "max_rhs_calls": 100000,
+          "backend": "process",
+          "workers": 12
+        },
+        "planned": 384,
+        "succeeded": 384,
+        "failed": 0,
+        "python": "3.14.8",
+        "dependencies": {
+          "numpy": "2.5.2",
+          "scipy": "1.18.1"
+        },
+        "source_sha256": {
+          "__init__.py": "4038ce67d84b663b59696296565206bc21471556b979c8f211a755e8a1464b8f",
+          "analytic.py": "6ed50598634923cf2819b21a15efd47013d1cd56b8a0eb24d5bf0c5382324aca",
+          "benchmark.py": "d7cd0ac9039f51c15aca6a8e21b01c393ae211c384f73883d3645c0f1a88d875",
+          "check_environment.py": "38af69a56835f9db3e57e302bfeda2b1b609c8c8582d083efaf9a2b4b8b3cde9",
+          "config.py": "ae70992112ef314058553e2813148c180856a55a4921f6027ae5c753e972aa4e",
+          "dataset.py": "f68d2c1b063a31372093eb838af7fc0f8335837108838aecbf187a0b3afafa3b",
+          "equations.py": "d08d51d57c2616c068b484dd6c5637420636d66a2536e517985623dbfa05c04e",
+          "evaluate.py": "4f07d878870f20ec8424841c3b4bebb953214646a2b0fb68bae4cd9ab47c5e00",
+          "generate_data.py": "9039a88e0e86f56050f04f05632a6274bf9f9629086b268088e018b3581f6e4f",
+          "model.py": "6041965303c587ae8351f9344f22dc9485c7184d1c729008ce9381899b7d6505",
+          "plot_results.py": "82d1e14f2935e8d7add2733c9e9ff0cc3c6fc651c8f28cffbd55e1247b63e696",
+          "predict.py": "cc3532c32777b7399bd70e4834f7490cd39570995150bea6f60b769522f5710a",
+          "reference.py": "ed0b4aa08f7a56594cc0014b7f8c14c06929c4592446ee987d1e84173a5e2377",
+          "train.py": "d067da02ccc060644d98223ab9600f39897543b9208d0e5b6391c4e716a28fff",
+          "validate_reference.py": "fbdbb1d4300321cb7652c5355e3a438b31d5822a0353d48423f90bd3de6280de"
+        },
+        "reference_validation": {
+          "closed_form_preflight": {
+            "passed": true,
+            "cases": [
+              {
+                "name": "linear_homogeneous-repeated_real_order2",
+                "family": "linear_homogeneous",
+                "order": 2,
+                "passed": true,
+                "seconds": 0.005560316999890347,
+                "nfev": 391,
+                "error": null,
+                "max_abs_error": 2.452266723018681e-10,
+                "error_ratio": 0.0017300059907770255,
+                "per_component_max_abs_error": [
+                  1.2146450512062756e-10,
+                  2.452266723018681e-10
+                ],
+                "matrix_exponential_error_ratio": 5.983516971735435e-09
+              },
+              {
+                "name": "linear_sinusoidal-repeated_real_order2",
+                "family": "linear_sinusoidal",
+                "order": 2,
+                "passed": true,
+                "seconds": 0.012011570999902688,
+                "nfev": 943,
+                "error": null,
+                "max_abs_error": 3.7221337123583e-11,
+                "error_ratio": 8.056117163742869e-05,
+                "per_component_max_abs_error": [
+                  2.457434256086799e-11,
+                  3.7221337123583e-11
+                ],
+                "matrix_exponential_error_ratio": 1.9250406086100086e-08
+              },
+              {
+                "name": "linear_homogeneous-repeated_real_order3",
+                "family": "linear_homogeneous",
+                "order": 3,
+                "passed": true,
+                "seconds": 0.005531196999982058,
+                "nfev": 409,
+                "error": null,
+                "max_abs_error": 1.0659295668347113e-10,
+                "error_ratio": 0.00020813790724679207,
+                "per_component_max_abs_error": [
+                  6.9469763275265e-11,
+                  8.527811790060014e-11,
+                  1.0659295668347113e-10
+                ],
+                "matrix_exponential_error_ratio": 8.76953735646784e-09
+              },
+              {
+                "name": "linear_sinusoidal-repeated_real_order3",
+                "family": "linear_sinusoidal",
+                "order": 3,
+                "passed": true,
+                "seconds": 0.01491624100003719,
+                "nfev": 1039,
+                "error": null,
+                "max_abs_error": 1.8303958349008553e-10,
+                "error_ratio": 0.00027287965887381826,
+                "per_component_max_abs_error": [
+                  4.699551858777795e-11,
+                  9.996292682501462e-11,
+                  1.8303958349008553e-10
+                ],
+                "matrix_exponential_error_ratio": 1.5077929640199444e-08
+              },
+              {
+                "name": "linear_homogeneous-repeated_real_order6",
+                "family": "linear_homogeneous",
+                "order": 6,
+                "passed": true,
+                "seconds": 0.00529145299992706,
+                "nfev": 379,
+                "error": null,
+                "max_abs_error": 8.096523451683879e-11,
+                "error_ratio": 0.00013930483932723763,
+                "per_component_max_abs_error": [
+                  8.096523451683879e-11,
+                  6.398981344801769e-11,
+                  4.9119708300793263e-11,
+                  3.4716673980028645e-11,
+                  1.878724953385813e-11,
+                  6.594252921487964e-12
+                ],
+                "matrix_exponential_error_ratio": 8.249277250419876e-08
+              },
+              {
+                "name": "linear_sinusoidal-repeated_real_order6",
+                "family": "linear_sinusoidal",
+                "order": 6,
+                "passed": true,
+                "seconds": 0.020494948000077784,
+                "nfev": 1468,
+                "error": null,
+                "max_abs_error": 3.6212416398839764e-10,
+                "error_ratio": 0.001320515352547554,
+                "per_component_max_abs_error": [
+                  1.2973733198862192e-11,
+                  1.6983414674598407e-11,
+                  1.2819523220741758e-11,
+                  1.548883243884802e-11,
+                  1.1139777988944388e-10,
+                  3.6212416398839764e-10
+                ],
+                "matrix_exponential_error_ratio": 6.624046650633675e-08
+              },
+              {
+                "name": "linear_homogeneous-distinct_real_order2",
+                "family": "linear_homogeneous",
+                "order": 2,
+                "passed": true,
+                "seconds": 0.008420376999993096,
+                "nfev": 619,
+                "error": null,
+                "max_abs_error": 4.9866499818307375e-11,
+                "error_ratio": 0.001651035447076652,
+                "per_component_max_abs_error": [
+                  2.4757307315326216e-11,
+                  4.9866499818307375e-11
+                ],
+                "matrix_exponential_error_ratio": 7.478233410498445e-09
+              },
+              {
+                "name": "linear_sinusoidal-distinct_real_order2",
+                "family": "linear_sinusoidal",
+                "order": 2,
+                "passed": true,
+                "seconds": 0.01517712500003654,
+                "nfev": 1174,
+                "error": null,
+                "max_abs_error": 4.9936166313102603e-11,
+                "error_ratio": 0.00014548896847110457,
+                "per_component_max_abs_error": [
+                  2.4668600495658666e-11,
+                  4.9936166313102603e-11
+                ],
+                "matrix_exponential_error_ratio": 1.2313535421584508e-08
+              },
+              {
+                "name": "linear_homogeneous-damped_complex_order2",
+                "family": "linear_homogeneous",
+                "order": 2,
+                "passed": true,
+                "seconds": 0.007175194999945234,
+                "nfev": 526,
+                "error": null,
+                "max_abs_error": 2.2581675418464897e-10,
+                "error_ratio": 0.0005316487784528919,
+                "per_component_max_abs_error": [
+                  1.734723475976807e-10,
+                  2.2581675418464897e-10
+                ],
+                "matrix_exponential_error_ratio": 5.047447656756363e-07
+              },
+              {
+                "name": "linear_sinusoidal-damped_complex_order2",
+                "family": "linear_sinusoidal",
+                "order": 2,
+                "passed": true,
+                "seconds": 0.008878605000063544,
+                "nfev": 670,
+                "error": null,
+                "max_abs_error": 3.753525268379576e-11,
+                "error_ratio": 0.0006135847710321997,
+                "per_component_max_abs_error": [
+                  3.157679673293501e-11,
+                  3.753525268379576e-11
+                ],
+                "matrix_exponential_error_ratio": 4.3970422311308924e-07
+              },
+              {
+                "name": "linear_homogeneous-distinct_real_order3",
+                "family": "linear_homogeneous",
+                "order": 3,
+                "passed": true,
+                "seconds": 0.009546495999984472,
+                "nfev": 709,
+                "error": null,
+                "max_abs_error": 1.3431838974398147e-10,
+                "error_ratio": 0.0015208483651789608,
+                "per_component_max_abs_error": [
+                  1.1289441603778982e-11,
+                  2.536089394045149e-11,
+                  1.3431838974398147e-10
+                ],
+                "matrix_exponential_error_ratio": 8.993146238663719e-09
+              },
+              {
+                "name": "linear_sinusoidal-distinct_real_order3",
+                "family": "linear_sinusoidal",
+                "order": 3,
+                "passed": true,
+                "seconds": 0.021115739000151734,
+                "nfev": 1612,
+                "error": null,
+                "max_abs_error": 5.601122343712461e-10,
+                "error_ratio": 0.001313371963581701,
+                "per_component_max_abs_error": [
+                  5.3023807566887626e-11,
+                  1.7566509358246662e-10,
+                  5.601122343712461e-10
+                ],
+                "matrix_exponential_error_ratio": 8.037149603526032e-09
+              },
+              {
+                "name": "linear_sinusoidal-resonance",
+                "family": "linear_sinusoidal",
+                "order": 2,
+                "passed": true,
+                "seconds": 0.008038800000122137,
+                "nfev": 589,
+                "error": null,
+                "max_abs_error": 1.554683048965444e-10,
+                "error_ratio": 0.0020321022297601033,
+                "per_component_max_abs_error": [
+                  1.554683048965444e-10,
+                  1.1616463346797445e-10
+                ],
+                "matrix_exponential_error_ratio": 1.0539354545043864e-06
+              }
+            ],
+            "method": "DOP853",
+            "reference_rtol": 1e-06,
+            "reference_atol": 1e-08,
+            "families": [
+              "linear_homogeneous",
+              "linear_sinusoidal"
+            ],
+            "config": {
+              "seed": 20261015,
+              "orders": [
+                2,
+                3
+              ],
+              "max_order": 6,
+              "families": [
+                "linear_homogeneous",
+                "linear_sinusoidal"
+              ],
+              "groups_per_split": [
+                16,
+                4,
+                4
+              ],
+              "initial_conditions_per_group": 4,
+              "diagnostic_groups": 0,
+              "decay_range": [
+                0.1,
+                1.0
+              ],
+              "frequency_range": [
+                0.5,
+                2.0
+              ],
+              "initial_state_range": [
+                -1.0,
+                1.0
+              ],
+              "amplitude_range": [
+                0.1,
+                1.0
+              ],
+              "t_start": 0.0,
+              "t_stop": 5.0,
+              "time_points": 101,
+              "method": "DOP853",
+              "rtol": 1e-09,
+              "atol": 1e-11,
+              "refinement_factor": 10.0,
+              "reference_rtol": 1e-06,
+              "reference_atol": 1e-08,
+              "independent_check_points": 5,
+              "max_abs_state": 1000000.0,
+              "max_rhs_calls": 100000,
+              "backend": "process",
+              "workers": 12
+            },
+            "python": "3.14.8",
+            "machine": "x86_64",
+            "dependencies": {
+              "numpy": "2.5.2",
+              "scipy": "1.18.1"
+            },
+            "source_sha256": {
+              "equations.py": "d08d51d57c2616c068b484dd6c5637420636d66a2536e517985623dbfa05c04e",
+              "reference.py": "ed0b4aa08f7a56594cc0014b7f8c14c06929c4592446ee987d1e84173a5e2377",
+              "analytic.py": "6ed50598634923cf2819b21a15efd47013d1cd56b8a0eb24d5bf0c5382324aca",
+              "validate_reference.py": "fbdbb1d4300321cb7652c5355e3a438b31d5822a0353d48423f90bd3de6280de"
+            },
+            "seconds": 0.15588564600011523
+          },
+          "per_trajectory": "tolerance refinement plus matrix exponential at selected times"
+        },
+        "family_counts": {
+          "linear_homogeneous": {
+            "succeeded": 192,
+            "failed": 0
+          },
+          "linear_sinusoidal": {
+            "succeeded": 192,
+            "failed": 0
+          }
+        },
+        "split_policy": "core joint holdout; diagnostics cross train and validation identities only",
+        "records_sha256": "66969faf516020410ba84ab7154450b027ff2a84f3b28fe3582cdc8b13649ad0",
+        "seconds": 1.4500314760000492
+      },
+      "trajectories_per_second": 264.8218375640192,
+      "stage_worker_seconds": {
+        "coarse": 3.767228332002105,
+        "refined": 4.655614997997645,
+        "matrix_exponential": 0.07318535899935341
+      },
+      "archive_bytes": 1016303
+    },
+    {
+      "workers": 12,
+      "repeat": 1,
+      "manifest": {
+        "schema_version": 1,
+        "status": "complete",
+        "config": {
+          "seed": 20261015,
+          "orders": [
+            2,
+            3
+          ],
+          "max_order": 6,
+          "families": [
+            "linear_homogeneous",
+            "linear_sinusoidal"
+          ],
+          "groups_per_split": [
+            16,
+            4,
+            4
+          ],
+          "initial_conditions_per_group": 4,
+          "diagnostic_groups": 0,
+          "decay_range": [
+            0.1,
+            1.0
+          ],
+          "frequency_range": [
+            0.5,
+            2.0
+          ],
+          "initial_state_range": [
+            -1.0,
+            1.0
+          ],
+          "amplitude_range": [
+            0.1,
+            1.0
+          ],
+          "t_start": 0.0,
+          "t_stop": 5.0,
+          "time_points": 101,
+          "method": "DOP853",
+          "rtol": 1e-09,
+          "atol": 1e-11,
+          "refinement_factor": 10.0,
+          "reference_rtol": 1e-06,
+          "reference_atol": 1e-08,
+          "independent_check_points": 5,
+          "max_abs_state": 1000000.0,
+          "max_rhs_calls": 100000,
+          "backend": "process",
+          "workers": 12
+        },
+        "planned": 384,
+        "succeeded": 384,
+        "failed": 0,
+        "python": "3.14.8",
+        "dependencies": {
+          "numpy": "2.5.2",
+          "scipy": "1.18.1"
+        },
+        "source_sha256": {
+          "__init__.py": "4038ce67d84b663b59696296565206bc21471556b979c8f211a755e8a1464b8f",
+          "analytic.py": "6ed50598634923cf2819b21a15efd47013d1cd56b8a0eb24d5bf0c5382324aca",
+          "benchmark.py": "d7cd0ac9039f51c15aca6a8e21b01c393ae211c384f73883d3645c0f1a88d875",
+          "check_environment.py": "38af69a56835f9db3e57e302bfeda2b1b609c8c8582d083efaf9a2b4b8b3cde9",
+          "config.py": "ae70992112ef314058553e2813148c180856a55a4921f6027ae5c753e972aa4e",
+          "dataset.py": "f68d2c1b063a31372093eb838af7fc0f8335837108838aecbf187a0b3afafa3b",
+          "equations.py": "d08d51d57c2616c068b484dd6c5637420636d66a2536e517985623dbfa05c04e",
+          "evaluate.py": "4f07d878870f20ec8424841c3b4bebb953214646a2b0fb68bae4cd9ab47c5e00",
+          "generate_data.py": "9039a88e0e86f56050f04f05632a6274bf9f9629086b268088e018b3581f6e4f",
+          "model.py": "6041965303c587ae8351f9344f22dc9485c7184d1c729008ce9381899b7d6505",
+          "plot_results.py": "82d1e14f2935e8d7add2733c9e9ff0cc3c6fc651c8f28cffbd55e1247b63e696",
+          "predict.py": "cc3532c32777b7399bd70e4834f7490cd39570995150bea6f60b769522f5710a",
+          "reference.py": "ed0b4aa08f7a56594cc0014b7f8c14c06929c4592446ee987d1e84173a5e2377",
+          "train.py": "d067da02ccc060644d98223ab9600f39897543b9208d0e5b6391c4e716a28fff",
+          "validate_reference.py": "fbdbb1d4300321cb7652c5355e3a438b31d5822a0353d48423f90bd3de6280de"
+        },
+        "reference_validation": {
+          "closed_form_preflight": {
+            "passed": true,
+            "cases": [
+              {
+                "name": "linear_homogeneous-repeated_real_order2",
+                "family": "linear_homogeneous",
+                "order": 2,
+                "passed": true,
+                "seconds": 0.006698437000068225,
+                "nfev": 391,
+                "error": null,
+                "max_abs_error": 2.452266723018681e-10,
+                "error_ratio": 0.0017300059907770255,
+                "per_component_max_abs_error": [
+                  1.2146450512062756e-10,
+                  2.452266723018681e-10
+                ],
+                "matrix_exponential_error_ratio": 5.983516971735435e-09
+              },
+              {
+                "name": "linear_sinusoidal-repeated_real_order2",
+                "family": "linear_sinusoidal",
+                "order": 2,
+                "passed": true,
+                "seconds": 0.012637090999987777,
+                "nfev": 943,
+                "error": null,
+                "max_abs_error": 3.7221337123583e-11,
+                "error_ratio": 8.056117163742869e-05,
+                "per_component_max_abs_error": [
+                  2.457434256086799e-11,
+                  3.7221337123583e-11
+                ],
+                "matrix_exponential_error_ratio": 1.9250406086100086e-08
+              },
+              {
+                "name": "linear_homogeneous-repeated_real_order3",
+                "family": "linear_homogeneous",
+                "order": 3,
+                "passed": true,
+                "seconds": 0.006005264999885185,
+                "nfev": 409,
+                "error": null,
+                "max_abs_error": 1.0659295668347113e-10,
+                "error_ratio": 0.00020813790724679207,
+                "per_component_max_abs_error": [
+                  6.9469763275265e-11,
+                  8.527811790060014e-11,
+                  1.0659295668347113e-10
+                ],
+                "matrix_exponential_error_ratio": 8.76953735646784e-09
+              },
+              {
+                "name": "linear_sinusoidal-repeated_real_order3",
+                "family": "linear_sinusoidal",
+                "order": 3,
+                "passed": true,
+                "seconds": 0.014741756999910649,
+                "nfev": 1039,
+                "error": null,
+                "max_abs_error": 1.8303958349008553e-10,
+                "error_ratio": 0.00027287965887381826,
+                "per_component_max_abs_error": [
+                  4.699551858777795e-11,
+                  9.996292682501462e-11,
+                  1.8303958349008553e-10
+                ],
+                "matrix_exponential_error_ratio": 1.5077929640199444e-08
+              },
+              {
+                "name": "linear_homogeneous-repeated_real_order6",
+                "family": "linear_homogeneous",
+                "order": 6,
+                "passed": true,
+                "seconds": 0.0053709030000845814,
+                "nfev": 379,
+                "error": null,
+                "max_abs_error": 8.096523451683879e-11,
+                "error_ratio": 0.00013930483932723763,
+                "per_component_max_abs_error": [
+                  8.096523451683879e-11,
+                  6.398981344801769e-11,
+                  4.9119708300793263e-11,
+                  3.4716673980028645e-11,
+                  1.878724953385813e-11,
+                  6.594252921487964e-12
+                ],
+                "matrix_exponential_error_ratio": 8.249277250419876e-08
+              },
+              {
+                "name": "linear_sinusoidal-repeated_real_order6",
+                "family": "linear_sinusoidal",
+                "order": 6,
+                "passed": true,
+                "seconds": 0.01902877200018338,
+                "nfev": 1468,
+                "error": null,
+                "max_abs_error": 3.6212416398839764e-10,
+                "error_ratio": 0.001320515352547554,
+                "per_component_max_abs_error": [
+                  1.2973733198862192e-11,
+                  1.6983414674598407e-11,
+                  1.2819523220741758e-11,
+                  1.548883243884802e-11,
+                  1.1139777988944388e-10,
+                  3.6212416398839764e-10
+                ],
+                "matrix_exponential_error_ratio": 6.624046650633675e-08
+              },
+              {
+                "name": "linear_homogeneous-distinct_real_order2",
+                "family": "linear_homogeneous",
+                "order": 2,
+                "passed": true,
+                "seconds": 0.00823739299994486,
+                "nfev": 619,
+                "error": null,
+                "max_abs_error": 4.9866499818307375e-11,
+                "error_ratio": 0.001651035447076652,
+                "per_component_max_abs_error": [
+                  2.4757307315326216e-11,
+                  4.9866499818307375e-11
+                ],
+                "matrix_exponential_error_ratio": 7.478233410498445e-09
+              },
+              {
+                "name": "linear_sinusoidal-distinct_real_order2",
+                "family": "linear_sinusoidal",
+                "order": 2,
+                "passed": true,
+                "seconds": 0.014963860999841927,
+                "nfev": 1174,
+                "error": null,
+                "max_abs_error": 4.9936166313102603e-11,
+                "error_ratio": 0.00014548896847110457,
+                "per_component_max_abs_error": [
+                  2.4668600495658666e-11,
+                  4.9936166313102603e-11
+                ],
+                "matrix_exponential_error_ratio": 1.2313535421584508e-08
+              },
+              {
+                "name": "linear_homogeneous-damped_complex_order2",
+                "family": "linear_homogeneous",
+                "order": 2,
+                "passed": true,
+                "seconds": 0.007089204000067184,
+                "nfev": 526,
+                "error": null,
+                "max_abs_error": 2.2581675418464897e-10,
+                "error_ratio": 0.0005316487784528919,
+                "per_component_max_abs_error": [
+                  1.734723475976807e-10,
+                  2.2581675418464897e-10
+                ],
+                "matrix_exponential_error_ratio": 5.047447656756363e-07
+              },
+              {
+                "name": "linear_sinusoidal-damped_complex_order2",
+                "family": "linear_sinusoidal",
+                "order": 2,
+                "passed": true,
+                "seconds": 0.008878444999936619,
+                "nfev": 670,
+                "error": null,
+                "max_abs_error": 3.753525268379576e-11,
+                "error_ratio": 0.0006135847710321997,
+                "per_component_max_abs_error": [
+                  3.157679673293501e-11,
+                  3.753525268379576e-11
+                ],
+                "matrix_exponential_error_ratio": 4.3970422311308924e-07
+              },
+              {
+                "name": "linear_homogeneous-distinct_real_order3",
+                "family": "linear_homogeneous",
+                "order": 3,
+                "passed": true,
+                "seconds": 0.009465184999953635,
+                "nfev": 709,
+                "error": null,
+                "max_abs_error": 1.3431838974398147e-10,
+                "error_ratio": 0.0015208483651789608,
+                "per_component_max_abs_error": [
+                  1.1289441603778982e-11,
+                  2.536089394045149e-11,
+                  1.3431838974398147e-10
+                ],
+                "matrix_exponential_error_ratio": 8.993146238663719e-09
+              },
+              {
+                "name": "linear_sinusoidal-distinct_real_order3",
+                "family": "linear_sinusoidal",
+                "order": 3,
+                "passed": true,
+                "seconds": 0.020826864000127898,
+                "nfev": 1612,
+                "error": null,
+                "max_abs_error": 5.601122343712461e-10,
+                "error_ratio": 0.001313371963581701,
+                "per_component_max_abs_error": [
+                  5.3023807566887626e-11,
+                  1.7566509358246662e-10,
+                  5.601122343712461e-10
+                ],
+                "matrix_exponential_error_ratio": 8.037149603526032e-09
+              },
+              {
+                "name": "linear_sinusoidal-resonance",
+                "family": "linear_sinusoidal",
+                "order": 2,
+                "passed": true,
+                "seconds": 0.007891617000041151,
+                "nfev": 589,
+                "error": null,
+                "max_abs_error": 1.554683048965444e-10,
+                "error_ratio": 0.0020321022297601033,
+                "per_component_max_abs_error": [
+                  1.554683048965444e-10,
+                  1.1616463346797445e-10
+                ],
+                "matrix_exponential_error_ratio": 1.0539354545043864e-06
+              }
+            ],
+            "method": "DOP853",
+            "reference_rtol": 1e-06,
+            "reference_atol": 1e-08,
+            "families": [
+              "linear_homogeneous",
+              "linear_sinusoidal"
+            ],
+            "config": {
+              "seed": 20261015,
+              "orders": [
+                2,
+                3
+              ],
+              "max_order": 6,
+              "families": [
+                "linear_homogeneous",
+                "linear_sinusoidal"
+              ],
+              "groups_per_split": [
+                16,
+                4,
+                4
+              ],
+              "initial_conditions_per_group": 4,
+              "diagnostic_groups": 0,
+              "decay_range": [
+                0.1,
+                1.0
+              ],
+              "frequency_range": [
+                0.5,
+                2.0
+              ],
+              "initial_state_range": [
+                -1.0,
+                1.0
+              ],
+              "amplitude_range": [
+                0.1,
+                1.0
+              ],
+              "t_start": 0.0,
+              "t_stop": 5.0,
+              "time_points": 101,
+              "method": "DOP853",
+              "rtol": 1e-09,
+              "atol": 1e-11,
+              "refinement_factor": 10.0,
+              "reference_rtol": 1e-06,
+              "reference_atol": 1e-08,
+              "independent_check_points": 5,
+              "max_abs_state": 1000000.0,
+              "max_rhs_calls": 100000,
+              "backend": "process",
+              "workers": 12
+            },
+            "python": "3.14.8",
+            "machine": "x86_64",
+            "dependencies": {
+              "numpy": "2.5.2",
+              "scipy": "1.18.1"
+            },
+            "source_sha256": {
+              "equations.py": "d08d51d57c2616c068b484dd6c5637420636d66a2536e517985623dbfa05c04e",
+              "reference.py": "ed0b4aa08f7a56594cc0014b7f8c14c06929c4592446ee987d1e84173a5e2377",
+              "analytic.py": "6ed50598634923cf2819b21a15efd47013d1cd56b8a0eb24d5bf0c5382324aca",
+              "validate_reference.py": "fbdbb1d4300321cb7652c5355e3a438b31d5822a0353d48423f90bd3de6280de"
+            },
+            "seconds": 0.1553090180000254
+          },
+          "per_trajectory": "tolerance refinement plus matrix exponential at selected times"
+        },
+        "family_counts": {
+          "linear_homogeneous": {
+            "succeeded": 192,
+            "failed": 0
+          },
+          "linear_sinusoidal": {
+            "succeeded": 192,
+            "failed": 0
+          }
+        },
+        "split_policy": "core joint holdout; diagnostics cross train and validation identities only",
+        "records_sha256": "00108c20ab9929ae6b7731644942ea11a024802eb50b660aaa4efcf39f5c7359",
+        "seconds": 1.4405106880001313
+      },
+      "trajectories_per_second": 266.57212834228204,
+      "stage_worker_seconds": {
+        "coarse": 3.718629320001355,
+        "refined": 4.617297811002345,
+        "matrix_exponential": 0.07425086299986106
+      },
+      "archive_bytes": 1016303
+    },
+    {
+      "workers": 12,
+      "repeat": 2,
+      "manifest": {
+        "schema_version": 1,
+        "status": "complete",
+        "config": {
+          "seed": 20261015,
+          "orders": [
+            2,
+            3
+          ],
+          "max_order": 6,
+          "families": [
+            "linear_homogeneous",
+            "linear_sinusoidal"
+          ],
+          "groups_per_split": [
+            16,
+            4,
+            4
+          ],
+          "initial_conditions_per_group": 4,
+          "diagnostic_groups": 0,
+          "decay_range": [
+            0.1,
+            1.0
+          ],
+          "frequency_range": [
+            0.5,
+            2.0
+          ],
+          "initial_state_range": [
+            -1.0,
+            1.0
+          ],
+          "amplitude_range": [
+            0.1,
+            1.0
+          ],
+          "t_start": 0.0,
+          "t_stop": 5.0,
+          "time_points": 101,
+          "method": "DOP853",
+          "rtol": 1e-09,
+          "atol": 1e-11,
+          "refinement_factor": 10.0,
+          "reference_rtol": 1e-06,
+          "reference_atol": 1e-08,
+          "independent_check_points": 5,
+          "max_abs_state": 1000000.0,
+          "max_rhs_calls": 100000,
+          "backend": "process",
+          "workers": 12
+        },
+        "planned": 384,
+        "succeeded": 384,
+        "failed": 0,
+        "python": "3.14.8",
+        "dependencies": {
+          "numpy": "2.5.2",
+          "scipy": "1.18.1"
+        },
+        "source_sha256": {
+          "__init__.py": "4038ce67d84b663b59696296565206bc21471556b979c8f211a755e8a1464b8f",
+          "analytic.py": "6ed50598634923cf2819b21a15efd47013d1cd56b8a0eb24d5bf0c5382324aca",
+          "benchmark.py": "d7cd0ac9039f51c15aca6a8e21b01c393ae211c384f73883d3645c0f1a88d875",
+          "check_environment.py": "38af69a56835f9db3e57e302bfeda2b1b609c8c8582d083efaf9a2b4b8b3cde9",
+          "config.py": "ae70992112ef314058553e2813148c180856a55a4921f6027ae5c753e972aa4e",
+          "dataset.py": "f68d2c1b063a31372093eb838af7fc0f8335837108838aecbf187a0b3afafa3b",
+          "equations.py": "d08d51d57c2616c068b484dd6c5637420636d66a2536e517985623dbfa05c04e",
+          "evaluate.py": "4f07d878870f20ec8424841c3b4bebb953214646a2b0fb68bae4cd9ab47c5e00",
+          "generate_data.py": "9039a88e0e86f56050f04f05632a6274bf9f9629086b268088e018b3581f6e4f",
+          "model.py": "6041965303c587ae8351f9344f22dc9485c7184d1c729008ce9381899b7d6505",
+          "plot_results.py": "82d1e14f2935e8d7add2733c9e9ff0cc3c6fc651c8f28cffbd55e1247b63e696",
+          "predict.py": "cc3532c32777b7399bd70e4834f7490cd39570995150bea6f60b769522f5710a",
+          "reference.py": "ed0b4aa08f7a56594cc0014b7f8c14c06929c4592446ee987d1e84173a5e2377",
+          "train.py": "d067da02ccc060644d98223ab9600f39897543b9208d0e5b6391c4e716a28fff",
+          "validate_reference.py": "fbdbb1d4300321cb7652c5355e3a438b31d5822a0353d48423f90bd3de6280de"
+        },
+        "reference_validation": {
+          "closed_form_preflight": {
+            "passed": true,
+            "cases": [
+              {
+                "name": "linear_homogeneous-repeated_real_order2",
+                "family": "linear_homogeneous",
+                "order": 2,
+                "passed": true,
+                "seconds": 0.0059251830000448535,
+                "nfev": 391,
+                "error": null,
+                "max_abs_error": 2.452266723018681e-10,
+                "error_ratio": 0.0017300059907770255,
+                "per_component_max_abs_error": [
+                  1.2146450512062756e-10,
+                  2.452266723018681e-10
+                ],
+                "matrix_exponential_error_ratio": 5.983516971735435e-09
+              },
+              {
+                "name": "linear_sinusoidal-repeated_real_order2",
+                "family": "linear_sinusoidal",
+                "order": 2,
+                "passed": true,
+                "seconds": 0.012565838999989865,
+                "nfev": 943,
+                "error": null,
+                "max_abs_error": 3.7221337123583e-11,
+                "error_ratio": 8.056117163742869e-05,
+                "per_component_max_abs_error": [
+                  2.457434256086799e-11,
+                  3.7221337123583e-11
+                ],
+                "matrix_exponential_error_ratio": 1.9250406086100086e-08
+              },
+              {
+                "name": "linear_homogeneous-repeated_real_order3",
+                "family": "linear_homogeneous",
+                "order": 3,
+                "passed": true,
+                "seconds": 0.005650018000096679,
+                "nfev": 409,
+                "error": null,
+                "max_abs_error": 1.0659295668347113e-10,
+                "error_ratio": 0.00020813790724679207,
+                "per_component_max_abs_error": [
+                  6.9469763275265e-11,
+                  8.527811790060014e-11,
+                  1.0659295668347113e-10
+                ],
+                "matrix_exponential_error_ratio": 8.76953735646784e-09
+              },
+              {
+                "name": "linear_sinusoidal-repeated_real_order3",
+                "family": "linear_sinusoidal",
+                "order": 3,
+                "passed": true,
+                "seconds": 0.013566705999892292,
+                "nfev": 1039,
+                "error": null,
+                "max_abs_error": 1.8303958349008553e-10,
+                "error_ratio": 0.00027287965887381826,
+                "per_component_max_abs_error": [
+                  4.699551858777795e-11,
+                  9.996292682501462e-11,
+                  1.8303958349008553e-10
+                ],
+                "matrix_exponential_error_ratio": 1.5077929640199444e-08
+              },
+              {
+                "name": "linear_homogeneous-repeated_real_order6",
+                "family": "linear_homogeneous",
+                "order": 6,
+                "passed": true,
+                "seconds": 0.005322292000073503,
+                "nfev": 379,
+                "error": null,
+                "max_abs_error": 8.096523451683879e-11,
+                "error_ratio": 0.00013930483932723763,
+                "per_component_max_abs_error": [
+                  8.096523451683879e-11,
+                  6.398981344801769e-11,
+                  4.9119708300793263e-11,
+                  3.4716673980028645e-11,
+                  1.878724953385813e-11,
+                  6.594252921487964e-12
+                ],
+                "matrix_exponential_error_ratio": 8.249277250419876e-08
+              },
+              {
+                "name": "linear_sinusoidal-repeated_real_order6",
+                "family": "linear_sinusoidal",
+                "order": 6,
+                "passed": true,
+                "seconds": 0.018938988999934736,
+                "nfev": 1468,
+                "error": null,
+                "max_abs_error": 3.6212416398839764e-10,
+                "error_ratio": 0.001320515352547554,
+                "per_component_max_abs_error": [
+                  1.2973733198862192e-11,
+                  1.6983414674598407e-11,
+                  1.2819523220741758e-11,
+                  1.548883243884802e-11,
+                  1.1139777988944388e-10,
+                  3.6212416398839764e-10
+                ],
+                "matrix_exponential_error_ratio": 6.624046650633675e-08
+              },
+              {
+                "name": "linear_homogeneous-distinct_real_order2",
+                "family": "linear_homogeneous",
+                "order": 2,
+                "passed": true,
+                "seconds": 0.008256673999994746,
+                "nfev": 619,
+                "error": null,
+                "max_abs_error": 4.9866499818307375e-11,
+                "error_ratio": 0.001651035447076652,
+                "per_component_max_abs_error": [
+                  2.4757307315326216e-11,
+                  4.9866499818307375e-11
+                ],
+                "matrix_exponential_error_ratio": 7.478233410498445e-09
+              },
+              {
+                "name": "linear_sinusoidal-distinct_real_order2",
+                "family": "linear_sinusoidal",
+                "order": 2,
+                "passed": true,
+                "seconds": 0.015099093000117136,
+                "nfev": 1174,
+                "error": null,
+                "max_abs_error": 4.9936166313102603e-11,
+                "error_ratio": 0.00014548896847110457,
+                "per_component_max_abs_error": [
+                  2.4668600495658666e-11,
+                  4.9936166313102603e-11
+                ],
+                "matrix_exponential_error_ratio": 1.2313535421584508e-08
+              },
+              {
+                "name": "linear_homogeneous-damped_complex_order2",
+                "family": "linear_homogeneous",
+                "order": 2,
+                "passed": true,
+                "seconds": 0.007040222999876278,
+                "nfev": 526,
+                "error": null,
+                "max_abs_error": 2.2581675418464897e-10,
+                "error_ratio": 0.0005316487784528919,
+                "per_component_max_abs_error": [
+                  1.734723475976807e-10,
+                  2.2581675418464897e-10
+                ],
+                "matrix_exponential_error_ratio": 5.047447656756363e-07
+              },
+              {
+                "name": "linear_sinusoidal-damped_complex_order2",
+                "family": "linear_sinusoidal",
+                "order": 2,
+                "passed": true,
+                "seconds": 0.008873193999988871,
+                "nfev": 670,
+                "error": null,
+                "max_abs_error": 3.753525268379576e-11,
+                "error_ratio": 0.0006135847710321997,
+                "per_component_max_abs_error": [
+                  3.157679673293501e-11,
+                  3.753525268379576e-11
+                ],
+                "matrix_exponential_error_ratio": 4.3970422311308924e-07
+              },
+              {
+                "name": "linear_homogeneous-distinct_real_order3",
+                "family": "linear_homogeneous",
+                "order": 3,
+                "passed": true,
+                "seconds": 0.009462303999953292,
+                "nfev": 709,
+                "error": null,
+                "max_abs_error": 1.3431838974398147e-10,
+                "error_ratio": 0.0015208483651789608,
+                "per_component_max_abs_error": [
+                  1.1289441603778982e-11,
+                  2.536089394045149e-11,
+                  1.3431838974398147e-10
+                ],
+                "matrix_exponential_error_ratio": 8.993146238663719e-09
+              },
+              {
+                "name": "linear_sinusoidal-distinct_real_order3",
+                "family": "linear_sinusoidal",
+                "order": 3,
+                "passed": true,
+                "seconds": 0.020603597999979684,
+                "nfev": 1612,
+                "error": null,
+                "max_abs_error": 5.601122343712461e-10,
+                "error_ratio": 0.001313371963581701,
+                "per_component_max_abs_error": [
+                  5.3023807566887626e-11,
+                  1.7566509358246662e-10,
+                  5.601122343712461e-10
+                ],
+                "matrix_exponential_error_ratio": 8.037149603526032e-09
+              },
+              {
+                "name": "linear_sinusoidal-resonance",
+                "family": "linear_sinusoidal",
+                "order": 2,
+                "passed": true,
+                "seconds": 0.007903208000016093,
+                "nfev": 589,
+                "error": null,
+                "max_abs_error": 1.554683048965444e-10,
+                "error_ratio": 0.0020321022297601033,
+                "per_component_max_abs_error": [
+                  1.554683048965444e-10,
+                  1.1616463346797445e-10
+                ],
+                "matrix_exponential_error_ratio": 1.0539354545043864e-06
+              }
+            ],
+            "method": "DOP853",
+            "reference_rtol": 1e-06,
+            "reference_atol": 1e-08,
+            "families": [
+              "linear_homogeneous",
+              "linear_sinusoidal"
+            ],
+            "config": {
+              "seed": 20261015,
+              "orders": [
+                2,
+                3
+              ],
+              "max_order": 6,
+              "families": [
+                "linear_homogeneous",
+                "linear_sinusoidal"
+              ],
+              "groups_per_split": [
+                16,
+                4,
+                4
+              ],
+              "initial_conditions_per_group": 4,
+              "diagnostic_groups": 0,
+              "decay_range": [
+                0.1,
+                1.0
+              ],
+              "frequency_range": [
+                0.5,
+                2.0
+              ],
+              "initial_state_range": [
+                -1.0,
+                1.0
+              ],
+              "amplitude_range": [
+                0.1,
+                1.0
+              ],
+              "t_start": 0.0,
+              "t_stop": 5.0,
+              "time_points": 101,
+              "method": "DOP853",
+              "rtol": 1e-09,
+              "atol": 1e-11,
+              "refinement_factor": 10.0,
+              "reference_rtol": 1e-06,
+              "reference_atol": 1e-08,
+              "independent_check_points": 5,
+              "max_abs_state": 1000000.0,
+              "max_rhs_calls": 100000,
+              "backend": "process",
+              "workers": 12
+            },
+            "python": "3.14.8",
+            "machine": "x86_64",
+            "dependencies": {
+              "numpy": "2.5.2",
+              "scipy": "1.18.1"
+            },
+            "source_sha256": {
+              "equations.py": "d08d51d57c2616c068b484dd6c5637420636d66a2536e517985623dbfa05c04e",
+              "reference.py": "ed0b4aa08f7a56594cc0014b7f8c14c06929c4592446ee987d1e84173a5e2377",
+              "analytic.py": "6ed50598634923cf2819b21a15efd47013d1cd56b8a0eb24d5bf0c5382324aca",
+              "validate_reference.py": "fbdbb1d4300321cb7652c5355e3a438b31d5822a0353d48423f90bd3de6280de"
+            },
+            "seconds": 0.15269699500004208
+          },
+          "per_trajectory": "tolerance refinement plus matrix exponential at selected times"
+        },
+        "family_counts": {
+          "linear_homogeneous": {
+            "succeeded": 192,
+            "failed": 0
+          },
+          "linear_sinusoidal": {
+            "succeeded": 192,
+            "failed": 0
+          }
+        },
+        "split_policy": "core joint holdout; diagnostics cross train and validation identities only",
+        "records_sha256": "565f9a26257b15d22cc3ba2a7572470053beccfbb515b816db226d1f584615bf",
+        "seconds": 1.447821513000008
+      },
+      "trajectories_per_second": 265.2260631245351,
+      "stage_worker_seconds": {
+        "coarse": 3.8008423410008163,
+        "refined": 4.7270638849997795,
+        "matrix_exponential": 0.0753156579971801
+      },
+      "archive_bytes": 1016303
+    }
+  ]
+}

@@ -1,0 +1,6 @@
+{
+  "reference_run": "20261016-smoke-01",
+  "all_weights_bitwise_equal": true,
+  "execution_profile": "ode/configs/resources_local.json",
+  "batch_size_override": 256
+}

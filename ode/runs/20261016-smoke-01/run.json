@@ -1,0 +1,254 @@
+{
+  "status": "complete",
+  "config": {
+    "seed": 20261015,
+    "orders": [
+      2,
+      3
+    ],
+    "max_order": 6,
+    "families": [
+      "linear_homogeneous",
+      "linear_sinusoidal"
+    ],
+    "groups_per_split": [
+      16,
+      4,
+      4
+    ],
+    "initial_conditions_per_group": 4,
+    "diagnostic_groups": 0,
+    "decay_range": [
+      0.1,
+      1.0
+    ],
+    "frequency_range": [
+      0.5,
+      2.0
+    ],
+    "initial_state_range": [
+      -1.0,
+      1.0
+    ],
+    "amplitude_range": [
+      0.1,
+      1.0
+    ],
+    "t_start": 0.0,
+    "t_stop": 5.0,
+    "time_points": 101,
+    "method": "DOP853",
+    "rtol": 1e-09,
+    "atol": 1e-11,
+    "refinement_factor": 10.0,
+    "reference_rtol": 1e-06,
+    "reference_atol": 1e-08,
+    "independent_check_points": 5,
+    "max_abs_state": 1000000.0,
+    "max_rhs_calls": 100000,
+    "backend": "process",
+    "workers": 12
+  },
+  "architecture": {
+    "max_order": 6,
+    "width": 128,
+    "depth": 3
+  },
+  "normalizer": {
+    "input_mean": [
+      1.7716643099868716,
+      2.027450846069649,
+      1.6439444895939106,
+      0.0,
+      0.0,
+      0.0,
+      0.006682315319560421,
+      -0.09188796043723421,
+      0.07401341786392632,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.2705659361567882,
+      0.6643005883253086,
+      0.027461895299219826,
+      -0.04378608583363445,
+      2.5
+    ],
+    "input_scale": [
+      1.1508733485355391,
+      1.3722698497711407,
+      0.6406707307270005,
+      1.0,
+      1.0,
+      1.0,
+      0.61330821233441,
+      0.559778452840261,
+      0.591275186181746,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      0.3227231742529263,
+      0.7385139475255149,
+      0.46856048819504736,
+      0.5270480925839344,
+      1.4577379737113252
+    ],
+    "target_mean": [
+      -0.007768497936167896,
+      -0.002287161324669654,
+      0.013241924335342246,
+      0.0,
+      0.0,
+      0.0
+    ],
+    "target_scale": [
+      0.4500298976541605,
+      0.37357615256993654,
+      0.48561820524933635,
+      1.0,
+      1.0,
+      1.0
+    ]
+  },
+  "seed": 20261015,
+  "device": "cpu",
+  "epochs": [
+    {
+      "epoch": 1,
+      "train_mse": 0.7853437886379733,
+      "validation_mse": 0.582836245841319,
+      "validation_relative_l2": 0.7809597729360378,
+      "validation_by_family": {
+        "order2/linear_homogeneous": 0.7598799293208685,
+        "order2/linear_sinusoidal": 0.8844298215692189,
+        "order3/linear_homogeneous": 0.7353368265709294,
+        "order3/linear_sinusoidal": 0.7441925142831346
+      },
+      "seconds": 0.3395142819999819
+    },
+    {
+      "epoch": 2,
+      "train_mse": 0.5479494731615085,
+      "validation_mse": 0.46135103673037914,
+      "validation_relative_l2": 0.698857179854665,
+      "validation_by_family": {
+        "order2/linear_homogeneous": 0.5869876321524288,
+        "order2/linear_sinusoidal": 0.758779748076861,
+        "order3/linear_homogeneous": 0.6725897346015668,
+        "order3/linear_sinusoidal": 0.777071604587803
+      },
+      "seconds": 0.3223082209999575
+    },
+    {
+      "epoch": 3,
+      "train_mse": 0.3501204305356092,
+      "validation_mse": 0.36668691245636137,
+      "validation_relative_l2": 0.6211856141726765,
+      "validation_by_family": {
+        "order2/linear_homogeneous": 0.4602566722474573,
+        "order2/linear_sinusoidal": 0.7048695837027888,
+        "order3/linear_homogeneous": 0.5576627350771031,
+        "order3/linear_sinusoidal": 0.7619534656633568
+      },
+      "seconds": 0.32022590799988393
+    },
+    {
+      "epoch": 4,
+      "train_mse": 0.23295564226584858,
+      "validation_mse": 0.3063825522318925,
+      "validation_relative_l2": 0.5773350659383498,
+      "validation_by_family": {
+        "order2/linear_homogeneous": 0.41418838572510563,
+        "order2/linear_sinusoidal": 0.6839127061438175,
+        "order3/linear_homogeneous": 0.5195696200763549,
+        "order3/linear_sinusoidal": 0.6916695518081217
+      },
+      "seconds": 0.32098823299998
+    },
+    {
+      "epoch": 5,
+      "train_mse": 0.16456330102859157,
+      "validation_mse": 0.27059403379069696,
+      "validation_relative_l2": 0.542467066198947,
+      "validation_by_family": {
+        "order2/linear_homogeneous": 0.36493890983860955,
+        "order2/linear_sinusoidal": 0.7143738162100436,
+        "order3/linear_homogeneous": 0.47196783838867745,
+        "order3/linear_sinusoidal": 0.6185877003584574
+      },
+      "seconds": 0.3218358460001127
+    }
+  ],
+  "device_name": "",
+  "cuda_build": null,
+  "hip_build": "7.14.60850",
+  "data": "/home/trent/Coding/Projects/ML/ODE/ode/data/20261016-smoke-384",
+  "dataset_manifest_sha256": "60295a13a76d8cea5588d97053c72cb4111bfeaa9b8757285b4d5ad817ebc3cd",
+  "python": "3.14.8",
+  "dependencies": {
+    "numpy": "2.5.2",
+    "scipy": "1.18.1",
+    "torch": "2.14.1+rocm7.14"
+  },
+  "source_sha256": {
+    "__init__.py": "4038ce67d84b663b59696296565206bc21471556b979c8f211a755e8a1464b8f",
+    "analytic.py": "6ed50598634923cf2819b21a15efd47013d1cd56b8a0eb24d5bf0c5382324aca",
+    "benchmark.py": "d7cd0ac9039f51c15aca6a8e21b01c393ae211c384f73883d3645c0f1a88d875",
+    "check_environment.py": "38af69a56835f9db3e57e302bfeda2b1b609c8c8582d083efaf9a2b4b8b3cde9",
+    "config.py": "ae70992112ef314058553e2813148c180856a55a4921f6027ae5c753e972aa4e",
+    "dataset.py": "f68d2c1b063a31372093eb838af7fc0f8335837108838aecbf187a0b3afafa3b",
+    "equations.py": "d08d51d57c2616c068b484dd6c5637420636d66a2536e517985623dbfa05c04e",
+    "evaluate.py": "4f07d878870f20ec8424841c3b4bebb953214646a2b0fb68bae4cd9ab47c5e00",
+    "generate_data.py": "9039a88e0e86f56050f04f05632a6274bf9f9629086b268088e018b3581f6e4f",
+    "model.py": "6041965303c587ae8351f9344f22dc9485c7184d1c729008ce9381899b7d6505",
+    "plot_results.py": "0a65382af5d32aee6df48cdd0258a3fc87f6584a6ea65434d9d67e8d447f8209",
+    "predict.py": "cc3532c32777b7399bd70e4834f7490cd39570995150bea6f60b769522f5710a",
+    "reference.py": "ed0b4aa08f7a56594cc0014b7f8c14c06929c4592446ee987d1e84173a5e2377",
+    "train.py": "d067da02ccc060644d98223ab9600f39897543b9208d0e5b6391c4e716a28fff",
+    "validate_reference.py": "fbdbb1d4300321cb7652c5355e3a438b31d5822a0353d48423f90bd3de6280de"
+  },
+  "training_options": {
+    "config": "/home/trent/Coding/Projects/ML/ODE/ode/configs/generator.json",
+    "data": "ode/data/20261016-smoke-384",
+    "run": "ode/runs/20261016-smoke-01",
+    "train": true,
+    "epochs": 5,
+    "batch_size": 256,
+    "width": 128,
+    "depth": 3,
+    "learning_rate": 0.001,
+    "loader_workers": 0,
+    "threads": 2,
+    "device": "cpu",
+    "preload": true,
+    "allow_failures": false
+  },
+  "reference_failures": 0,
+  "test_evaluated": false,
+  "metric": {
+    "version": "trajectory-rms-v1",
+    "primary": "full_state_relative_l2",
+    "component_scales": "one for each nondimensional derivative; no centering",
+    "time_weights": "uniform over all stored points, including endpoints",
+    "denominator_rms_floor": 1e-06,
+    "failure_threshold": 0.05,
+    "aggregation": "equal weight per trajectory; nonfinite results prevent passing"
+  },
+  "selection": "validation mean full-state trajectory relative L2",
+  "best_epoch": 5,
+  "best_validation_relative_l2": 0.542467066198947,
+  "checkpoint_sha256": "a36e287ffa7d619428be156eea61dc9e7e3782d1deefde45fadafe768576ea13",
+  "training_seconds": 1.630404396999893
+}

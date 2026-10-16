@@ -1,0 +1,3 @@
+# Exact local CPU-tested environment; ROCm wheel is host-specific.
+-r requirements.txt
+torch==2.14.1+rocm7.14

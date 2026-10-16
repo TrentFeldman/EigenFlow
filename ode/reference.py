@@ -5,7 +5,8 @@ at selected times. Accepted arrays go to the generator; failures carry a reason
 and evaluation count into its ledger. Closed-form benchmarks reuse this path.
 """
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from time import perf_counter
 
 import numpy as np
 from scipy.integrate import solve_ivp
@@ -44,6 +45,7 @@ class SolveResult:
         nfev: RHS call count across both solves, including failed calls.
         refinement_ratio: Maximum componentwise L2 error/threshold, or None.
         independent_ratio: Maximum sampled pointwise error/threshold, or None.
+        stage_seconds: Worker wall times for completed numerical stages; excludes I/O.
     """
 
     job: SolveJob
@@ -53,6 +55,8 @@ class SolveResult:
     nfev: int = 0
     refinement_ratio: float | None = None
     independent_ratio: float | None = None
+    # Wall seconds per numerical stage, excluding executor/IPC and file writing.
+    stage_seconds: dict = field(default_factory=dict)
 
 
 class _IntegrationFailure(Exception):
@@ -173,19 +177,25 @@ def solve_job(job: SolveJob, config: GeneratorConfig) -> SolveResult:
     times = np.linspace(config.t_start, config.t_stop, config.time_points)
 
     try:
+        started = perf_counter()
         coarse, calls = _integrate(job.equation, config, times, 1.0)
         result.nfev += calls
 
+        result.stage_seconds["coarse"] = perf_counter() - started
+        started = perf_counter()
         refined, calls = _integrate(job.equation, config, times, config.refinement_factor)
         result.nfev += calls
 
+        result.stage_seconds["refined"] = perf_counter() - started
         result.refinement_ratio = _refinement_ratio(coarse, refined, config)
 
         if not np.isfinite(result.refinement_ratio) or result.refinement_ratio > 1:
             raise RuntimeError("Tolerance-refinement agreement check failed")
 
+        started = perf_counter()
         result.independent_ratio = _independent_ratio(refined, job.equation, times, config)
 
+        result.stage_seconds["matrix_exponential"] = perf_counter() - started
         if not np.isfinite(result.independent_ratio) or result.independent_ratio > 1:
             raise RuntimeError("Independent matrix-exponential agreement check failed")
 

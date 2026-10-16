@@ -13,7 +13,7 @@ from pathlib import Path
 import numpy as np
 from torch.utils.data import Dataset
 
-from .config import SPLITS, record_split
+from .config import SPLITS, ALL_SPLITS, DIAGNOSTIC_SPLITS, record_split
 from .equations import LinearODE
 
 
@@ -110,7 +110,7 @@ class TrajectoryDataset(Dataset):
 
     Args:
         root: Directory containing manifest.json, records.jsonl and archives.
-        split: Train, validation or test partition name.
+        split: Core train/validation/test or validation_parameter/validation_initial.
         max_order: Model padding width M.
         allow_failures: Allow completed datasets containing recorded solve failures.
     Raises:
@@ -122,7 +122,7 @@ class TrajectoryDataset(Dataset):
     def __init__(self, root, split: str, max_order: int, allow_failures: bool = False):
         self.root = Path(root).resolve()
 
-        if split not in SPLITS:
+        if split not in ALL_SPLITS:
             raise ValueError(f"Unknown split: {split}")
 
         self.split, self.max_order = split, max_order
@@ -181,7 +181,7 @@ class TrajectoryDataset(Dataset):
         selected = []
 
         for record in records:
-            if record["trajectory_id"] in trajectory_ids or record["split"] not in SPLITS:
+            if record["trajectory_id"] in trajectory_ids or record["split"] not in ALL_SPLITS:
                 raise ValueError("Duplicate trajectory ID or unknown split")
 
             trajectory_ids.add(record["trajectory_id"])
@@ -193,24 +193,36 @@ class TrajectoryDataset(Dataset):
             if equation.family != record["family"]:
                 raise ValueError("Equation family mismatch")
 
-            record_split(
-                parameter_splits,
-                equation.parameter_id,
-                record["split"],
-                "Detected cross-split leakage",
-            )
-            record_split(
-                initial_splits,
-                equation.initial_state,
-                record["split"],
-                "Detected cross-split leakage",
-            )
+            if record["split"] in SPLITS:
+                record_split(parameter_splits, equation.parameter_id, record["split"],
+                             "Detected cross-split leakage")
+                record_split(initial_splits, equation.initial_state, record["split"],
+                             "Detected cross-split leakage")
 
             if record["split"] == self.split and record["status"] == "success":
                 if equation.order > self.max_order:
                     raise ValueError("Dataset exceeds model max_order")
 
                 selected.append(record)
+
+        # Diagnostics intentionally share exactly one training identity; their
+        # other identity belongs to validation. Test identities stay isolated.
+        successful = {(r["parameter_id"], tuple(r["equation"]["initial_state"]))
+                      for r in records if r["split"] == "train" and r["status"] == "success"}
+        train_parameters = {pair[0] for pair in successful}
+        train_initials = {pair[1] for pair in successful}
+        for record in records:
+            split = record["split"]
+            if split not in DIAGNOSTIC_SPLITS:
+                continue
+            parameter = record["parameter_id"]
+            initial = tuple(record["equation"]["initial_state"])
+            expected = ("validation", "train") if split == "validation_parameter" else ("train", "validation")
+            if (parameter_splits.get(parameter), initial_splits.get(initial)) != expected:
+                raise ValueError("Diagnostic split must cross train/validation identities only")
+            if ((split == "validation_parameter" and initial not in train_initials)
+                    or (split == "validation_initial" and parameter not in train_parameters)):
+                raise ValueError("Diagnostic seen identity has no successful training trajectory")
 
         if not selected:
             raise ValueError(f"No successful trajectories in {self.split}")

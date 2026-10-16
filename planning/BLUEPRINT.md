@@ -1,6 +1,11 @@
 # EigenFlow blueprint
 
-Status: ODE implementation is available with dry-run defaults and bounded closed-form reference checks; fluid implementation remains pending. No training dataset or trained model exists. Model accuracy and target-hardware throughput are unmeasured. The mission and deadlines in [AGENTS.md](../AGENTS.md) govern this plan.
+Status: scientific ODE v1 specification resolved October 16; generation, training,
+release-metric evaluation, diagnostic splits, standalone inference, plotting and
+runtime measurement are implemented and have local CPU evidence. See STATUS.md
+for measured pilot outcomes. Target GPU/HPC allocation remains unverified. Fluid
+implementation stays pending until November 2. The mission and deadlines in
+[AGENTS.md](../AGENTS.md) govern this plan.
 
 ## Project map
 
@@ -10,7 +15,7 @@ Status: ODE implementation is available with dry-run defaults and bounded closed
 | `planning/STATUS.md` | Current milestone, task state, risks and next action |
 | `planning/DECISIONS.md` | Decisions and unresolved choices |
 | `ode/BLUEPRINT.md` | October model design and evaluation contract |
-| `ode/` | ODE implementation placeholders and future local artifacts |
+| `ode/` | ODE implementation, tests and recorded local experiments |
 | `fluid/BLUEPRINT.md` | November–December sequence and validation gates |
 | `fluid/` | Fluid implementation placeholders and future local artifacts |
 

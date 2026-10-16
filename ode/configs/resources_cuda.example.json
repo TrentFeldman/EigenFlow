@@ -1,0 +1,10 @@
+{
+  "backend": "process",
+  "workers": "auto",
+  "threads": 4,
+  "loader_workers": 0,
+  "device": "cuda",
+  "batch_size": 4096,
+  "preload": true,
+  "preload_limit_gib": 4.0
+}

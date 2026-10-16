@@ -41,7 +41,13 @@ Update `STATUS.md` with the review date, task states, measured progress, risks, 
 - Examples, metrics and plots correspond to the released checkpoint.
 - A release report states whether accuracy targets passed, failed or were not evaluated.
 
-Runnable ODE checks and dependency specifications are documented in `ode/README.md` and `ode/ENVIRONMENT.md`. The generator and trainer default to dry-run; bulk dataset generation and model training are explicitly deferred for the current task. Small numerical validation cases are authorized and recorded separately from dataset/model runs. No automated workflow or experiment service is required at this stage.
+Runnable checks and dependencies are documented in `ode/README.md` and
+`ode/ENVIRONMENT.md`. Generator/trainer remain dry-run by default. The October 16
+request authorizes real smoke runs, timing and a bounded accuracy pilot; the
+historical generation/training deferral no longer applies. Record all runs and
+keep the 100k capacity preset separate from the selected pilot. Cluster execution
+still requires actual allocation/access information. No experiment service is
+required.
 
 ## Documentation handoff
 

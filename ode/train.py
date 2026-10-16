@@ -20,8 +20,10 @@ import torch
 from torch.utils.data import DataLoader
 
 from .config import GeneratorConfig, provenance
-from .dataset import Normalizer, TrajectoryDataset
+from .dataset import Normalizer, TrajectoryDataset, feature_width
 from .model import OrderConditionedMLP, masked_mse
+from .evaluate import METRIC, evaluate_model
+from .resources import TRAINING_KEYS, load_resources
 
 
 # Bound the combined gradient norm to limit unusually large optimizer updates.
@@ -154,7 +156,8 @@ def parse_args(argv=None):
     parser.add_argument("--device", choices=("cpu", "cuda", "auto"), default="cpu")
     parser.add_argument(
         "--preload",
-        action="store_true",
+        action=argparse.BooleanOptionalAction,
+        default=False,
         help="Load standardized examples into host RAM",
     )
     parser.add_argument(
@@ -162,7 +165,14 @@ def parse_args(argv=None):
         action="store_true",
         help="Opt in after inspecting failed reference solves",
     )
+    parser.add_argument("--resources", type=Path, help="Execution profile; CLI overrides take precedence")
+    parser.add_argument("--preload-limit-gib", type=float, help="Maximum GiB for preload arrays, excluding other process memory")
+    profile = load_resources(parser.parse_known_args(argv)[0].resources)
+    parser.set_defaults(**{key: value for key, value in profile.items() if key in TRAINING_KEYS})
     args = parser.parse_args(argv)
+
+    if args.preload_limit_gib is not None and (not np.isfinite(args.preload_limit_gib) or args.preload_limit_gib <= 0):
+        parser.error("--preload-limit-gib must be finite and positive")
 
     if args.preload and args.loader_workers:
         parser.error("Use --loader-workers 0 with --preload to avoid duplicating the dataset")
@@ -201,7 +211,8 @@ def _training_plan(args, config):
         "loader_workers": args.loader_workers,
         "requested_device": args.device,
         "preload": args.preload,
-        "selection": "validation masked MSE; test set remains reserved",
+        "preload_limit_gib": args.preload_limit_gib,
+        "selection": "validation mean trajectory relative L2; test set remains reserved",
     }
 
 
@@ -218,6 +229,9 @@ def _load_datasets(args, config):
     training.normalizer = validation.normalizer = normalizer
 
     if args.preload:
+        required = (len(training) + len(validation)) * (feature_width(config.max_order) + 2 * config.max_order) * 4
+        if args.preload_limit_gib is not None and required > args.preload_limit_gib * 1024**3:
+            raise ValueError(f"Preload arrays need {required / 1024**3:.3f} GiB; increase --preload-limit-gib or use --no-preload")
         training.preload()
         validation.preload()
 
@@ -282,10 +296,12 @@ def build_report(args, config, model, normalizer, training, device):
         },
         "reference_failures": training.manifest["failed"],
         "test_evaluated": False,
+        "metric": METRIC,
+        "selection": "validation mean full-state trajectory relative L2",
     }
 
 
-def save_checkpoint(run, model, normalizer, config, epoch, validation_mse, manifest_sha256):
+def save_checkpoint(run, model, normalizer, config, epoch, validation_mse, manifest_sha256, validation_relative_l2=None):
     """Atomically replace best.pt with the selected model and preprocessing.
 
     Args:
@@ -296,6 +312,7 @@ def save_checkpoint(run, model, normalizer, config, epoch, validation_mse, manif
         epoch: One-based epoch number selected by validation loss.
         validation_mse: Selected scalar validation loss.
         manifest_sha256: Dataset manifest digest identifying the training source.
+        validation_relative_l2: Frozen selection metric; optional for legacy callers.
     Raises:
         OSError: The checkpoint cannot be written or replaced.
     """
@@ -312,6 +329,8 @@ def save_checkpoint(run, model, normalizer, config, epoch, validation_mse, manif
             "epoch": epoch,
             "config": asdict(config),
             "validation_mse": validation_mse,
+            "validation_relative_l2": validation_relative_l2,
+            "metric": METRIC,
             "dataset_manifest_sha256": manifest_sha256,
         },
         temporary_path,
@@ -331,27 +350,39 @@ def _fit(model, optimizer, loaders, device, normalizer, config, args, report):
             epoch_started = perf_counter()
             train_loss = run_epoch(model, train_loader, device, optimizer)
             validation_loss = run_epoch(model, validation_loader, device)
+            validation_metrics = evaluate_model(
+                model, normalizer, validation_loader.dataset, device, args.batch_size)
+            relative_l2 = validation_metrics["overall"]["mean"]
+            if relative_l2 is None:
+                raise RuntimeError("Nonfinite validation predictions")
             report["epochs"].append(
                 {
                     "epoch": epoch,
                     "train_mse": train_loss,
                     "validation_mse": validation_loss,
+                    "validation_relative_l2": relative_l2,
+                    "validation_by_family": {name: value["mean"] for name, value
+                                             in validation_metrics["by_family"].items()},
                     "seconds": perf_counter() - epoch_started,
                 }
             )
 
-            if validation_loss < best:
-                best = validation_loss
+            if relative_l2 < best:
+                best = relative_l2
                 save_checkpoint(
                     args.run,
                     model,
                     normalizer,
                     config,
                     epoch,
-                    best,
+                    validation_loss,
                     report["dataset_manifest_sha256"],
+                    relative_l2,
                 )
                 report["best_epoch"] = epoch
+                report["best_validation_relative_l2"] = best
+
+            print(f"epoch {epoch}: validation relative L2={relative_l2:.6f}", flush=True)
 
             report_path.write_text(json.dumps(report, indent=2, allow_nan=False) + "\n")
 

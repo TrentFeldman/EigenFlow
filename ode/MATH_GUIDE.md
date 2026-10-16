@@ -32,7 +32,7 @@ We sample coefficients by first choosing decaying modes and then multiplying the
 
 The numerical trajectory is the answer we train against. `rtol` is a relative local-error tolerance and `atol` is an absolute tolerance for values near zero. Smaller settings request tighter numerical control; they are not guarantees of a global trajectory error.
 
-Each future trajectory will be solved twice, with the second solve using tighter tolerances. The code compares them separately for each derivative. The allowed L2 difference is `reference_atol * sqrt(number of times) + reference_rtol * norm(refined component)`. A reported refinement ratio of 1 is the acceptance boundary; smaller is better. This ratio is **not** the model's relative trajectory error.
+Each trajectory is solved twice, with the second solve using tighter tolerances. The code compares them separately for each derivative. The allowed L2 difference is `reference_atol * sqrt(number of times) + reference_rtol * norm(refined component)`. A reported refinement ratio of 1 is the acceptance boundary; smaller is better. This ratio is **not** the model's relative trajectory error.
 
 Each trajectory is also checked at selected times using a matrix exponential: a separate way to evolve a constant linear system directly, rather than taking adaptive steps. Sine forcing becomes two extra internal states, sine and cosine, so this approach checks both homogeneous and nonhomogeneous equations, including resonance. Its pointwise allowance is `reference_atol + reference_rtol * abs(reference component)`. This is a floating-point numerical check, not symbolic exact arithmetic or a proof between the selected times. See [SciPy's matrix-exponential documentation](https://docs.scipy.org/doc/scipy/reference/generated/scipy.linalg.expm.html).
 
@@ -52,4 +52,27 @@ Supporting an order in the input format does not mean the model learned it. A mo
 
 ## Why keep full trajectories together?
 
-Randomly assigning individual time points to train and test would expose nearly the same curve during training and evaluation. That can make apparent accuracy misleading. We assign whole equation-parameter groups to a split first; all their initial-condition trajectories stay there. Current partitions are a joint holdout of parameters and initial states. Separate parameter-only and initial-condition-only diagnostic tests remain future work.
+Randomly assigning individual time points to train and test would expose nearly the same curve during training and evaluation. That can make apparent accuracy misleading. We assign whole equation-parameter groups to a split first; all their initial-condition trajectories stay there. Current partitions are a joint holdout of parameters and initial states. The pilot additionally crosses validation parameters with training ICs, and training parameters with validation ICs, to diagnose each source of generalization error. These diagnostics deliberately share one identity with training and never use test identities.
+
+
+## The frozen neural error metric
+
+For one trajectory, subtract reference from prediction, square every real state
+component at every saved time, average, and take the square root. This is the
+absolute root-mean-square error E. Compute R the same way from the reference
+itself. The primary error is `E / max(R, 0.000001)`. For example, reference
+`[[1,2],[1,2]]` and prediction `[[2,2],[2,2]]` give `E=sqrt(1/2)` and
+`R=sqrt(5/2)`, so relative L2 is `1/sqrt(5)`, about 44.7%. The first component
+is 100% wrong and the second is exact; the report includes those breakdowns.
+
+All time samples (including endpoints) have equal weights. Nondimensional
+components have unit scales, with no centering or training standard deviation
+in this metric. The denominator floor keeps a zero reference from dividing by
+zero: predicting `2e-7` for an all-zero trajectory gives absolute RMSE `2e-7`
+and floored relative error 0.2. Interpret the absolute error for such cases.
+
+Average per-trajectory errors with equal weights; never combine all trajectories
+into one norm. Report tails and failures as well as the mean. A nonfinite
+prediction prevents passing, and the report labels finite-only summaries.
+The <5% release target applies to the reserved joint test split, while validation
+chooses checkpoints. Standardized training MSE is a different quantity.

@@ -1,90 +1,81 @@
-# Generation and training estimates
+# Measured compute and remaining allocation questions
 
-These are planning estimates, not measured HPC or GPU results. The only measured
-runtime is a small local numerical-validation suite on the Ryzen 5 5600. No
-training dataset or trained model was created for these estimates.
+Updated October 16, 2026. Local timings below are measured. The old assumption
+of one 32-core HPC node is withdrawn: no scheduler allocation, cluster login or
+NVIDIA GPU is available in this session. Cluster-wide core counts are not a job
+allocation. This generator operates on one node.
 
-## Assumptions
+## Local generation benchmark
 
-- One allocated HPC node with 32 CPU cores, 32 process workers, and local scratch
-  storage. The cluster's 20,000+ total cores across 600+ nodes are shared capacity,
-  not the resources assigned to this job. This generator is single-node.
-- One NVIDIA RTX PRO 6000 Blackwell. The workstation model has 96 GB GDDR7;
-  exact workstation/server/Max-Q edition and host CPU affect performance.
-  [NVIDIA specifications](https://www.nvidia.com/en-us/products/workstations/professional-desktop-gpus/rtx-pro-6000/).
-- Current order-2/order-3 linear homogeneous and sinusoidally forced families,
-  time interval [0, 5], 101 saved times, two adaptive solves and five independent
-  matrix-exponential checkpoints per trajectory.
-- Training uses the current 36,870-parameter MLP, 20 epochs, float32, the current
-  approximately 2/3 training, 1/6 validation and 1/6 test proportions, and
-  `--device cuda --preload --loader-workers 0`. Test data is not scored in training.
-- Exclude scheduler queue time, installing dependencies and copying data between
-  machines. Do not interpret runtime estimates as accuracy or convergence claims.
+Host: AMD Ryzen 5 5600, six physical cores / 12 logical CPUs, 31 GiB RAM.
+Python 3.14.8, NumPy 2.5.2, SciPy 1.18.1. Native OpenMP/BLAS threads were one.
+Each measurement generated the same 384-case recipe in a fresh temporary
+location, including preflight, process startup, two solves, matrix exponentials,
+compressed archives and ledger writes. Three repetitions per worker setting.
 
-## Rough wall times
+| Execution | Median seconds | Trajectories/second |
+|---|---:|---:|
+| Serial | 4.039 | 95.1 |
+| Six processes | 1.174 | 327.0 |
+| Twelve processes | 1.448 | 265.2 |
 
-| Total trajectories | CPU generation on one 32-core node | Training on one RTX PRO 6000 Blackwell, 20 epochs |
-|---|---|---|
-| 384 (current example) | 5-30 seconds | 5-30 seconds |
-| About 10,000 | 20 seconds-2 minutes | 1-5 minutes |
-| About 100,000 | 2-15 minutes | 10-45 minutes |
+Evidence: [benchmark report](runs/20261016-generation-benchmark-01/report.json).
+No reference failures occurred. Stage sums are worker-seconds and cannot be
+added to infer elapsed time in parallel runs. In the first serial run, coarse
+integration took 1.595s, refinement 2.064s and matrix exponentials 0.039s.
+Refinement is expensive but mandatory; independent checks cost about 1% of
+numerical-stage time in this configuration. Keep both safeguards.
 
-These deliberately broad ranges include process/GPU startup and expected data
-handling overhead. They assume good local-scratch performance. A shared filesystem
-with expensive small-file operations can exceed these ranges. Generation writes
-one archive per trajectory; storage/metadata overhead can dominate large runs.
+**Use six workers locally.** Twelve workers were about 23% slower on this small
+workload; this does not establish the best setting on another CPU or filesystem.
+Repeat there with actual allocated CPU counts. Avoid concurrent heavy work when
+benchmarking. Filesystem cache state was not controlled, and /tmp is not cluster
+scratch; these are local planning measurements, not universal throughput claims.
 
-The validation cases locally took approximately 6-20 ms per job, including two
-solves and five independent checks, but excluding archive writing and process
-startup. They are chosen benchmarks, not random-sample throughput measurements.
-For larger runs, estimate:
+## Dataset size and training budget
 
-```text
-generation seconds ~= startup + N * seconds_per_job / (workers * efficiency) + I/O
-```
+Select the 6,656-case pilot: 4,096 train; 1,024 validation; 1,024 reserved test;
+256 parameter-only and 256 IC-only validation diagnostics. Config:
+[generator_pilot.json](configs/generator_pilot.json). The smoke-rate projection
+was about 20s generation; the run note records measured pilot time separately.
+The 100,032-case preset remains unused until learning curves justify expansion.
 
-Use measured target-node timings when available. Efficiency is less than 1;
-32 workers do not imply 32-fold speedup. Higher orders, longer horizons and
-stiff equations can make each trajectory much more expensive.
+At M=6, training preload uses 35 float32 values per time point (23 inputs, six
+targets, six masks): 140 bytes/point, about 58 MB for pilot training and 14.5 MB
+for validation, excluding temporary arrays/model/loader overhead. Raw pilot
+reference states occupy about 13.4 MB; archives also contain times/metadata.
+Use `--preload --loader-workers 0` to avoid shuffled archive decompression.
 
-The model is small enough that CPU collation, transfers and launch overhead may
-dominate GPU arithmetic. `--preload` avoids repeated decompression during shuffled
-training. At max_order=6, preloaded examples use about 140 bytes per time point,
-or 14,140 bytes per trajectory before other overhead; train plus validation need
-about 4.5 MB for the current example and about 1.18 GB for 100,000 total trajectories.
-This is host RAM, not GPU VRAM. Transient loading/statistics and worker copies can
-increase peak memory. Use zero loader workers with preloading.
+The pilot budget is 100 CPU epochs, batch 1024, two PyTorch threads, 3x128 SiLU
+MLP, AdamW at 1e-3. Training and validation-relative-L2 timings are recorded in
+`runs/20261016-pilot-baseline-01/run.json`. Different batch sizes change the
+optimization path. No extrapolated GPU time is used to justify this experiment.
+Inference timing uses `benchmark.py inference`, excludes checkpoint loading,
+warms up, and synchronizes GPU work. Reports include device/build, hardware,
+batch sizes, thread count, median/p95 latency and throughput.
 
-The default batch size is 256. Trying 1024-4096 can reduce GPU launch overhead,
-but changes optimization and must be validated rather than assumed equivalent.
-Twenty epochs on the default configuration mean 2,020 training updates plus
-validation. Reaching a target error may require many more epochs, more data or
-a different architecture. A 200-epoch run is roughly ten times the epoch work;
-startup and one-time loading do not multiply by ten.
+## Actual target allocation: unresolved
 
-## Future HPC execution examples
+Needed: cluster login/access, scheduler job/account/partition, allocated CPUs,
+RAM and wall limit, GPU model/edition and count, driver and supported CUDA
+PyTorch environment. There are no SLURM/PBS allocation variables or configured
+SSH host in the local session. No target job has been submitted.
 
-These commands are examples only and were not executed. Request one CPU node
-through the site's scheduler first; match workers to the allocated CPUs, not
-the cluster's advertised total. Paths should be placed on allocated scratch.
+Inside an actual allocated GPU job, activate its CUDA environment and run:
 
 ```bash
-OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 MKL_NUM_THREADS=1 \
-python -m ode.generate_data --backend process --workers 32 \
-  --generate --output ode/data/linear-v1
-
-python -m ode.train --device cuda --preload --loader-workers 0 \
-  --data ode/data/linear-v1 --run ode/runs/blackwell-baseline \
-  --epochs 20 --batch-size 256 --train
+# Copy/edit the execution profile for the actual allocation.
+bash ode/target_smoke.sh 20261016-target-smoke-01 ode/configs/resources_cuda.example.json
 ```
 
-Limiting native-library threads avoids spawning a full BLAS thread pool inside
-every solver process. Run inside a suitable environment on the allocated host.
-The local ROCm environment cannot provide NVIDIA CUDA support on another machine.
-Use a Blackwell-compatible CUDA PyTorch build on the GPU host; choose the current
-supported build with the cluster administrator. [PyTorch's CUDA support matrix](https://github.com/pytorch/pytorch/blob/main/RELEASE.md)
-and [Blackwell support announcement](https://pytorch.org/blog/pytorch-2-7/).
+The script checks the NVIDIA build and forward/backward execution, captures
+scheduler/GPU/environment evidence, generates 384 cases, trains five epochs,
+reloads the checkpoint through the CLI, evaluates validation and measures GPU
+inference. It fails on this local ROCm environment by design. It does not request
+or guess scheduler resources, install packages, or launch the 100k job.
 
-No multi-node partition/merge layer, scheduler submission automation or GPU
-benchmark is implemented. The next useful measurement is a small benchmark on
-the actual allocated hardware, before reserving a long job.
+Choose the CUDA installation for the target driver/Python using the official
+[PyTorch installer](https://pytorch.org/get-started/locally/). The CUDA and ROCm
+builds share a `torch.cuda` API, so availability alone does not identify NVIDIA;
+the readiness gate also checks `torch.version.cuda` and `torch.version.hip`.
+Record the actual tested build before treating it as a reproducible target lock.

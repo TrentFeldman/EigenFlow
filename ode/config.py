@@ -16,6 +16,8 @@ import numpy as np
 
 
 SPLITS = ("train", "validation", "test")
+DIAGNOSTIC_SPLITS = ("validation_parameter", "validation_initial")
+ALL_SPLITS = SPLITS + DIAGNOSTIC_SPLITS
 FAMILIES = ("linear_homogeneous", "linear_sinusoidal")
 # Leave enough float64 precision for a second, tighter solve.
 MIN_SOLVER_RTOL = 1e-12
@@ -76,7 +78,8 @@ class GeneratorConfig:
 
     Args:
         seed, orders, max_order, families: Reproducibility and equation scope.
-        groups_per_split, initial_conditions_per_group: Dataset population.
+        groups_per_split, initial_conditions_per_group: Core dataset population.
+        diagnostic_groups: Extra crossed train/validation groups per order/family.
         decay_range, frequency_range, initial_state_range, amplitude_range:
             Sampling bounds in the nondimensional units documented below.
         t_start, t_stop, time_points: Stored time grid.
@@ -105,6 +108,9 @@ class GeneratorConfig:
 
     # Initial-state count for each shared parameter group; multiplies dataset size.
     initial_conditions_per_group: int = 4
+
+    # Additional groups per order/family for EACH diagnostic, reusing train/validation pools.
+    diagnostic_groups: int = 0
 
     # Positive decay bounds (inverse time); larger values give faster decay.
     decay_range: tuple[float, float] = (0.1, 1.0)
@@ -222,6 +228,10 @@ class GeneratorConfig:
         ):
             raise ValueError("Every order must be between 1 and max_order")
 
+        if (isinstance(self.diagnostic_groups, bool) or not isinstance(self.diagnostic_groups, int)
+                or self.diagnostic_groups < 0):
+            raise ValueError("diagnostic_groups must be a nonnegative integer")
+
         if len(self.groups_per_split) != len(SPLITS):
             raise ValueError("groups_per_split needs three counts")
 
@@ -230,6 +240,9 @@ class GeneratorConfig:
             for count in self.groups_per_split
         ):
             raise ValueError("groups_per_split counts must be positive integers")
+
+        if self.diagnostic_groups > min(self.groups_per_split[:2]):
+            raise ValueError("diagnostic_groups cannot exceed train or validation group count")
 
     def _validate_ranges(self):
         """Check finite increasing endpoints and positive decay/forcing bounds."""
@@ -348,7 +361,7 @@ class GeneratorConfig:
         return (
             len(self.orders)
             * len(self.families)
-            * sum(self.groups_per_split)
+            * (sum(self.groups_per_split) + 2 * self.diagnostic_groups)
             * self.initial_conditions_per_group
         )
 
@@ -364,7 +377,7 @@ class GeneratorConfig:
             self.time_points
             * sum(self.orders)
             * len(self.families)
-            * sum(self.groups_per_split)
+            * (sum(self.groups_per_split) + 2 * self.diagnostic_groups)
             * self.initial_conditions_per_group
         )
 
@@ -375,5 +388,5 @@ class GeneratorConfig:
             "raw_state_bytes": total_stored_floats * FLOAT64_BYTES,
             "reference_solves_per_trajectory": 2,
             "independent_checks_per_trajectory": min(self.independent_check_points, self.time_points),
-            "split_policy": "disjoint equation groups and initial states; joint holdout",
+            "split_policy": "joint core holdout; optional crossed training/validation diagnostics",
         }

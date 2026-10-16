@@ -1,0 +1,73 @@
+{
+  "kind": "inference",
+  "hardware": {
+    "host": "arch",
+    "platform": "Linux-7.2.9-arch1-1-x86_64-with-glibc2.44",
+    "cpu": "AMD Ryzen 5 5600 6-Core Processor",
+    "logical_cpus": 12,
+    "affinity_cpus": 12,
+    "scheduler": {},
+    "native_threads": {
+      "OMP_NUM_THREADS": null,
+      "OPENBLAS_NUM_THREADS": null,
+      "MKL_NUM_THREADS": null
+    }
+  },
+  "device": "cpu",
+  "device_name": "AMD Ryzen 5 5600 6-Core Processor",
+  "cuda_build": null,
+  "hip_build": "7.14.60850",
+  "threads": 2,
+  "checkpoint_sha256": "d2afedb7cb9cce80ccf4de1baf56dccc821912fc444c0839077f56eb575b7ca6",
+  "scope": "loaded end-to-end prediction, excludes checkpoint load",
+  "python": "3.14.8",
+  "dependencies": {
+    "numpy": "2.5.2",
+    "scipy": "1.18.1",
+    "torch": "2.14.1+rocm7.14"
+  },
+  "source_sha256": {
+    "__init__.py": "4038ce67d84b663b59696296565206bc21471556b979c8f211a755e8a1464b8f",
+    "analytic.py": "6ed50598634923cf2819b21a15efd47013d1cd56b8a0eb24d5bf0c5382324aca",
+    "benchmark.py": "612fd10de1bbfd9a6a1141226d8c52f141f27a6a1ed15e461d76ea535850a8a7",
+    "check_environment.py": "02c2e9b73775dcd5f08457b432df6ab41ff498b2cc316a2282fa9bd6d1e874aa",
+    "config.py": "ae70992112ef314058553e2813148c180856a55a4921f6027ae5c753e972aa4e",
+    "dataset.py": "f68d2c1b063a31372093eb838af7fc0f8335837108838aecbf187a0b3afafa3b",
+    "equations.py": "d08d51d57c2616c068b484dd6c5637420636d66a2536e517985623dbfa05c04e",
+    "evaluate.py": "4f07d878870f20ec8424841c3b4bebb953214646a2b0fb68bae4cd9ab47c5e00",
+    "generate_data.py": "f3edcdc6bc5c75253c4b11c14de2b39bc9f2d1188093d9c3647a70fb265bccf2",
+    "model.py": "6041965303c587ae8351f9344f22dc9485c7184d1c729008ce9381899b7d6505",
+    "plot_results.py": "0a65382af5d32aee6df48cdd0258a3fc87f6584a6ea65434d9d67e8d447f8209",
+    "predict.py": "cc3532c32777b7399bd70e4834f7490cd39570995150bea6f60b769522f5710a",
+    "reference.py": "ed0b4aa08f7a56594cc0014b7f8c14c06929c4592446ee987d1e84173a5e2377",
+    "resources.py": "94f7da1743b138cd57c074d1220296155b5b497fd30a95b8d437f5b587b6c8c1",
+    "train.py": "e3cf5562c1f1adfa7366ecdee8820530aff49d6c227995d1317fbbf8aca3ff74",
+    "validate_reference.py": "fbdbb1d4300321cb7652c5355e3a438b31d5822a0353d48423f90bd3de6280de"
+  },
+  "results": [
+    {
+      "batch_size_points": 1,
+      "repeats": 30,
+      "warmup": 5,
+      "median_seconds": 8.585099999436352e-05,
+      "p95_seconds": 9.23360000001594e-05,
+      "points_per_second": 11648.087967125068
+    },
+    {
+      "batch_size_points": 101,
+      "repeats": 30,
+      "warmup": 5,
+      "median_seconds": 0.00018731099999058642,
+      "p95_seconds": 0.00019818149988850564,
+      "points_per_second": 539210.1905658285
+    },
+    {
+      "batch_size_points": 4096,
+      "repeats": 30,
+      "warmup": 5,
+      "median_seconds": 0.0024335080000810194,
+      "p95_seconds": 0.0025458680500037184,
+      "points_per_second": 1683166.8520767677
+    }
+  ]
+}

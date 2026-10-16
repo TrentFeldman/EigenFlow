@@ -1,0 +1,10 @@
+{
+  "backend": "process",
+  "workers": 6,
+  "threads": 2,
+  "loader_workers": 0,
+  "device": "cpu",
+  "batch_size": 1024,
+  "preload": true,
+  "preload_limit_gib": 4.0
+}

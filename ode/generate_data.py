@@ -21,6 +21,7 @@ from .config import FAMILIES, SPLITS, GeneratorConfig, provenance, record_split
 from .equations import LinearODE, fingerprint, stable_coefficients
 from .reference import SolveJob, solve_job
 from .validate_reference import validate_reference
+from .resources import GENERATION_KEYS, load_resources
 
 
 PARAMETER_STREAM = 0
@@ -63,13 +64,31 @@ def iter_jobs(config: GeneratorConfig):
     Args:
         config: Sampling bounds, group counts and root seed.
     Yields:
-        SolveJob with a whole parameter group assigned to a single split.
+        SolveJob in a core joint holdout or an explicitly crossed diagnostic.
+        Diagnostic parameters/ICs reuse training and validation pools only.
     """
     for split_index, split in enumerate(SPLITS):
         for order in config.orders:
             for family in config.families:
                 for group in range(config.groups_per_split[split_index]):
                     yield from _group_jobs(config, split_index, order, family, group)
+
+    # Cross existing train/validation pools without using any test identity.
+    # Parameter diagnostic: validation equation + seen training IC.
+    # IC diagnostic: seen training equation + validation IC.
+    for order in config.orders:
+        for family in config.families:
+            for group in range(config.diagnostic_groups):
+                train = list(_group_jobs(config, 0, order, family, group))
+                validation = list(_group_jobs(config, 1, order, family, group))
+                for index, (seen, unseen) in enumerate(zip(train, validation)):
+                    for split, parameters, initial in (
+                        ("validation_parameter", unseen, seen),
+                        ("validation_initial", seen, unseen),
+                    ):
+                        equation = replace(parameters.equation, initial_state=initial.equation.initial_state)
+                        identity = f"{split}-o{order}-{family}-g{group}-i{index}"
+                        yield SolveJob(identity, equation.parameter_id, split, equation)
 
 
 def iter_results(jobs, config: GeneratorConfig):
@@ -134,7 +153,7 @@ def _build_manifest(config, validation):
             family: {"succeeded": 0, "failed": 0}
             for family in config.families
         },
-        "split_policy": "joint holdout: equation parameters and initial states disjoint",
+        "split_policy": "core joint holdout; diagnostics cross train and validation identities only",
     }
 
 
@@ -149,6 +168,7 @@ def _record_result(result, output, manifest) -> dict:
         "order": job.equation.order,
         "equation": asdict(job.equation),
         "nfev": result.nfev,
+        "stage_seconds": result.stage_seconds,
         "refinement_error_ratio": result.refinement_ratio,
         "independent_error_ratio": result.independent_ratio,
         "status": "failed" if result.error else "success",
@@ -179,9 +199,10 @@ def _write_ledger(config, output, manifest):
         for result in iter_results(iter_jobs(config), config):
             job = result.job
             collision_message = "Cross-split parameter or initial-state collision"
-            record_split(parameter_splits, job.parameter_id, job.split, collision_message)
-            record_split(initial_splits, fingerprint(job.equation.initial_state),
-                         job.split, collision_message)
+            if job.split in SPLITS:
+                record_split(parameter_splits, job.parameter_id, job.split, collision_message)
+                record_split(initial_splits, fingerprint(job.equation.initial_state),
+                             job.split, collision_message)
             record = _record_result(result, output, manifest)
             ledger.write(json.dumps(record, allow_nan=False) + "\n")
             ledger.flush()
@@ -265,8 +286,11 @@ def main(argv=None) -> int:
         help="Override workers with the CPUs allocated to this job",
     )
     parser.add_argument("--backend", choices=("thread", "process", "serial"))
+    parser.add_argument("--resources", type=Path, help="Execution profile; CLI overrides take precedence")
     args = parser.parse_args(argv)
     config = GeneratorConfig.load(args.config)
+    profile = load_resources(args.resources)
+    config = replace(config, **{key: value for key, value in profile.items() if key in GENERATION_KEYS})
     overrides = {
         name: getattr(args, name)
         for name in ("workers", "backend")

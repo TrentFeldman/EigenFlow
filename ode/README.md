@@ -4,11 +4,15 @@ This folder contains EigenFlow's numerical-reference generator and supervised
 PyTorch trajectory predictor. The current presets cover second- and third-order
 linear ODEs, both homogeneous and sinusoidally forced.
 
-The generator, loader, trainer and checkpoint inference are implemented. CPU
-generation and short training runs have been exercised using temporary fixtures.
-There is no released, evaluated model yet: held-out scoring and plotting remain
-pending in `evaluate.py` and `plot_results.py`. Full-scale generation, GPU
-throughput and the less-than-5% trajectory-error target remain unmeasured.
+Generation, training, release-metric evaluation, standalone inference, diagnostic
+splits, plots and runtime benchmarking are implemented. The scientific contract
+was frozen October 16. Recorded CPU smoke/pilot runs are linked from
+[project status](../planning/STATUS.md); no October release is declared yet.
+Target CUDA execution and actual HPC allocation still await hardware access.
+
+The [error-reduction plan](error_reduction/README.md) reviews saved validation
+evidence and prepares staged comparisons. Its draft settings are proposals;
+no experiments were executed for that planning task.
 
 All commands here run from the **repository root**, using `.venv/bin/python`.
 See the [environment guide](ENVIRONMENT.md) for installation and the
@@ -97,8 +101,7 @@ changes the right-hand side to `0.4 sin(1.2 τ)`.
 
 These commands create local artifacts. Choose new dataset and run names if the
 example paths already exist; overwriting and automatic resume are not supported.
-The configuration remains an experiment recipe, pending the release-specification
-freeze.
+The scientific recipe is frozen; counts and execution profiles identify each experiment.
 
 ### 1. Generate reference trajectories
 
@@ -110,7 +113,7 @@ OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 MKL_NUM_THREADS=1 \
   --output ode/data/linear-v1
 ```
 
-The preset uses 12 process workers. Add `--workers 4` for a smaller CPU allocation
+The preset uses six process workers. Add `--workers 4` for a smaller CPU allocation
 or `--backend serial` for sequential execution. The environment variables limit
 native-library threads per process so competing thread pools do not multiply the
 requested parallelism.
@@ -133,14 +136,23 @@ and `failed: 0`. Failed solves are recorded, not substituted with new samples.
 ```
 
 The trainer fits normalization on the training split, optimizes the model, and
-saves the checkpoint with the lowest validation loss. It does not score the test
+saves the checkpoint with the lowest mean validation trajectory relative L2. It does not score the test
 set. A successful run creates `best.pt` and `run.json`; completing 20 epochs does
 not itself establish acceptable prediction accuracy.
 
 ### 3. Load the checkpoint and predict
 
-Inference is a Python API. It loads the saved model and normalization on CPU and
-does not require the training dataset.
+Inference has both a Python API and a JSON CLI; neither requires the training dataset.
+The API defaults to CPU; `Predictor(path, device="cuda")` loads once for repeated
+GPU calls. The CLI rejects requests outside the saved scientific domain unless
+`--allow-extrapolation` explicitly requests an unsupported probe.
+
+```bash
+.venv/bin/python -m ode.predict \
+  --checkpoint ode/runs/linear-v1-baseline/best.pt \
+  --input ode/configs/predict_example.json \
+  --output ode/runs/linear-v1-baseline/prediction.json
+```
 
 ```bash
 .venv/bin/python - <<'PY'
@@ -179,7 +191,87 @@ The numerical comparison above is a single illustrative case, not a held-out
 evaluation. The network does not enforce the initial condition exactly and can
 produce finite but inaccurate states.
 
+## Resource profiles and selected pilot
+
+Scientific recipes and execution settings are separate. Use
+`--resources ode/configs/resources_local.json` locally, or copy/edit
+[resources_cuda.example.json](configs/resources_cuda.example.json) for the
+allocation obtained from the cluster. Explicit CLI flags override profile values;
+profile values override defaults. All resolved settings are recorded in artifacts.
+
+| Profile key / CLI flag | Meaning |
+|---|---|
+| `workers` / `--workers` | Generation processes; profile also accepts `"auto"` |
+| `backend` / `--backend` | `process`, `thread`, or `serial` generation |
+| `threads` / `--threads` | Training CPU threads; profile also accepts `"auto"` |
+| `loader_workers` / `--loader-workers` | DataLoader subprocesses; zero for preload |
+| `device` / `--device` | `cpu`, `cuda`, or `auto` training |
+| `batch_size` / `--batch-size` | Training points per update; changes optimization |
+| `preload` / `--preload`, `--no-preload` | Keep normalized training/validation in RAM |
+| `preload_limit_gib` / `--preload-limit-gib` | Upper bound for preload arrays, excluding other process memory |
+
+CPU `"auto"` uses the minimum of affinity, logical CPUs and `SLURM_CPUS_PER_TASK`
+when present. It never uses total cluster capacity. For non-SLURM allocations
+without enforced affinity, set explicit counts. The example CUDA profile is
+editable and untested on the target. No scientific ranges change when switching
+profiles. Batch size/device changes still define a new training experiment.
+
+The selected next-size recipe is `generator_pilot.json`: **6,656 trajectories**
+(4,096 train, 1,024 validation, 1,024 reserved test, 256 in each diagnostic).
+The original 384-case preset stays available for wiring and device checks.
+
+```bash
+OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 MKL_NUM_THREADS=1 \
+.venv/bin/python -m ode.generate_data --config ode/configs/generator_pilot.json \
+  --resources ode/configs/resources_local.json --generate --output ode/data/pilot-v1
+.venv/bin/python -m ode.train --config ode/configs/generator_pilot.json \
+  --resources ode/configs/resources_local.json --data ode/data/pilot-v1 \
+  --run ode/runs/pilot-v1 --epochs 100 --train
+```
+
+## Evaluate, plot and benchmark
+
+The primary metric is `RMS(pred-ref)/max(RMS(ref),1e-6)` over real state
+components and all stored times. Component scales and time weights are one;
+trajectories have equal aggregate weight. `evaluate.py` reports mean, median,
+p95, worst, >=5% and numerical failures, absolute errors, near-zero summaries,
+and per-order/forcing-family/component breakdowns. See [MATH_GUIDE.md](MATH_GUIDE.md)
+for a worked example. Nonfinite outputs cannot produce a passing result.
+
+```bash
+.venv/bin/python -m ode.evaluate --checkpoint ode/runs/pilot-v1/best.pt \
+  --data ode/data/pilot-v1 --splits validation validation_parameter validation_initial \
+  --output ode/runs/pilot-v1/evaluation.json
+.venv/bin/python -m ode.plot_results --checkpoint ode/runs/pilot-v1/best.pt \
+  --data ode/data/pilot-v1 --report ode/runs/pilot-v1/evaluation.json \
+  --output ode/runs/pilot-v1/plots --worst 3
+.venv/bin/python -m ode.benchmark inference --checkpoint ode/runs/pilot-v1/best.pt \
+  --batch-sizes 1 101 4096 --repeats 30 --threads 2 \
+  --output ode/runs/pilot-v1/runtime.json
+```
+
+Plots include the median case in each family and worst cases overall. SVG files
+contain component overlays and signed errors, labeled with equation parameters
+and nondimensional axes; no plotting package is needed. Runtime measures warmed
+loaded prediction, including transfers/encoding and excluding checkpoint load.
+Use `--device cuda` on the tested GPU. Evaluation defaults to validation; request
+`--splits test` only for a recorded milestone after model selection is finished.
+Every report/plot verifies the dataset/checkpoint identity, and new paths prevent
+accidental overwrite. Diagnostics are absent in the 384-case recipe.
+
+```bash
+OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 MKL_NUM_THREADS=1 \
+.venv/bin/python -m ode.benchmark generation --workers 1 6 12 --repeats 3 \
+  --output ode/runs/local-throughput/report.json
+```
+
+This solves real data repeatedly in temporary directories and records all timing
+and failure evidence. Match the worker sweep to the actual CPU allocation.
+
 ## Full-run preset: 100,032 trajectories
+
+This is an unused capacity option, not the selected next run. It contains only
+core splits; add and version diagnostics before promoting it to a release recipe.
 
 [configs/generator_full.json](configs/generator_full.json) keeps the same
 equation families, bounds, time grid and solver checks as the small preset. It
@@ -207,7 +299,7 @@ Preview first:
 .venv/bin/python -m ode.generate_data --config ode/configs/generator_full.json
 ```
 
-To execute with the preset's 12 process workers:
+To execute with the preset's six process workers:
 
 ```bash
 OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 MKL_NUM_THREADS=1 \
@@ -217,8 +309,8 @@ OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 MKL_NUM_THREADS=1 \
   --output ode/data/linear-100k-v1
 ```
 
-On an allocated 32-core node, add `--workers 32` and use a new output directory
-on the site's scratch storage. Use the site's Python environment and match the
+On the actual allocated node, set `--workers` to a measured appropriate count
+and use a new output directory on the site's scratch storage. Use the site's Python environment and match the
 worker count to the allocation. Sampling seeds are independent of worker
 scheduling and backend choice.
 
@@ -237,12 +329,12 @@ Training must use the matching full configuration. For a compatible GPU host:
 ```
 
 `--preload` requires enough host RAM for normalized examples; omit it to load
-archives lazily. CPU execution is available with `--device cpu`. Hardware timings
-in [COMPUTE_ESTIMATES.md](COMPUTE_ESTIMATES.md) are projections, not measurements.
+archives lazily. CPU execution is available with `--device cpu`. Local measured timings and unresolved target hardware are recorded
+in [COMPUTE_ESTIMATES.md](COMPUTE_ESTIMATES.md).
 
 ## Configuration and sampling
 
-Both JSON presets use these scientific settings:
+All dataset presets use these frozen scientific settings:
 
 | Setting | Value | Meaning |
 |---|---|---|
@@ -263,7 +355,7 @@ Both JSON presets use these scientific settings:
 | `independent_check_points` | `5` | Saved times checked using a matrix exponential |
 | `max_abs_state` | `1e6` | Reject states exceeding this absolute component bound |
 | `max_rhs_calls` | `100000` | Maximum right-hand-side evaluations per solve |
-| `backend`, `workers` | `process`, `12` | Execution settings in the JSON presets |
+| `backend`, `workers` | `process`, `6` | Execution settings in the JSON presets |
 
 Forcing phases are sampled in `[-π, π)`. Coefficients are constructed from
 decaying complex-conjugate root pairs, with an additional negative real root for
@@ -339,11 +431,15 @@ ode/data/linear-v1/
 Archives store absolute times on the configured grid. Encoding subtracts
 `t_start`, so the model and prediction API receive elapsed times.
 
-Splits hold out **both equation parameters and initial states**. All initial
+Core splits hold out **both equation parameters and initial states**. All initial
 conditions belonging to one equation-parameter group stay in the same split;
 time samples from a trajectory are never distributed across splits. The parameter
 ID hashes coefficients and forcing parameters, excluding the initial state.
-Generation and loading detect cross-split parameter or initial-state collisions.
+Generation and loading detect cross-core-split parameter or initial-state collisions.
+The pilot also has `validation_parameter` (new parameters, seen ICs) and
+`validation_initial` (seen parameters, new ICs). They cross training/validation
+identities intentionally; test identities remain isolated. The diagnostic group
+count is `diagnostic_groups` per order/forcing family, with four ICs per group.
 
 The loader verifies the manifest, ledger checksum, counts and record metadata.
 Archive checksums and array contracts are checked when each trajectory is first
@@ -391,7 +487,7 @@ Training uses **masked mean squared error**: average squared error across active
 derivatives within each example, then average across examples. Padding contributes
 no loss, and higher-order equations do not receive extra weight merely for having
 more components. This loss is in standardized state units. It is distinct from
-the proposed relative trajectory L2 release metric; a validation MSE of `0.05`
+the frozen relative trajectory L2 release metric; a validation MSE of `0.05`
 does not mean 5% trajectory error.
 
 ## Training options and saved artifacts
@@ -450,9 +546,12 @@ evidence.
 | [dataset.py](dataset.py) | Integrity checks, feature encoding, loading and normalization |
 | [model.py](model.py) | Mixed-order neural baseline and masked loss |
 | [train.py](train.py) | Training, validation selection and saved artifacts |
-| [predict.py](predict.py) | CPU inference from a checkpoint |
+| [predict.py](predict.py) | CPU/CUDA inference and independent JSON CLI |
 | [check_environment.py](check_environment.py) | Interpreter, dependency and device readiness report |
-| [evaluate.py](evaluate.py), [plot_results.py](plot_results.py) | Documented placeholders; implementation pending |
+| [evaluate.py](evaluate.py), [plot_results.py](plot_results.py) | Frozen metrics, breakdowns and standalone SVG plots |
+| [benchmark.py](benchmark.py) | Generation/inference runtime with hardware and stage evidence |
+| [resources.py](resources.py) | Separate execution profiles, CPU allocation detection and validation |
+| [target_smoke.sh](target_smoke.sh) | Actual allocated NVIDIA end-to-end verification |
 
 ## Troubleshooting
 
@@ -472,35 +571,15 @@ evidence.
 
 ## Verification and remaining work
 
-As of October 16, 2026, the 25-test suite and 13 deterministic reference cases
-pass. The recorded reference benchmark's largest absolute state-component error
-was approximately `5.6e-10`; see the
-[validation record](runs/20261015-reference-validation-01/README.md) and
-[JSON report](runs/20261015-reference-validation-01/report.json).
-This measures numerical-reference accuracy on those cases, not neural accuracy.
+Run `.venv/bin/python -m unittest discover -v` from the root. Tests cover
+closed-form reference accuracy, partition isolation, near-zero/nonfinite metric
+behavior, validation checkpoint selection, inference reload and execution
+profile precedence. Historical reference evidence lives in
+[runs/20261015-reference-validation-01](runs/20261015-reference-validation-01/README.md).
+New smoke/pilot/benchmark evidence and current counts are in
+[STATUS.md](../planning/STATUS.md). Reference error does not measure neural error.
 
-Refactoring checks also exercised temporary dataset generation and short CPU
-training runs, comparing sampling, normalization, encoded data, inference,
-reference results and trained weights. They do not establish generalization or
-target-hardware performance, and their temporary artifacts are not release assets.
-
-Before the October release, the project still needs:
-
-- A frozen family/range, time-domain and evaluation specification.
-- A versioned production dataset and reproducible trained checkpoint.
-- Held-out evaluation with mean, median, 95th percentile, worst cases and failures,
-  including per-family and per-component results.
-- A documented relative-L2 definition, component scaling and near-zero denominator
-  policy before applying the less-than-5% target.
-- Separate parameter-only, initial-condition-only and unseen-order investigations
-  where claimed; the current split is a joint holdout.
-- Prediction/reference plots, inference timing and a tested release environment.
-
-Closed-form coverage includes repeated and all-real roots, but the current
-sampler does not deliberately generate those families. Likewise, passing an
-order-six numerical case does not establish order-six neural generalization.
-Keep accuracy claims within the domains and checkpoints actually evaluated.
-
-The [ODE blueprint](BLUEPRINT.md), [decision register](../planning/DECISIONS.md)
-and [project status](../planning/STATUS.md) track the remaining design and release
-work. Proposed choices remain provisional until explicitly resolved.
+Remaining release gates are target hardware verification, checkpoint selection
+and distribution, documented milestone test evaluation, and clean-environment
+reproduction. Padding width six does not establish neural accuracy on untrained
+orders or all-real/repeated-root families. Fluid implementation remains deferred.

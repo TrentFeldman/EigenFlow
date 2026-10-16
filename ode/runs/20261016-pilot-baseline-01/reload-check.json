@@ -1,0 +1,10 @@
+{
+  "checkpoint_sha256": "d2afedb7cb9cce80ccf4de1baf56dccc821912fc444c0839077f56eb575b7ca6",
+  "reload_bitwise_equal": true,
+  "cli_api_max_absolute_difference": 2.2227185897394364e-07,
+  "state_shape": [
+    11,
+    2
+  ],
+  "dataset_required": false
+}

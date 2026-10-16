@@ -1,42 +1,102 @@
 # Project status
 
-Updated: October 15, 2026.
+Updated: October 16, 2026.
 
-Current phase: both-family numerical-reference validation and CPU/CUDA training preparation. Small numerical benchmarks have passed; no training dataset has been generated and no model has been trained. Model accuracy and actual HPC/GPU throughput remain unmeasured.
+Verified analytical review: [combined cost–benefit analysis](../ode/error_reduction/COST_BENEFIT.md)
+incorporates all six parked AGENTS.md options and updates the draft experiment
+order/settings. Cost projections are analytical; candidate accuracy and runtime
+remain unmeasured. No experiments were executed.
 
-## Verified foundation
+Verified preparation: [error-reduction plan](../ode/error_reduction/README.md),
+source-hashed saved-validation review, draft comparison settings and a prepared
+control command. All proposed experiments remain unexecuted, as requested.
+Model/trainer/generator code and existing data/checkpoints were preserved.
 
-- Configurable positive-order state conversion and stable linear-family parameter sampler.
-- Dry-run-by-default generator, bounded thread/process/serial coordination, deterministic job seeds, failure ledger and integrity manifest. CLI worker/backend overrides support a single-node allocation.
-- Both configured families pass closed-form preflight. Each future trajectory must additionally pass tolerance refinement and matrix-exponential checks at five configured times.
-- Mixed-order padded features, masked loss, training-only normalization, CPU/CUDA trainer, optional host-RAM preloading and independent checkpoint inference. GPU execution is not hardware-tested locally.
-- Existing isolated Python environment checked; SciPy added; NumPy/PyTorch retained; dependency compatibility check passed.
-- Generator example configured for the local Ryzen 5 5600 with 12 process workers; numerical generation and performance benchmarking remain deferred.
-- Team documentation rules, plain-language math guide and documented roles for every Python file, including fluid placeholders.
-- All 24 unit checks passed, including real closed-form numerical checks, process-worker execution, dry-run safety, independent-check failure detection and preload/device contracts.
-- All 13 deterministic benchmark cases passed across homogeneous/sine-forced equations, repeated/distinct roots, damped oscillations, orders 2/3/6 and resonance. Worst absolute state-component error was about 5.6e-10; this is reference accuracy on these cases, not neural accuracy.
-- Validation evidence: `ode/runs/20261015-reference-validation-01/report.json` and its run note. No dataset or trained checkpoint was produced.
-- `ode/COMPUTE_ESTIMATES.md` records explicitly unmeasured single-node HPC / RTX PRO 6000 Blackwell projections, including queue/I/O and hardware assumptions.
-- Added `ode/configs/generator_full.json` and root/ODE README instructions for 100,032 planned trajectories (66,688 train; 16,672 validation; 16,672 test). Only the preset dry-run was checked; full generation remains user-triggered.
+Verified documentation handoff: [professor-facing brief](../ode/PROFESSOR_BRIEF.md)
+explains the equations, reference checks, model, evaluation and pilot limitations.
+Checked against the implementation and recorded results; no experiments rerun.
 
-## Immediate milestone — October 18
+Current phase: scientific ODE v1 specification resolved; CPU pilot trained and
+measured. **The unchanged 3x128 baseline achieved 3.689% mean relative L2 on a
+1,024-trajectory joint test set**, evaluated once after validation-only checkpoint
+selection. This passes the pooled pilot target, with substantial tail errors and
+a 5.573% mean for the third-order sine-forced family. No October release declared.
 
-| Task | State | Completion evidence |
+## October 18 freeze and requested work
+
+| Task | State | Evidence / next action |
 |---|---|---|
-| Choose second- and third-order families | planned | Equations, parameter bounds and rationale recorded |
-| Freeze inputs, outputs and time domain | planned | Complete data contract in ODE blueprint |
-| Define reference validation | planned | Solver choice, tolerances and convergence checks specified |
-| Freeze evaluation protocol | planned | Split recipe, metrics, near-zero handling and target scope recorded |
-| Estimate initial experiment size | planned | Hardware budget, dataset sizes and training budget recorded |
+| Families, bounds, forcing and time domain | verified | Resolved v1 contract in DECISIONS.md and ode/BLUEPRINT.md; 101 points on [0,5] |
+| Reference protocol | verified | All 6,656 pilot references pass preflight, refinement and independent checks |
+| Primary metric / near-zero / component policy | verified | Frozen RMS-normalized relative L2, 1e-6 floor; metric tests and full reports |
+| Joint, parameter-only and IC-only splits | verified | Pilot diagnostic partitions and loader ownership checks; no test leakage |
+| Extrapolation policy | verified | Outside October acceptance; no out-of-range dataset required for v1 |
+| Dataset size / workers | verified | Selected 6,656-case pilot; measured six local workers beat twelve; 100k unused |
+| Evaluation, plotting and independent CLI | verified | Smoke/pilot reports, SVG medians/worst cases, JSON prediction and reload checks |
+| Runtime benchmark | verified locally | Hardware/batch/thread details and warmed latency in pilot runtime.json |
+| Real small end-to-end run | verified | 384 references → five epochs → independent reload/evaluation/plots |
+| Baseline adequacy / fallback plan | verified for pilot pooled target | 100-epoch baseline, explicit family/tail limitations; controlled fallback order recorded |
+| Test discovery / environment / stale docs | verified | 35 discovered tests pass, pip check passes, direct pins and recorded environment |
+| Portable CPU/GPU resources | verified locally | Editable profiles, CLI precedence, scheduler-aware auto CPUs, preload cap; bitwise matching smoke rerun |
+| Error-reduction research plan | verified preparation only | Saved validation review, all AGENTS.md options, cost–benefit analysis and draft comparisons in ode/error_reduction/; experiments not run |
+| Actual HPC allocation | blocked | User obtaining details in a meeting; need host/access, CPU/RAM/time/account/partition/GPU allocation |
+| NVIDIA target training and throughput | blocked | Local torch is ROCm, no GPU; target_smoke.sh prepared, actual allocated execution required |
+| Fluid implementation | planned | Placeholders unchanged; primary work starts November 2 |
 
-Next action: freeze the October 18 data/evaluation specification and determine the actual HPC CPU allocation. Bulk dataset generation and training remain deferred by the user's explicit clarification; the current task performed only code changes and small validation cases.
+## Measured evidence
+
+- [Generation benchmark](../ode/runs/20261016-generation-benchmark-01/README.md):
+  three repetitions of 384 cases for each setting; median serial 4.039s,
+  six workers 1.174s, twelve workers 1.448s. All 3,456 references passed.
+- [Small end-to-end smoke](../ode/runs/20261016-smoke-01/README.md): 384 valid
+  references, five CPU epochs; best validation error 54.247%. Pipeline passed;
+  smoke accuracy failed the target. No smoke test-set scoring.
+- [Pilot result](../ode/runs/20261016-pilot-baseline-01/README.md): 6,656 valid
+  references in 13.056s; 100 epochs in 374.581s; best epoch 96. Validation mean
+  3.578%, parameter-only 3.993%, IC-only 2.938%. One reserved-test use.
+- Pilot test: mean **3.689%**, median **2.704%**, p95 **8.976%**, worst **36.908%**;
+  **216/1,024 cases >=5%**, zero nonfinite predictions. Test family means:
+  order-2 homogeneous 2.253%, order-2 sine 4.842%, order-3 homogeneous 2.090%,
+  order-3 sine **5.573%**. Per-component and absolute/near-zero records retained.
+- Loaded CPU prediction median latency: 0.086 ms / one point, 0.187 ms / 101,
+  2.434 ms / 4,096; 30 repetitions, five warmups, two CPU threads. Not GPU timing.
+- Independent checkpoint reload and CLI agreement passed. Resource-profile smoke
+  [rerun](../ode/runs/20261016-resource-smoke-01/README.md) produced bitwise identical
+  selected weights with matching training options.
+- [Environment evidence](../ode/runs/20261016-environment-01/README.md): Python
+  3.14.8, NumPy 2.5.2, SciPy 1.18.1, torch 2.14.1+rocm7.14. No package changes.
+  CUDA readiness explicitly fails locally; target testing is not claimed.
+- `.venv/bin/python -m unittest discover -v`: **35 tests passed**. The previous
+  24-test note was stale (25 existing tests before this session; ten added).
+  The earlier 13-case reference benchmark remains valid historical evidence.
+
+## Next actions and risks
+
+1. After the user's allocation meeting, edit the CUDA resource profile and run
+   `ode/target_smoke.sh` inside the real allocation; measure generation workers
+   there. Do not reuse the old assumed 32-core node or local ROCm wheel.
+2. By October 23, retain this functioning pilot baseline. A controlled
+   validation-only study is now prepared in `ode/error_reduction/`; execution is
+   deferred by the user's current instruction. The pilot test has been consumed
+   once; do not repeatedly tune against it.
+3. By October 27, consolidate failure analysis and select the release candidate.
+   Keep test protocol changes explicit and preserve independently reserved data.
+4. By October 30–31, package a reproducible checkpoint, environment and artifacts,
+   verify clean installation/inference, and document acceptance limits. A local
+   pilot passing the pooled metric is not yet a packaged release.
+
+No 100k dataset was generated. Single-seed pilot evidence does not establish
+robustness across random seeds, out-of-domain parameters, new orders or longer
+times. The full-state metric can hide individual component/family weakness, so
+reports retain those breakdowns. Large small-file datasets may behave differently
+on cluster storage. CPU/GPU reproducibility and throughput require target tests.
 
 ## Later milestones
 
 | Due | Deliverable | State |
 |---|---|---|
-| Oct 23 | Trained ODE baseline | planned |
-| Oct 27 | Higher-order evaluation and reliability improvements | planned |
+| Oct 23 | Trained ODE baseline | verified locally; target portability pending |
+| Oct 27 | Higher-order reliability evaluation | active |
 | Oct 30–31 | Reproducible ODE v1.0 | planned |
 | Nov 6 | Validated fluid reference solver | planned |
 | Nov 13 | Reproducible fluid dataset | planned |
@@ -45,13 +105,7 @@ Next action: freeze the October 18 data/evaluation specification and determine t
 | Dec 4 | Working comparison demo | planned |
 | Dec 11 | Evaluated semester release | planned |
 
-## Risks and measured progress
-
-- Equation ranges, compute budget and numerical tolerances are not yet settled.
-- Reference quality and leakage-free splits must be established before model results are meaningful.
-- The 5% model accuracy goal is untested. Only small local reference benchmarks are measured; HPC generation and Blackwell training estimates still need target-hardware benchmarks.
-- If timing becomes threatened, reduce family scope explicitly before reducing validation or documentation.
-
-## Review entry template
-
-Date; verified tasks and evidence; measured results; blockers and risks; scope changes; next deliverable; target date.
+Review: October 16; froze scientific contract, established full CPU pipeline and
+pooled accuracy feasibility; retained failure/timing evidence; selected pilot
+instead of 100k; target allocation/CUDA unresolved. Next deliverable is allocated
+hardware verification and baseline handoff, target October 23.

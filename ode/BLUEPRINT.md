@@ -1,51 +1,85 @@
 # ODE model blueprint
 
-Target: reproducible higher-order trajectory prediction release by October 31, 2026. Design choices below are proposals until the October 18 specification is frozen.
+Target: reproducible higher-order trajectory predictor by October 31, 2026.
+The scientific v1 contract was resolved October 16, before real-data generation.
+See [the decision register](../planning/DECISIONS.md) for bounds, rationale,
+fallbacks and the explicitly unresolved target-hardware allocation.
 
-Implementation update: the generator, data/model interfaces, CPU/CUDA trainer and checkpoint inference now exist; see [README.md](README.md) for safe dry-runs and current limits. Small numerical-reference benchmarks passed for both families, but bulk generation and real training have not run. Read [MATH_GUIDE.md](MATH_GUIDE.md) for the plain-language mathematical contract.
+## Implemented data flow
 
-## Intended data flow
-
-Family and sampling configuration → validated numerical trajectories → grouped train/validation/test partitions → training-only normalization → supervised baseline → saved model and preprocessing → standalone prediction → evaluation and plots.
-
-## Reserved files
+Frozen equation recipe → independently checked numerical trajectories → whole
+trajectory splits → training-only normalization → shared MLP → validation
+relative-L2 checkpoint selection → independent inference → evaluation and plots.
 
 | File | Responsibility |
 |---|---|
-| `equations.py` | Family definitions and conversion to first-order state systems |
-| `generate_data.py` | Reference trajectories, solver checks and dataset manifest |
-| `dataset.py` | Load partitions and fit/apply saved normalization |
-| `model.py` | Modest PyTorch trajectory baseline |
-| `train.py` | Seeded training, validation and checkpoint selection |
-| `evaluate.py` | Frozen-set metrics, failure analysis and evaluation report |
-| `predict.py` | Load model, configuration and preprocessing for independent inference |
-| `plot_results.py` | Reference/prediction overlays and error plots |
-| `analytic.py`, `validate_reference.py` | Independent reference calculation and closed-form preflight |
-| `tests/test_reference.py`, `tests/test_validation.py` | Solver safeguard and real numerical-reference checks |
-| `tests/test_data.py` | Future partition isolation and data-contract checks |
-| `tests/test_inference.py` | Future saved-artifact inference and reproducibility checks |
+| `config.py`, `equations.py` | Validated recipe, equation representation and stable-root sampling |
+| `generate_data.py`, `reference.py` | Bounded generation, dual solves, independent checks, archives and failure ledger |
+| `analytic.py`, `validate_reference.py` | Matrix exponentials and 13 closed-form preflight cases |
+| `dataset.py` | Archive/partition integrity, padded features, training-only normalization |
+| `model.py`, `train.py` | Shared MLP, masked MSE optimization, release-metric validation selection |
+| `predict.py` | CPU/CUDA checkpoint loading and dataset-independent JSON CLI |
+| `evaluate.py` | Per-trajectory metrics, split/family/component summaries and failure accounting |
+| `plot_results.py` | Standalone SVG overlays/error panels for family medians and worst cases |
+| `benchmark.py` | Generation stage timings and warmed, synchronized inference runtime |
+| `check_environment.py`, `target_smoke.sh` | Environment/allocation evidence and target CUDA smoke workflow |
+| `tests/` | Discoverable numerical, leakage, metric, selection and inference contracts |
 
-`configs/` contains a draft generator configuration. `data/` remains empty; `runs/20261015-reference-validation-01/` holds a small numerical-validation report, not a trained model. Evaluation and plotting modules remain documented placeholders. Tests include software contracts and real closed-form numerical checks. HPC/GPU timings remain projections in [COMPUTE_ESTIMATES.md](COMPUTE_ESTIMATES.md).
+## Frozen data contract
 
-## Proposed data contract
+State is `[y,y']` for order 2 and `[y,y',y'']` for order 3. Reference arrays have
+shape `(T,n)`, with `T=101`, `t=0..5`, spacing `0.05`. All units are
+nondimensional. Coefficients multiply ascending derivatives; the highest
+coefficient is one. Both orders include equal homogeneous/sine-forced samples.
 
-Each trajectory has a stable ID, family ID, named equation parameters, initial state, time samples and reference states. A second-order state is `(y, y')`; a third-order state is `(y, y', y'')`. State arrays have shape `(number of times, order)`. Record component units or nondimensionalization explicitly.
+Roots are `-d +/- iw` and an additional `-r` for order 3: `d,r in [0.1,1]`,
+`w in [0.5,2]`. Initial derivatives are in `[-1,1]`; sine amplitude `[0.1,1]`,
+frequency `[0.5,2]`, phase `[-pi,pi]`. Coefficients are induced and correlated;
+exact formulas and coefficient bounds are in the decision register. Extrapolation
+past these distributions or time 5 is outside October acceptance.
 
-Implemented model input: padded coefficients and initial state, an order mask, sinusoidal forcing descriptors and elapsed time. Output: padded full state, sliced to the actual equation order at inference. A shared modest MLP is the initial framework baseline; see `planning/DECISIONS.md` for the change from the earlier separate-model proposal. Representability of higher orders is separate from measured generalization.
+Model input is padded coefficients, IC, order mask, forcing descriptors and time.
+With padding width M=6, input is `(B,23)` and output `(B,6)`; prediction returns
+only the actual n components. Untrained orders remain unsupported despite padding.
 
-The dataset manifest records schema version, generation configuration, seed, solver and tolerances, bounds, successful and failed solves, and split membership. Do not silently discard failed solves. Store exact sample times; record any interpolation used to obtain them.
+Archives retain float64 reference states. Every trajectory passes DOP853
+`rtol=1e-9/atol=1e-11`, a tenfold tolerance refinement and five independent
+matrix-exponential checks with `reference_rtol=1e-6/reference_atol=1e-8`.
+Preflight must pass before creation. Manifests record resolved configuration,
+seeds, environment/source hashes, failures, identities and archive checksums.
 
-Split complete trajectories, never individual time samples. Hold parameter combinations out together for parameter-generalization tests, and initial conditions out together for initial-condition tests. Add a joint holdout where both are unseen. Record overlap rules explicitly. Keep extrapolation outside the training bounds separate from in-domain results.
+## Splits and metrics
 
-## Reference and evaluation gates
+Core train/validation/test are disjoint in both parameters and ICs. The pilot is
+6,656 cases: 4,096 train, 1,024 validation, 1,024 reserved test, and two diagnostics
+of 256 each. Parameter-only validation uses validation parameters with training
+ICs. IC-only validation uses training parameters with validation ICs. The loader
+checks those intentional overlaps; no test identity enters a diagnostic.
+Normalization fits only the core training partition.
 
-1. Compare reference integration with an analytic case for each family where available. Tighten tolerances or refine sampling to quantify numerical convergence. Set acceptable reference error well below the model target before dataset generation.
-2. Validate finite values, initial conditions, state dimensions, unique IDs and partition isolation.
-3. Select checkpoints using validation data and report performance separately by family and generalization split.
-4. Compute trajectory L2 error as the norm of prediction minus reference divided by the reference norm with a documented denominator floor. Freeze time weighting, component scaling and that floor before test evaluation. Report absolute error for near-zero references and report per-component errors so derivatives do not hide poor position predictions.
-5. Report mean, median, 95th percentile, worst case and failure counts. The initial target is less than 5% mean relative trajectory L2 error on the defined held-out set; report both combined and per-family results, with the primary metric fixed by October 18.
-6. Measure inference runtime with documented hardware and batch size. Verify checkpoint reload gives consistent predictions and requires no training data.
+For one trajectory compute `E=RMS(prediction-reference)` and `R=RMS(reference)`
+over all times and real derivatives. Primary error is `E/max(R,1e-6)`: relative
+L2 with a norm denominator floor `1e-6*sqrt(T*n)`. Time weights and component
+scales are all one, with no centering. Each trajectory has equal aggregate weight.
+Report mean, median, p95, worst, >=5% errors and nonfinite failures, plus breakdowns
+by order/forcing family, split and component. Report absolute RMSE/max errors;
+references with RMS<=1e-6 also receive a separate near-zero absolute-error summary.
+If any prediction is nonfinite, primary mean/worst are null and passing is false;
+finite-only statistics remain labeled. MSE is the optimization loss only.
 
-## October release contents
+The target is **<5% mean relative L2 on the reserved joint test split**. Validation
+progress alone does not establish that target. Test evaluation is explicit,
+recorded and reserved for milestones. Diagnostics guide development and never
+join the primary release average. No out-of-range test set is required for v1.
 
-Provide implemented scripts, a recorded environment, dataset-generation and split recipes, saved configuration and normalization, accessible checkpoint, evaluation report, representative and worst-case plots, and exact setup/training/inference instructions. Record tested domains and unsupported inputs. No accuracy claim is valid until measured.
+## Evidence and remaining gates
+
+See [STATUS.md](../planning/STATUS.md) and the dated `runs/` notes for measured
+CPU generation/training, checkpoint reload, plots and runtime. The 100,032 recipe
+is an unused capacity option. Actual HPC allocation and NVIDIA execution remain
+unverified until an allocated target job provides evidence.
+
+Release still needs a selected checkpoint, a recorded reserved-test evaluation,
+representative/worst-case plots and runtime, artifact distribution/checksums,
+and reproduction from a clean tested environment. Neither reference accuracy
+nor a completed training run alone establishes neural model acceptance.

@@ -1,0 +1,9 @@
+{
+  "unittest_command": ".venv/bin/python -m unittest discover -v",
+  "tests_passed": 35,
+  "tests_failed": 0,
+  "pip_check": "No broken requirements found",
+  "target_script_syntax": "bash -n ode/target_smoke.sh passed",
+  "gpu_execution": "not available; CUDA readiness guard failed as expected locally",
+  "fluid_files_changed": false
+}

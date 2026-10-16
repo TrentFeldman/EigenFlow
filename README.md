@@ -18,16 +18,16 @@ Implementation snapshot: **October 16, 2026**.
 
 | Area | Available now | Still needed |
 |---|---|---|
-| ODE reference data | Deterministic sampling, numerical integration, independent checks, grouped splits and checksummed archives | Frozen experiment specification and production dataset |
-| ODE learning | Mixed-order PyTorch model, CPU/CUDA training interface, saved normalization and checkpoint inference | Evaluated release checkpoint, held-out metrics and example plots |
-| Verification | 25 passing tests, 13 passing closed-form reference cases, temporary CPU generation/training smoke checks | Full-scale throughput and GPU hardware validation |
+| ODE reference data | Deterministic sampling, numerical integration, independent checks, grouped splits and checksummed archives | Release dataset/checkpoint selection |
+| ODE learning | Mixed-order training, release metrics, inference CLI, plots and resource profiles | Release checkpoint distribution and final reproduction |
+| Verification | Discoverable tests, 13 closed-form cases, recorded CPU smoke/pilot and timing runs | Actual HPC allocation and target CUDA validation |
 | Fluid simulation | Documented scope and module placeholders | Numerical solver, dataset, learned predictor, rollout and evaluation |
 
-Small CPU runs have exercised generation and training during development. These
-are smoke checks; there is no released, evaluated ODE model yet. The **less-than-5%
-mean relative trajectory L2 error** goal has not been established. The
-100,032-trajectory preset has been previewed, but its full execution and performance
-measurements remain pending.
+The scientific contract was frozen October 16. Recorded smoke and 6,656-case
+pilot experiments exercise the full CPU workflow; see [STATUS.md](planning/STATUS.md)
+for measured accuracy and limitations. The 100,032-case preset is unused, and
+there is no October release yet. The release target is **less than 5% mean
+relative trajectory L2 error** on the reserved joint holdout.
 
 ## Getting started
 
@@ -43,7 +43,7 @@ If `.venv` already exists:
 .venv/bin/python -m pip check
 ```
 
-For a fresh clone without a virtual environment, use Python 3.11 or newer:
+For a fresh clone without a virtual environment, use the tested Python 3.14.8 interpreter:
 
 ```bash
 python3 -m venv .venv
@@ -53,7 +53,7 @@ python3 -m venv .venv
 ```
 
 Dependencies are NumPy, SciPy and PyTorch. A GPU is optional; CPU execution is
-the default. Dependency ranges are not a locked environment, and GPU training
+the default. Direct dependencies and the Python version are pinned; GPU training
 requires a PyTorch build compatible with the host. See the
 [environment guide](ode/ENVIRONMENT.md) for the locally checked versions.
 
@@ -85,8 +85,9 @@ Follow the [complete ODE walkthrough](ode/README.md#run-the-small-example) for
 generation, training and a Python prediction example. Execution requires
 `--generate` or `--train` and a new output directory.
 
-For the larger experiment, use the
-[100,032-trajectory instructions](ode/README.md#full-run-preset-100032-trajectories).
+For the selected pilot and editable local/HPC settings, use the
+[resource-profile instructions](ode/README.md#resource-profiles-and-selected-pilot).
+The 100,032-case capacity option remains available for later scaling.
 Use the same scientific configuration for generation and training, and match
 worker counts to the CPUs actually allocated to the job.
 
@@ -126,7 +127,7 @@ Training-only normalization → neural model training
         ↓
 Validation-selected checkpoint → standalone prediction
         ↓
-Held-out evaluation and plots (implementation pending)
+Held-out evaluation, failure reports, plots and runtime
 ```
 
 ## Repository map
@@ -181,9 +182,9 @@ the [fluid blueprint](fluid/BLUEPRINT.md) for later stage gates.
 | [ODE math guide](ode/MATH_GUIDE.md) | Equations, derivatives and numerical reasoning |
 | [Roots and extensions](ode/ROOTS_AND_EXTENSIONS.md) | Characteristic roots and possible family extensions |
 | [Environment guide](ode/ENVIRONMENT.md) | Interpreter, dependencies and device setup |
-| [Compute estimates](ode/COMPUTE_ESTIMATES.md) | HPC/GPU assumptions and unmeasured projections |
+| [Compute estimates](ode/COMPUTE_ESTIMATES.md) | Measured local timings and unresolved target allocation |
 | [Project status](planning/STATUS.md) | Dated milestone tracking and next actions |
-| [Project blueprint](planning/BLUEPRINT.md) and [ODE blueprint](ode/BLUEPRINT.md) | Architecture and proposed release contract |
+| [Project blueprint](planning/BLUEPRINT.md) and [ODE blueprint](ode/BLUEPRINT.md) | Architecture and frozen scientific contract |
 | [Decision register](planning/DECISIONS.md) | Design choices and unresolved proposals |
 | [Working system](planning/WORKFLOW.md) | Experiment records, reviews and release evidence |
 | [Repository instructions](AGENTS.md) | Team conventions and mission |
