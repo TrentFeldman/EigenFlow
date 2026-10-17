@@ -1,0 +1,105 @@
+{
+  "status": "analytical_cost_benefit_only_no_new_experiments",
+  "prepared_date": "2026-10-16",
+  "sources_sha256": {
+    "AGENTS.md": "424ff14c73221b06ca526e86af8c2baa28ff8407c02177095ab64920f321640d",
+    "ode/runs/archive/20261016-pilot-baseline-01/run.json": "5ffc1ec8ea66dafe21b17bca6996c0332b47607f5f3753a286e4cbb6cd101ae8",
+    "ode/runs/archive/20261016-generation-benchmark-01/report.json": "f9162bb867da727b97815d3f2b24aba0dc48325bbda4920e7c65cba6d9821e38",
+    "ode/configs/generator_pilot.json": "00ad9913bfb00163714098f1446314ff84f34db02c5b56e7ec2c5f7b50e27ebd",
+    "ode/configs/generator_full.json": "a7c53bd5838186b58ad05623fb99f333f5477286b223e5ac824c3f7cd6b5e196",
+    "ode/data/20261016-pilot-6656/manifest.json": "502e37df1d6175eb0a7d1be18e0ad7ce282c1193a6f6e88931196567a4e36834"
+  },
+  "cost_basis": {
+    "baseline_training_validation_seconds": 374.58078299199997,
+    "baseline_epochs": 100,
+    "baseline_train_trajectories": 4096,
+    "baseline_point_batch": 1024,
+    "hardware": "Ryzen 5 5600, two PyTorch threads",
+    "cpu_projections_are_not_gpu_estimates": true
+  },
+  "architectures": [
+    {
+      "width": 128,
+      "depth": 3,
+      "parameters": 36870,
+      "forward_dense_macs_per_point": 36480,
+      "relative_forward_dense_macs": 1.0
+    },
+    {
+      "width": 256,
+      "depth": 3,
+      "parameters": 139270,
+      "forward_dense_macs_per_point": 138496,
+      "relative_forward_dense_macs": 3.7964912280701753
+    },
+    {
+      "width": 256,
+      "depth": 4,
+      "parameters": 205062,
+      "forward_dense_macs_per_point": 204032,
+      "relative_forward_dense_macs": 5.5929824561403505
+    },
+    {
+      "width": 512,
+      "depth": 3,
+      "parameters": 540678,
+      "forward_dense_macs_per_point": 539136,
+      "relative_forward_dense_macs": 14.778947368421052
+    },
+    {
+      "width": 512,
+      "depth": 4,
+      "parameters": 803334,
+      "forward_dense_macs_per_point": 801280,
+      "relative_forward_dense_macs": 21.964912280701753
+    }
+  ],
+  "feature_forward_dense_arithmetic": {
+    "two_forcing_phase_features_relative_increase": 0.007017543859649123,
+    "three_damped_mode_features_relative_increase": 0.010526315789473684,
+    "eight_generic_fourier_features_relative_increase": 0.028070175438596492,
+    "excluded_costs": [
+      "trigonometric/exponential transforms",
+      "root extraction",
+      "normalization",
+      "data handling",
+      "backward pass",
+      "optimizer",
+      "hardware utilization"
+    ]
+  },
+  "full_dataset": {
+    "core_total_trajectories": 100032,
+    "train_trajectories": 66688,
+    "relative_training_population": 16.28125,
+    "local_100_epoch_hours_linear_projection": 1.6940676036356943,
+    "local_300_epoch_hours_linear_projection": 5.0822028109070825,
+    "local_three_300_epoch_seeds_hours_linear_projection": 15.246608432721247,
+    "generation_seconds_linear_projection_from_smoke": 305.92427851501554,
+    "generation_seconds_linear_projection_from_pilot": 196.2200984850313,
+    "train_validation_preload_array_bytes": 1178710400,
+    "train_validation_preload_array_gib": 1.0977596044540405,
+    "full_dataset_epochs_for_same_example_exposure_as_pilot_100_epochs": 6.142034548944338,
+    "diagnostics_in_full_preset": false,
+    "limitations": [
+      "linear CPU scaling assumption",
+      "large-run filesystem cost unmeasured",
+      "comparison must hold validation fixed",
+      "equal epochs changes update count"
+    ]
+  },
+  "combined_512x4_full_dataset_dense_arithmetic_ratio_at_equal_epochs": 357.6162280701754,
+  "expected_error_reduction": null,
+  "expected_error_reduction_reason": "No proposed alternative has been trained/evaluated",
+  "monetary_cost": null,
+  "monetary_cost_reason": "Allocation, billing unit, rates and GPU timing unknown",
+  "recommendation": [
+    "validation_diagnostics",
+    "longer_training_and_cosine_control",
+    "forcing_phase_features",
+    "natural_mode_decay_features",
+    "physical_relative_squared_loss",
+    "width_256_control",
+    "conditional_data_learning_curve_or_linearity_branch"
+  ]
+}

@@ -12,12 +12,13 @@ import numpy as np
 import torch
 
 from ode.config import GeneratorConfig
-from ode.dataset import TrajectoryDataset
-from ode.evaluate import trajectory_metrics, summarize
-from ode.generate_data import generate, iter_jobs
-from ode.predict import domain_violations
-from ode.equations import LinearODE
-from ode.train import _fit
+from ode.training.dataset import TrajectoryDataset
+from ode.evaluation.evaluate import trajectory_metrics, summarize
+from ode.generation.generate_data import generate, iter_jobs
+from ode.evaluation.predict import domain_violations
+from ode.generation.equations import LinearODE
+from ode.training.train import _fit
+from ode.evaluation.plot_results import summary_svg, training_svg, trajectory_svg
 
 
 class EvaluationTests(unittest.TestCase):
@@ -98,9 +99,9 @@ class EvaluationTests(unittest.TestCase):
             scores = [{'overall': {'mean': value}, 'by_family': {}} for value in [.2, .3]]
             def save(run, *unused):
                 (run / 'best.pt').write_bytes(b'fixture')
-            with patch('ode.train.run_epoch', side_effect=[1., .8, .5, .1]), \
-                    patch('ode.train.evaluate_model', side_effect=scores), \
-                    patch('ode.train.save_checkpoint', side_effect=save) as saver:
+            with patch('ode.training.train.run_epoch', side_effect=[1., .8, .5, .1]), \
+                    patch('ode.training.train.evaluate_model', side_effect=scores), \
+                    patch('ode.training.train.save_checkpoint', side_effect=save) as saver:
                 _fit(None, None, (loader, loader), 'cpu', None, None, args, report)
             self.assertEqual(report['best_epoch'], 1)
             self.assertEqual(saver.call_count, 1)
@@ -111,6 +112,22 @@ class EvaluationTests(unittest.TestCase):
         self.assertEqual(domain_violations(equation, [0., 5.], config), [])
         self.assertTrue(domain_violations(equation, [6.], config))
         self.assertTrue(domain_violations(replace(equation, coefficients=(-1., 1.)), [0.], config))
+
+    def test_charts_are_well_formed_svg(self):
+        """Every chart must parse as XML and say what it shows in words."""
+        import xml.etree.ElementTree as ElementTree
+        rows = [{'relative_l2': value, 'order': 2, 'family': 'linear_homogeneous'} for value in (.01, .02, .09)]
+        stats = summarize([{**row, 'absolute_rmse': 0., 'absolute_max': 0., 'reference_rms': 1.,
+                            'near_zero': False, 'nonfinite': False, 'failed': row['relative_l2'] >= .05}
+                           for row in rows])
+        split = {'overall': stats, 'by_family': {'order2/linear_homogeneous': stats}, 'trajectories': rows}
+        times = np.linspace(0, 5, 11)
+        states = np.stack((np.cos(times), -np.sin(times)), axis=1)
+        for svg in (summary_svg(split, 'validation'),
+                    training_svg([{'epoch': 1, 'validation_relative_l2': .4}, {'epoch': 2, 'validation_relative_l2': .1}]),
+                    trajectory_svg(times, states, states + .01, 'Typical case', ['y′′ + y = 0'])):
+            ElementTree.fromstring(svg)
+        self.assertIn('off by 4.0% on average', summary_svg(split, 'validation'))
 
 
 if __name__ == '__main__':

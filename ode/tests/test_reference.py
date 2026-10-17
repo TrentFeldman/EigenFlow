@@ -12,8 +12,8 @@ from unittest.mock import patch
 import numpy as np
 
 from ode.config import GeneratorConfig
-from ode.equations import LinearODE, stable_coefficients
-from ode.reference import SolveJob, solve_job
+from ode.generation.equations import LinearODE, stable_coefficients
+from ode.generation.reference import SolveJob, solve_job
 
 
 class ReferenceContractTests(unittest.TestCase):
@@ -64,8 +64,8 @@ class ReferenceContractTests(unittest.TestCase):
         fabricated = np.array([[1., 0.], [0.5, -0.2], [0.2, -0.1]])
         reply = SimpleNamespace(success=True, y=fabricated.T, t=times)
 
-        with patch("ode.reference.solve_ivp", return_value=reply) as solver, patch(
-                "ode.reference.linear_reference", return_value=fabricated):
+        with patch("ode.generation.reference.solve_ivp", return_value=reply) as solver, patch(
+                "ode.generation.reference.linear_reference", return_value=fabricated):
             result = solve_job(job, config)
             self.assertIsNone(result.error)
             self.assertEqual(solver.call_count, 2)
@@ -73,10 +73,10 @@ class ReferenceContractTests(unittest.TestCase):
 
         bad = SimpleNamespace(success=True, y=np.ones((2, 1)), t=times[:1])
 
-        with patch("ode.reference.solve_ivp", return_value=bad):
+        with patch("ode.generation.reference.solve_ivp", return_value=bad):
             self.assertIn("incomplete", solve_job(job, config).error)
 
-        with patch("ode.reference.solve_ivp", side_effect=RuntimeError("fixture error")):
+        with patch("ode.generation.reference.solve_ivp", side_effect=RuntimeError("fixture error")):
             failed = solve_job(job, config)
             self.assertIn("fixture error", failed.error)
             self.assertIsNone(failed.states)
@@ -89,14 +89,14 @@ class ReferenceContractTests(unittest.TestCase):
         replies = [SimpleNamespace(success=True, t=times, y=np.array([[1., end]]))
                    for end in (1., 2.)]
 
-        with patch("ode.reference.solve_ivp", side_effect=replies):
+        with patch("ode.generation.reference.solve_ivp", side_effect=replies):
             self.assertIn("refinement", solve_job(job, config).error)
 
         def excessive_calls(rhs, *solver_args, **solver_options):
             rhs(0, np.array([1.]))
             rhs(0, np.array([1.]))
 
-        with patch("ode.reference.solve_ivp", side_effect=excessive_calls):
+        with patch("ode.generation.reference.solve_ivp", side_effect=excessive_calls):
             result = solve_job(job, config)
             self.assertIn("budget", result.error)
             self.assertEqual(result.nfev, 2)
@@ -108,7 +108,7 @@ class ReferenceContractTests(unittest.TestCase):
         job = SolveJob("fixture", "parameters", "train", LinearODE((1,), (1,)))
         reply = SimpleNamespace(success=True, t=np.linspace(0, 5, 3), y=np.ones((1, 3)))
 
-        with patch("ode.reference.solve_ivp", return_value=reply):
+        with patch("ode.generation.reference.solve_ivp", return_value=reply):
             result = solve_job(job, config)
 
         self.assertIn("Independent", result.error)
@@ -132,7 +132,7 @@ class ReferenceContractTests(unittest.TestCase):
 
             return SimpleNamespace(success=True, t=times, y=np.array([[1., 1.]]))
 
-        with patch("ode.reference.solve_ivp", side_effect=solver_reply):
+        with patch("ode.generation.reference.solve_ivp", side_effect=solver_reply):
             result = solve_job(job, config)
 
         self.assertEqual(result.nfev, 3)

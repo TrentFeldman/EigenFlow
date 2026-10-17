@@ -10,12 +10,12 @@ import unittest
 
 import numpy as np
 
-from ode.analytic import linear_reference
+from ode.generation.analytic import linear_reference
 from ode.config import GeneratorConfig
-from ode.equations import LinearODE
-from ode.generate_data import iter_results
-from ode.reference import SolveJob, solve_job
-from ode.validate_reference import benchmark_cases, validate_reference
+from ode.generation.equations import LinearODE
+from ode.generation.generate_data import iter_results
+from ode.generation.reference import SolveJob, solve_job
+from ode.generation.validate_reference import benchmark_cases, validate_reference
 
 
 class NumericalValidationTests(unittest.TestCase):

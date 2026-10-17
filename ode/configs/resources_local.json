@@ -1,6 +1,6 @@
 {
   "backend": "process",
-  "workers": 6,
+  "workers": "auto",
   "threads": 2,
   "loader_workers": 0,
   "device": "cpu",

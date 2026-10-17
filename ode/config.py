@@ -14,6 +14,8 @@ import platform
 
 import numpy as np
 
+from .resources import available_cpus
+
 
 SPLITS = ("train", "validation", "test")
 DIAGNOSTIC_SPLITS = ("validation_parameter", "validation_initial")
@@ -24,6 +26,8 @@ MIN_SOLVER_RTOL = 1e-12
 # SciPy clips extremely small tolerances; stay above that rounding region.
 MIN_REFINED_RTOL = 100 * np.finfo(float).eps
 FLOAT64_BYTES = 8
+# Presets and resource profiles; CLI defaults resolve here from any directory.
+CONFIG_DIR = Path(__file__).parent / "configs"
 
 
 def record_split(assignments, identity, split, error_message):
@@ -48,16 +52,18 @@ def provenance(dependencies, source_names=None, include_machine=False) -> dict:
 
     Args:
         dependencies: Distribution names whose installed versions to record.
-        source_names: Module filenames; None selects every ode/*.py file.
+        source_names: Paths inside ode/; None selects every non-test module.
         include_machine: Include the machine architecture in the result.
     Returns:
         Dict with python, dependencies, source_sha256 and optional machine keys.
+        Source keys are paths inside ode/, e.g. "training/train.py"; tests excluded.
     Raises:
-        OSError: A requested source file cannot be read.
+        OSError: A source file cannot be read.
     """
     source_root = Path(__file__).parent
     paths = (
-        sorted(source_root.glob("*.py"))
+        sorted(path for path in source_root.rglob("*.py")
+               if path.relative_to(source_root).parts[0] not in ("tests", "runs", "data"))
         if source_names is None
         else [source_root / name for name in source_names]
     )
@@ -67,7 +73,7 @@ def provenance(dependencies, source_names=None, include_machine=False) -> dict:
         report["machine"] = platform.machine()
 
     report["dependencies"] = {name: version(name) for name in dependencies}
-    report["source_sha256"] = {path.name: sha256(path.read_bytes()).hexdigest() for path in paths}
+    report["source_sha256"] = {path.relative_to(source_root).as_posix(): sha256(path.read_bytes()).hexdigest() for path in paths}
 
     return report
 
@@ -322,6 +328,10 @@ class GeneratorConfig:
             raise ValueError(f"Unknown settings: {sorted(unknown)}")
 
         settings = data.copy()
+
+        # "auto" means every CPU this process/SLURM job may use (see resources.py).
+        if settings.get("workers") == "auto":
+            settings["workers"] = available_cpus()
 
         for name in (
             "orders",

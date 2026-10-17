@@ -14,7 +14,7 @@ implementation stays pending until November 2. The mission and deadlines in
 | `planning/WORKFLOW.md` | Work cycle, experiment records, review and release gates |
 | `planning/STATUS.md` | Current milestone, task state, risks and next action |
 | `planning/DECISIONS.md` | Decisions and unresolved choices |
-| `ode/BLUEPRINT.md` | October model design and evaluation contract |
+| `ode/docs/BLUEPRINT.md` | October model design and evaluation contract |
 | `ode/` | ODE implementation, tests and recorded local experiments |
 | `fluid/BLUEPRINT.md` | November–December sequence and validation gates |
 | `fluid/` | Fluid implementation placeholders and future local artifacts |

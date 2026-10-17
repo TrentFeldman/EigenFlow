@@ -14,11 +14,12 @@ from unittest.mock import patch
 import numpy as np
 import torch
 
-from ode.dataset import Normalizer, feature_width
-from ode.equations import LinearODE
-from ode.model import OrderConditionedMLP, masked_mse
-from ode.predict import predict
-from ode.train import main, resolve_device
+from ode.training.dataset import Normalizer, feature_width
+from ode.generation.equations import LinearODE
+from ode.training.model import OrderConditionedMLP, masked_mse
+from ode.evaluation.predict import Predictor, predict
+from ode.generation.analytic import linear_reference
+from ode.training.train import main, resolve_device
 
 
 class InferenceContractTests(unittest.TestCase):
@@ -67,9 +68,31 @@ class InferenceContractTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 predict(path, LinearODE((1.,) * 5, (0.,) * 5), [0])
 
+    def test_rescaled_prediction_adds_no_error_of_its_own(self):
+        """With an exact 'model', rescaling, superposition and stitching must stay exact."""
+        predictor = Predictor.__new__(Predictor)
+        predictor.checkpoint = {"config": {
+            "orders": [1, 2, 3, 4], "families": ["linear_homogeneous", "linear_sinusoidal"],
+            "decay_range": [0.1, 1.0], "frequency_range": [0.5, 2.0], "t_start": 0.0, "t_stop": 5.0}}
+        predictor.predict = linear_reference
+        times = np.linspace(0, 20, 201)
+        for equation in [LinearODE((39.478418, 0.628319), (1., 0.)),  # 1 Hz spring, 3x too fast
+                         LinearODE((1.5, 2.4, 2.1), (4., -3., 9.), 7., 3., 2.5)]:  # 3rd order, big push
+            states, pieces = predictor.predict_rescaled(equation, times)
+            self.assertGreater(pieces, 1)
+            np.testing.assert_allclose(states, linear_reference(equation, times), rtol=1e-7, atol=1e-7)
+        # First and fourth order (one real mode; two oscillating pairs) rescale exactly too.
+        for equation in [LinearODE((8.,), (3.,), 2., 5., 1.),
+                         LinearODE((float(x) for x in np.real(np.poly([-.3+1j, -.3-1j, -.5+3j, -.5-3j]))[:0:-1]),
+                                   (1., 0., 0., 0.))]:
+            states, pieces = predictor.predict_rescaled(equation, times)
+            np.testing.assert_allclose(states, linear_reference(equation, times), rtol=1e-6, atol=1e-6)
+        with self.assertRaisesRegex(ValueError, "oscillating pair"):
+            predictor.predict_rescaled(LinearODE((2., 3.), (1., 0.)), times)  # overdamped
+
     def test_training_dry_run_has_no_side_effects(self):
         """Verify default training CLI execution does not load data or run epochs."""
-        with patch("ode.train.TrajectoryDataset") as dataset, patch("ode.train.run_epoch") as epoch:
+        with patch("ode.training.train.TrajectoryDataset") as dataset, patch("ode.training.train.run_epoch") as epoch:
             with redirect_stdout(StringIO()):
                 self.assertEqual(main([]), 0)
 
@@ -80,13 +103,13 @@ class InferenceContractTests(unittest.TestCase):
         """Check explicit and automatic device choices for either availability state."""
         self.assertEqual(resolve_device("cpu"), torch.device("cpu"))
 
-        with patch("ode.train.torch.cuda.is_available", return_value=False):
+        with patch("ode.training.train.torch.cuda.is_available", return_value=False):
             self.assertEqual(resolve_device("auto"), torch.device("cpu"))
 
             with self.assertRaisesRegex(RuntimeError, "unavailable"):
                 resolve_device("cuda")
 
-        with patch("ode.train.torch.cuda.is_available", return_value=True):
+        with patch("ode.training.train.torch.cuda.is_available", return_value=True):
             self.assertEqual(resolve_device("cuda"), torch.device("cuda"))
 
 

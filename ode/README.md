@@ -1,62 +1,124 @@
 # ODE prediction framework
 
-This folder contains EigenFlow's numerical-reference generator and supervised
-PyTorch trajectory predictor. The current presets cover second- and third-order
-linear ODEs, both homogeneous and sinusoidally forced.
+EigenFlow's first track: generate exact-enough answers to linear ODEs with a
+numerical solver, train a neural network to reproduce them, and measure how
+far off it is on equations it never saw. The presets cover second- and
+third-order linear ODEs, with and without a sine-wave forcing term.
 
-Generation, training, release-metric evaluation, standalone inference, diagnostic
-splits, plots and runtime benchmarking are implemented. The scientific contract
-was frozen October 16. Recorded CPU smoke/pilot runs are linked from
-[project status](../planning/STATUS.md); no October release is declared yet.
-Target CUDA execution and actual HPC allocation still await hardware access.
+Everything runs from the **repository root** with the project's Python
+(`.venv/bin/python`, or `python` inside an activated environment). Setup is in
+[docs/ENVIRONMENT.md](docs/ENVIRONMENT.md); the mathematics, in plain language,
+is in [docs/MATH_GUIDE.md](docs/MATH_GUIDE.md). Run history and the current
+milestone live in [planning/STATUS.md](../planning/STATUS.md).
 
-The [error-reduction plan](error_reduction/README.md) reviews saved validation
-evidence and prepares staged comparisons. Its draft settings are proposals;
-no experiments were executed for that planning task.
+## Quick start: one command
 
-All commands here run from the **repository root**, using `.venv/bin/python`.
-See the [environment guide](ENVIRONMENT.md) for installation and the
-[math guide](MATH_GUIDE.md) for a fuller explanation of the equations.
+```bash
+.venv/bin/python -m ode pipeline --name 20261017-pilot-02 --preset pilot --epochs 300 --batch-size 1024
+```
 
-## Contents
+That runs four stages and prints progress with time estimates:
 
-- [Check the installation](#check-the-installation)
-- [Equations and state ordering](#equations-and-state-ordering)
-- [Run the small example](#run-the-small-example)
-- [Full-run preset: 100,032 trajectories](#full-run-preset-100032-trajectories)
-- [Configuration and sampling](#configuration-and-sampling)
-- [Reference validation](#reference-validation)
-- [Dataset format and split policy](#dataset-format-and-split-policy)
-- [Model inputs, normalization and loss](#model-inputs-normalization-and-loss)
-- [Training options and saved artifacts](#training-options-and-saved-artifacts)
-- [Code map](#code-map)
-- [Troubleshooting](#troubleshooting)
-- [Verification and remaining work](#verification-and-remaining-work)
+| Stage | Writes | Notes |
+|---|---|---|
+| 1. generate | `ode/data/pilot-6656/` | Solves 6,656 equations on every CPU core (about 15 s here). Reused by later runs with the same preset |
+| 2. train | `ode/runs/<name>/best.pt`, `last.pt`, `run.json` | Uses the GPU when PyTorch sees one (AMD ROCm counts as `cuda`) |
+| 3. evaluate | `ode/runs/<name>/evaluation.json` | Validation splits only; the test split stays sealed |
+| 4. plot | `ode/runs/<name>/plots/*.svg` | Start with `summary.svg`; open any SVG in a browser |
+
+**If it stops** (Ctrl-C, crash, SLURM time limit), run the identical command
+again. Finished stages are skipped and training resumes from the last completed
+epoch with the same result as an uninterrupted run. Presets: `small` (384
+equations, wiring checks), `pilot` (6,656), `full` (100,032), `wide` (480,000
+with barely-damped to nearly critically damped springs and faster oscillation
+and push; decay 0.01–1.5, frequency 0.5–4; 400,000 train, 40,000 validation). `final` (768,000, same ranges as `wide` plus orders 1–4;
+640,000 train, 64,000 validation; the planned release recipe, not yet trained). Any option the
+pipeline does not recognise goes to `train`, e.g. `--learning-rate-schedule cosine`.
+
+On FSU's cluster, submit the same thing as a batch job (edit the two
+`CHANGE ME` lines in the script once):
+
+```bash
+sbatch ode/slurm/pipeline.sbatch --name 20261101-full-01 --preset full --epochs 300 --batch-size 1024
+```
+
+## What is where
+
+```text
+ode/
+├── README.md          you are here
+├── __main__.py        `python -m ode <command>`: the single entry point
+├── pipeline.py        generate → train → evaluate → plot, resumable
+├── config.py          the scientific recipe (ranges, solver tolerances, split sizes)
+├── resources.py       hardware settings (CPU/GPU counts), kept apart from the recipe
+├── generation/        STAGE 1: make the dataset
+│   ├── equations.py          what an equation is; random stable coefficients
+│   ├── reference.py          solve one equation twice + an independent check
+│   ├── analytic.py           matrix-exponential solution used by that check
+│   ├── validate_reference.py test the solver against exact textbook formulas
+│   └── generate_data.py      run all solves in parallel, write the dataset
+├── training/          STAGE 2: learn from it
+│   ├── dataset.py            load + verify a dataset; turn equations into model inputs
+│   ├── model.py              the neural network and its loss
+│   └── train.py              the training loop, checkpoints, resume
+├── evaluation/        STAGE 3: judge and use the trained model
+│   ├── evaluate.py           the official error metric, per split and equation type
+│   ├── plot_results.py       charts for people (summary, training curve, examples)
+│   ├── diagnose.py           deeper error breakdowns for choosing experiments
+│   └── predict.py            load best.pt and predict any supported equation
+├── tools/             machine checks and timing, not part of the science
+├── configs/           JSON presets (generator_*.json) and hardware profiles (resources_*.json)
+├── equations/         your own equations to try with `predict`; charts land next to them
+├── slurm/             batch scripts for the HPC cluster
+├── docs/              math guide, environment, design blueprint, compute estimates, error-reduction plan
+├── tests/             `python -m unittest discover -s ode/tests`
+├── models/current/    the released model (best.pt + MODEL.md with its scores); the only checkpoint in git
+├── data/              generated datasets (not in git)
+└── runs/              one folder per experiment: results, notes, charts (all local, not in git)
+    └── archive/       finished history; `python -m ode runs` lists what is where
+```
+
+`python -m ode runs` prints every current run (status, dataset, epochs,
+average error, size) and every dataset with the runs that use it. Move a run
+you are done with into `ode/runs/archive/` to drop it from that list.
+
+A step-by-step walkthrough of how a result is produced, file by file and with
+one real equation traced through every stage, is at
+[EigenFlow ODE Walkthrough](https://claude.ai/artifact/Ded3cmWmb3ymRzRN2zJEQA)
+(shared page; ask the owner for access).
+
+## Commands
+
+`python -m ode` lists every command; `python -m ode <command> --help` lists its options.
+
+| Command | What it does |
+|---|---|
+| `pipeline` | All four stages, resumable |
+| `generate` | Print the plan for a preset; add `--generate --output DIR` to create it |
+| `validate` | Check the solver against exact closed-form solutions |
+| `train` | Print the plan; add `--train --data DIR --run DIR` to train (`--resume` continues) |
+| `evaluate` | Score `best.pt` on chosen splits |
+| `plot` | `--run DIR` draws the charts for a trained and evaluated run |
+| `diagnose` | Error by regime, initial-state error, derivative consistency |
+| `predict` | Predict one equation described in a JSON file |
+| `runs` | List runs and datasets with status, score and size |
+| `neurons` | Animated HTML page of the neurons changing during training (train with `--snapshot-every N`) |
+| `check` | Python, package and GPU report |
+| `benchmark` | Time generation or inference |
 
 ## Check the installation
 
 ```bash
-.venv/bin/python -m ode.check_environment
+.venv/bin/python -m ode check
 .venv/bin/python -m pip check
-.venv/bin/python -m ode.validate_reference
+.venv/bin/python -m ode validate
 .venv/bin/python -m unittest discover -s ode/tests -v
 ```
 
 The environment check reports Python, dependencies and GPU availability. A GPU
 is optional. Reference validation runs small deterministic numerical benchmarks;
-unit tests exercise numerical safeguards, data contracts and inference behavior.
-These commands do not retain a training dataset or trained checkpoint.
-
-Preview the default experiment without generating data or fitting a model:
-
-```bash
-.venv/bin/python -m ode.generate_data --config ode/configs/generator.json
-.venv/bin/python -m ode.train --config ode/configs/generator.json
-```
-
-Generation planning prints settings and counts without sampling or solving.
-Training planning prints settings without loading a dataset. Actual execution
-requires the corresponding `--generate` or `--train` flag.
+unit tests exercise numerical safeguards, data contracts, training resume and
+inference behavior. These commands do not keep a dataset or checkpoint.
 
 ## Equations and state ordering
 
@@ -80,7 +142,7 @@ nondimensional; there is no conversion from physical units in this pipeline.
 initial value of every state component:
 
 ```python
-from ode.equations import LinearODE
+from ode.generation.equations import LinearODE
 
 # y'' + y' + 1.25 y = 0, with y(0) = 0.5 and y'(0) = 0.
 equation = LinearODE(
@@ -97,185 +159,153 @@ order `n` therefore has shape `(T, n)`.
 For example, adding `amplitude=0.4, frequency=1.2, phase=0.0` to the constructor
 changes the right-hand side to `0.4 sin(1.2 τ)`.
 
-## Run the small example
+## Running the stages yourself
 
-These commands create local artifacts. Choose new dataset and run names if the
-example paths already exist; overwriting and automatic resume are not supported.
-The scientific recipe is frozen; counts and execution profiles identify each experiment.
+The pipeline is a wrapper around these commands; use them when you need one
+stage with non-default options. Each refuses to overwrite an existing output.
 
 ### 1. Generate reference trajectories
 
 ```bash
-OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 MKL_NUM_THREADS=1 \
-.venv/bin/python -m ode.generate_data \
-  --config ode/configs/generator.json \
-  --generate \
-  --output ode/data/linear-v1
+.venv/bin/python -m ode generate --config ode/configs/generator.json \
+  --generate --output ode/data/small-384
 ```
 
-The preset uses six process workers. Add `--workers 4` for a smaller CPU allocation
-or `--backend serial` for sequential execution. The environment variables limit
-native-library threads per process so competing thread pools do not multiply the
-requested parallelism.
+Workers default to every CPU this process may use (`"auto"`: the smallest of
+the logical CPUs, the process affinity and `SLURM_CPUS_PER_TASK`). Override with
+`--workers N`, or `--backend serial` for one process. Each worker is pinned to
+one native math thread automatically; leaving OpenBLAS free to start its own
+thread pool in every worker made generation 3.7 times slower (45 s instead of
+12 s for the pilot). Progress prints every 10 seconds on stderr.
 
-The requested split sizes are **256 training, 64 validation and 64 test
-trajectories**, each with 101 saved times. Inspect the printed manifest or
-`ode/data/linear-v1/manifest.json`: clean completion has `status: "complete"`
-and `failed: 0`. Failed solves are recorded, not substituted with new samples.
+The small preset requests **256 training, 64 validation and 64 test
+trajectories**, each with 101 saved times. `manifest.json` in the output shows
+`status: "complete"` and `failed: 0` on a clean run. Failed solves are recorded,
+not replaced with new samples.
 
-### 2. Train a baseline
+### 2. Train
 
 ```bash
-.venv/bin/python -m ode.train \
-  --config ode/configs/generator.json \
-  --data ode/data/linear-v1 \
-  --run ode/runs/linear-v1-baseline \
-  --device cpu \
-  --epochs 20 \
-  --train
+.venv/bin/python -m ode train --data ode/data/small-384 \
+  --run ode/runs/small-baseline --epochs 20 --train
 ```
 
-The trainer fits normalization on the training split, optimizes the model, and
-saves the checkpoint with the lowest mean validation trajectory relative L2. It does not score the test
-set. A successful run creates `best.pt` and `run.json`; completing 20 epochs does
-not itself establish acceptable prediction accuracy.
+The scientific recipe is read from the dataset's manifest, so `--config` is
+only needed to double-check it. Training fits normalization on the training
+split, keeps the whole split in memory (on the GPU when training there) and
+saves the epoch with the lowest mean validation error as `best.pt`. It never
+scores the test set. Each epoch prints its validation error, the best so far,
+seconds per epoch and an ETA.
 
-### 3. Load the checkpoint and predict
+To continue an interrupted run, repeat the command with `--resume`; to extend a
+finished run, raise `--epochs` and add `--resume`.
 
-Inference has both a Python API and a JSON CLI; neither requires the training dataset.
-The API defaults to CPU; `Predictor(path, device="cuda")` loads once for repeated
-GPU calls. The CLI rejects requests outside the saved scientific domain unless
-`--allow-extrapolation` explicitly requests an unsupported probe.
+### 3. Evaluate and plot
 
 ```bash
-.venv/bin/python -m ode.predict \
-  --checkpoint ode/runs/linear-v1-baseline/best.pt \
-  --input ode/configs/predict_example.json \
-  --output ode/runs/linear-v1-baseline/prediction.json
+.venv/bin/python -m ode evaluate --checkpoint ode/runs/small-baseline/best.pt \
+  --data ode/data/small-384 --output ode/runs/small-baseline/evaluation.json
+.venv/bin/python -m ode plot --run ode/runs/small-baseline
 ```
-
-```bash
-.venv/bin/python - <<'PY'
-from pathlib import Path
-
-import numpy as np
-
-from ode.analytic import linear_reference
-from ode.equations import LinearODE
-from ode.predict import predict
-
-equation = LinearODE(
-    coefficients=(1.25, 1.0),
-    initial_state=(0.5, 0.0),
-)
-elapsed_times = np.linspace(0.0, 5.0, 101)
-checkpoint = Path("ode/runs/linear-v1-baseline/best.pt")
-
-predicted = predict(checkpoint, equation, elapsed_times)
-reference = linear_reference(equation, elapsed_times)
-
-print("State shape:", predicted.shape)  # (101, 2): columns are y and y'.
-print("First five predicted states:\n", predicted[:5])
-print("Maximum absolute error per component:")
-print(np.max(np.abs(predicted - reference), axis=0))
-PY
-```
-
-`predict(checkpoint_path, equation, elapsed_times)` returns a float64 NumPy array
-of shape `(T, n)` in the original nondimensional scale. Model computation uses
-float32; returning float64 does not imply double-precision prediction accuracy.
-Elapsed times must be finite and nonnegative, and `n` must fit the checkpoint's
-maximum order. The caller must check the saved training ranges and time horizon.
-
-The numerical comparison above is a single illustrative case, not a held-out
-evaluation. The network does not enforce the initial condition exactly and can
-produce finite but inaccurate states.
-
-## Resource profiles and selected pilot
-
-Scientific recipes and execution settings are separate. Use
-`--resources ode/configs/resources_local.json` locally, or copy/edit
-[resources_cuda.example.json](configs/resources_cuda.example.json) for the
-allocation obtained from the cluster. Explicit CLI flags override profile values;
-profile values override defaults. All resolved settings are recorded in artifacts.
-
-| Profile key / CLI flag | Meaning |
-|---|---|
-| `workers` / `--workers` | Generation processes; profile also accepts `"auto"` |
-| `backend` / `--backend` | `process`, `thread`, or `serial` generation |
-| `threads` / `--threads` | Training CPU threads; profile also accepts `"auto"` |
-| `loader_workers` / `--loader-workers` | DataLoader subprocesses; zero for preload |
-| `device` / `--device` | `cpu`, `cuda`, or `auto` training |
-| `batch_size` / `--batch-size` | Training points per update; changes optimization |
-| `preload` / `--preload`, `--no-preload` | Keep normalized training/validation in RAM |
-| `preload_limit_gib` / `--preload-limit-gib` | Upper bound for preload arrays, excluding other process memory |
-
-CPU `"auto"` uses the minimum of affinity, logical CPUs and `SLURM_CPUS_PER_TASK`
-when present. It never uses total cluster capacity. For non-SLURM allocations
-without enforced affinity, set explicit counts. The example CUDA profile is
-editable and untested on the target. No scientific ranges change when switching
-profiles. Batch size/device changes still define a new training experiment.
-
-The selected next-size recipe is `generator_pilot.json`: **6,656 trajectories**
-(4,096 train, 1,024 validation, 1,024 reserved test, 256 in each diagnostic).
-The original 384-case preset stays available for wiring and device checks.
-
-```bash
-OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 MKL_NUM_THREADS=1 \
-.venv/bin/python -m ode.generate_data --config ode/configs/generator_pilot.json \
-  --resources ode/configs/resources_local.json --generate --output ode/data/pilot-v1
-.venv/bin/python -m ode.train --config ode/configs/generator_pilot.json \
-  --resources ode/configs/resources_local.json --data ode/data/pilot-v1 \
-  --run ode/runs/pilot-v1 --epochs 100 --train
-```
-
-## Evaluate, plot and benchmark
 
 The primary metric is `RMS(pred-ref)/max(RMS(ref),1e-6)` over real state
-components and all stored times. Component scales and time weights are one;
-trajectories have equal aggregate weight. `evaluate.py` reports mean, median,
-p95, worst, >=5% and numerical failures, absolute errors, near-zero summaries,
-and per-order/forcing-family/component breakdowns. See [MATH_GUIDE.md](MATH_GUIDE.md)
-for a worked example. Nonfinite outputs cannot produce a passing result.
+components and all stored times, so "2% error" means the miss is about 2% of
+the size of the solution. Trajectories have equal weight. `evaluate` reports
+mean, median, p95, worst, the count at or above 5%, numerical failures,
+absolute errors, near-zero summaries and per-order/family/component breakdowns.
+See [docs/MATH_GUIDE.md](docs/MATH_GUIDE.md) for a worked example. Request
+`--splits test` only for a recorded milestone after model selection is final.
+
+`plot` writes, into `<run>/plots/`:
+
+| File | Shows |
+|---|---|
+| `summary.svg` | Headline average error, error per equation type, and how many equations fall in each error range |
+| `training.svg` | Validation error after every epoch, best epoch marked |
+| `example-typical-case-*.svg` | The median equation of each type: exact vs predicted curves and the gap |
+| `example-worst-case-*.svg` | The worst predictions overall |
+
+Charts have plain-English titles and labels, hover tooltips in a browser, and
+follow the viewer's light/dark setting. No plotting package is needed.
+
+### 4. Predict a new equation
+
+Inference has a JSON CLI and a Python API; neither needs the training dataset.
+Requests outside the trained range (faster/slower oscillation, bigger starting
+values or push, longer times) are moved into it exactly: time is rescaled,
+the free and forced parts are predicted separately, and long times are
+stitched from several model runs (`Predictor.predict_rescaled`). Only the
+*ratios* (decay vs frequency, push frequency vs natural frequency) must lie in
+the trained range; if they don't, the CLI refuses unless
+`--allow-extrapolation` is given.
 
 ```bash
-.venv/bin/python -m ode.evaluate --checkpoint ode/runs/pilot-v1/best.pt \
-  --data ode/data/pilot-v1 --splits validation validation_parameter validation_initial \
-  --output ode/runs/pilot-v1/evaluation.json
-.venv/bin/python -m ode.plot_results --checkpoint ode/runs/pilot-v1/best.pt \
-  --data ode/data/pilot-v1 --report ode/runs/pilot-v1/evaluation.json \
-  --output ode/runs/pilot-v1/plots --worst 3
-.venv/bin/python -m ode.benchmark inference --checkpoint ode/runs/pilot-v1/best.pt \
-  --batch-sizes 1 101 4096 --repeats 30 --threads 2 \
-  --output ode/runs/pilot-v1/runtime.json
+.venv/bin/python -m ode predict --checkpoint ode/models/current/best.pt \
+  --input ode/equations/predict_example.json --output ode/runs/prediction.json
+
+# Try your own equation: copy a file in ode/equations/, edit it, and get a chart
+# of exact vs predicted (try_equation.svg) and a table with both solutions
+# (try_equation.csv) written next to it. --output adds exact_states to the JSON.
+# coefficients go lowest derivative first: [2.0, 0.6] means y'' + 0.6 y' + 2 y.
+# elapsed_times is optional; without it the model's trained 0–5 grid is used.
+.venv/bin/python -m ode predict --checkpoint ode/models/current/best.pt \
+  --input ode/equations/try_equation.json
 ```
 
-Plots include the median case in each family and worst cases overall. SVG files
-contain component overlays and signed errors, labeled with equation parameters
-and nondimensional axes; no plotting package is needed. Runtime measures warmed
-loaded prediction, including transfers/encoding and excluding checkpoint load.
-Use `--device cuda` on the tested GPU. Evaluation defaults to validation; request
-`--splits test` only for a recorded milestone after model selection is finished.
-Every report/plot verifies the dataset/checkpoint identity, and new paths prevent
-accidental overwrite. Diagnostics are absent in the 384-case recipe.
+```python
+import numpy as np
+from ode.generation.analytic import linear_reference
+from ode.generation.equations import LinearODE
+from ode.evaluation.predict import Predictor
 
-```bash
-OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 MKL_NUM_THREADS=1 \
-.venv/bin/python -m ode.benchmark generation --workers 1 6 12 --repeats 3 \
-  --output ode/runs/local-throughput/report.json
+equation = LinearODE(coefficients=(1.25, 1.0), initial_state=(0.5, 0.0))
+times = np.linspace(0.0, 5.0, 101)
+predicted = Predictor("ode/models/current/best.pt").predict(equation, times)  # (101, 2): y, y'
+print(np.max(np.abs(predicted - linear_reference(equation, times)), axis=0))
 ```
 
-This solves real data repeatedly in temporary directories and records all timing
-and failure evidence. Match the worker sweep to the actual CPU allocation.
+`predict` returns float64 states of shape `(T, n)` in the original
+nondimensional scale; the model computes in float32. The network does not
+enforce the initial condition exactly and can produce finite but inaccurate
+states.
+
+## Hardware profiles and the cluster
+
+Scientific recipes (`configs/generator_*.json`) and hardware settings
+(`configs/resources_*.json`) are separate, so moving to a bigger machine never
+changes the experiment. Pass a profile with `--resources FILE`; explicit flags
+override it. Every resolved setting is recorded in the run's artifacts.
+
+| Profile key / CLI flag | Meaning | Default |
+|---|---|---|
+| `workers` / `--workers` | Generation processes; `"auto"` = all allocated CPUs | `auto` in presets |
+| `backend` / `--backend` | `process`, `thread`, or `serial` generation | `process` in presets |
+| `threads` / `--threads` | Training CPU threads | all allocated CPUs |
+| `device` / `--device` | `cpu`, `cuda`, or `auto` | `auto` |
+| `batch_size` / `--batch-size` | Examples per update; changes optimization | 256 |
+| `preload` / `--no-preload` | Hold the split in (GPU) memory | on |
+| `preload_limit_gib` / `--preload-limit-gib` | Refuse to preload above this size | none |
+| `loader_workers` / `--loader-workers` | DataLoader subprocesses, only with `--no-preload` | 0 |
+
+On SLURM, `"auto"` follows `--cpus-per-task`, so
+[slurm/pipeline.sbatch](slurm/pipeline.sbatch) needs no worker edits. Its
+partition and environment lines are marked `CHANGE ME` because FSU's GPU
+partition names are site-specific. [slurm/target_smoke.sh](slurm/target_smoke.sh)
+is the separate NVIDIA readiness check (environment report, short train,
+reload, inference benchmark).
+
+**GPU utilisation.** The model is a small MLP, so at batch 1024 each step is
+mostly kernel-launch overhead and the GPU is far from saturated even after the
+data-loading fix (0.6 s per pilot epoch, previously 3.9 s). Larger batches use
+the GPU much better (8192: about 0.2 s per epoch) but change the optimization,
+so treat batch size as an experiment setting, not a speed knob.
 
 ## Full-run preset: 100,032 trajectories
 
-This is an unused capacity option, not the selected next run. It contains only
-core splits; add and version diagnostics before promoting it to a release recipe.
-
 [configs/generator_full.json](configs/generator_full.json) keeps the same
-equation families, bounds, time grid and solver checks as the small preset. It
-increases the number of equation-parameter groups.
+equation families, bounds, time grid and solver checks as the small preset and
+increases the number of equation-parameter groups. It has no diagnostic splits;
+add and version them before promoting it to a release recipe.
 
 | Split | Groups per order and family: small / full | Small trajectories | Full trajectories |
 |---|---:|---:|---:|
@@ -284,53 +314,13 @@ increases the number of equation-parameter groups.
 | Test | 4 / 1,042 | 64 | 16,672 |
 | **Total** | **24 / 6,252** | **384** | **100,032** |
 
-Each parameter group has four independently sampled initial states. The count is:
-
-```text
-number of orders × number of families × sum(groups_per_split)
-    × initial_conditions_per_group
-
-2 × 2 × (4168 + 1042 + 1042) × 4 = 100032
-```
-
-Preview first:
-
-```bash
-.venv/bin/python -m ode.generate_data --config ode/configs/generator_full.json
-```
-
-To execute with the preset's six process workers:
-
-```bash
-OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 MKL_NUM_THREADS=1 \
-.venv/bin/python -m ode.generate_data \
-  --config ode/configs/generator_full.json \
-  --generate \
-  --output ode/data/linear-100k-v1
-```
-
-On the actual allocated node, set `--workers` to a measured appropriate count
-and use a new output directory on the site's scratch storage. Use the site's Python environment and match the
-worker count to the allocation. Sampling seeds are independent of worker
-scheduling and backend choice.
-
-Training must use the matching full configuration. For a compatible GPU host:
-
-```bash
-.venv/bin/python -m ode.train \
-  --config ode/configs/generator_full.json \
-  --data ode/data/linear-100k-v1 \
-  --run ode/runs/linear-100k-baseline \
-  --device cuda \
-  --preload \
-  --loader-workers 0 \
-  --epochs 20 \
-  --train
-```
-
-`--preload` requires enough host RAM for normalized examples; omit it to load
-archives lazily. CPU execution is available with `--device cpu`. Local measured timings and unresolved target hardware are recorded
-in [COMPUTE_ESTIMATES.md](COMPUTE_ESTIMATES.md).
+Each parameter group has four independently sampled initial states:
+`orders × families × sum(groups_per_split) × initial_conditions_per_group`
+= `2 × 2 × (4168 + 1042 + 1042) × 4 = 100032`. Expect roughly four minutes of
+generation on this 6-core machine and about 1.1 GiB of preloaded training and
+validation examples. Sampling seeds are independent of worker count and
+backend, so any machine produces identical trajectories. Measured timings are in
+[docs/COMPUTE_ESTIMATES.md](docs/COMPUTE_ESTIMATES.md).
 
 ## Configuration and sampling
 
@@ -355,13 +345,13 @@ All dataset presets use these frozen scientific settings:
 | `independent_check_points` | `5` | Saved times checked using a matrix exponential |
 | `max_abs_state` | `1e6` | Reject states exceeding this absolute component bound |
 | `max_rhs_calls` | `100000` | Maximum right-hand-side evaluations per solve |
-| `backend`, `workers` | `process`, `6` | Execution settings in the JSON presets |
+| `backend`, `workers` | `process`, `auto` | Execution settings in the JSON presets (not part of the science) |
 
 Forcing phases are sampled in `[-π, π)`. Coefficients are constructed from
 decaying complex-conjugate root pairs, with an additional negative real root for
 odd orders. This controls stability of the sampled linear equations; it does not
 cover all possible coefficient combinations. See
-[ROOTS_AND_EXTENSIONS.md](ROOTS_AND_EXTENSIONS.md) for the mathematical reasoning.
+[docs/ROOTS_AND_EXTENSIONS.md](docs/ROOTS_AND_EXTENSIONS.md) for the mathematical reasoning.
 
 The generator also accepts `thread` and `serial` backends. Supported integration
 methods are `DOP853`, `RK45`, `Radau` and `BDF`. Configuration validation rejects
@@ -411,7 +401,7 @@ the sampled times; they do not prove an error bound between them.
 ## Dataset format and split policy
 
 ```text
-ode/data/linear-v1/
+ode/data/small-384/
 ├── manifest.json
 ├── records.jsonl
 ├── train/
@@ -495,87 +485,79 @@ does not mean 5% trajectory error.
 | Option | Default | Purpose |
 |---|---|---|
 | `--epochs` | `20` | Training passes through the dataset |
-| `--batch-size` | `256` | Time-point examples per batch |
+| `--batch-size` | `256` | Time-point examples per update |
 | `--width`, `--depth` | `128`, `3` | Hidden-layer size and count |
 | `--learning-rate` | `0.001` | AdamW learning rate |
-| `--device` | `cpu` | Choose `cpu`, explicit `cuda`, or automatic `auto` |
-| `--threads` | `4` | PyTorch CPU compute threads |
-| `--loader-workers` | `0` | DataLoader subprocesses |
-| `--preload` | Off | Keep normalized examples in host RAM; requires zero loader workers |
-| `--allow-failures` | Off | Accept a completed dataset with inspected reference failures |
-
-Generation `--workers`, training `--threads`, and training `--loader-workers`
-control separate resources. Scientific settings must match the dataset manifest;
-generation backend and worker count may differ from the training configuration.
+| `--learning-rate-schedule` | `constant` | `cosine` decays to `--minimum-learning-rate` by the last epoch |
+| `--weight-decay` | `0.01` | AdamW weight decay |
+| `--training-seed` | dataset seed | Model initialisation and shuffle order |
+| `--device` | `auto` | `cpu`, `cuda` (also AMD ROCm), or `auto` |
+| `--threads` | all allocated CPUs | PyTorch CPU threads |
+| `--preload` / `--no-preload` | on | Hold the split in memory; off streams archives through DataLoader |
+| `--resume` | off | Continue the `--run` folder from its `last.pt` |
+| `--snapshot-every N` | 0 (off) | Save the weights to `<run>/snapshots/` every N epochs (and epoch 0 of a fresh run) so `python -m ode neurons --run <run> --input <equation.json>` can animate the learning |
+| `--initialize-from PATH` | off | Start from another run's `best.pt` (same dataset, width, depth) instead of random weights; use to train an under-trained model further with a fresh schedule |
+| `--allow-failures` | off | Accept a completed dataset with inspected reference failures |
 
 Training seeds Python, NumPy and PyTorch and requests deterministic algorithms.
-The optimizer uses AdamW, with gradient norm clipping at one. Identical seeds do
+The optimizer is AdamW with gradient-norm clipping at one. With preloading,
+batches are slices of tensors already on the device; the shuffle consumes the
+seed exactly as PyTorch's DataLoader did, so a seed reproduces runs made before
+that change (checked to six decimals over six epochs of the GPU pilot). The
+loss total is read back once per epoch rather than every batch, so a
+non-finite gradient is reported at the end of its epoch. Identical seeds do
 not guarantee identical results across hardware or library versions.
 
 ```text
-ode/runs/linear-v1-baseline/
-├── best.pt
-└── run.json
+ode/runs/<name>/
+├── best.pt      weights of the best validation epoch (for prediction)
+├── last.pt      latest epoch + optimizer/scheduler/RNG state (for --resume)
+└── run.json     settings, environment, per-epoch errors and timings, status
 ```
 
 `best.pt` contains weights, architecture, encoding/schema version, normalization,
-generation configuration, selected epoch, validation loss and dataset-manifest
-checksum. Checkpoint replacement is atomic after a complete temporary write.
+generation configuration, selected epoch, validation scores and dataset-manifest
+checksum. `last.pt` adds AdamW and scheduler state, every random-number state
+and the run report; `--resume` restores all of it and refuses a different
+dataset or recipe. Both are written atomically and both stay out of Git.
 
 `run.json` records configuration, seed, environment, device, source and dataset
 identities, training options, epoch losses/timings and completion status. A
-completed run records the checkpoint checksum. An interrupted run remains labeled
-incomplete, even if an earlier best checkpoint exists. Training resume is not
-implemented.
+completed run records the checkpoint checksum. An interrupted run stays labeled
+incomplete until a resume finishes it.
 
 Add an experiment note describing the question, results, failure cases and next
 decision, following [the project workflow](../planning/WORKFLOW.md). Checkpoints
 and datasets stay outside Git; small reports and run notes provide reviewable
 evidence.
 
-## Code map
-
-| Module | Responsibility |
-|---|---|
-| [config.py](config.py) | Validated settings, split helpers and provenance |
-| [equations.py](equations.py) | Equation representation, parameter identity, root sampling and state-system conversion |
-| [analytic.py](analytic.py) | Independent matrix-exponential reference states |
-| [reference.py](reference.py) | Bounded integration, refinement, independent checks and failure results |
-| [validate_reference.py](validate_reference.py) | Closed-form benchmark suite and optional JSON report |
-| [generate_data.py](generate_data.py) | Deterministic jobs, bounded workers, archives and manifests |
-| [dataset.py](dataset.py) | Integrity checks, feature encoding, loading and normalization |
-| [model.py](model.py) | Mixed-order neural baseline and masked loss |
-| [train.py](train.py) | Training, validation selection and saved artifacts |
-| [predict.py](predict.py) | CPU/CUDA inference and independent JSON CLI |
-| [check_environment.py](check_environment.py) | Interpreter, dependency and device readiness report |
-| [evaluate.py](evaluate.py), [plot_results.py](plot_results.py) | Frozen metrics, breakdowns and standalone SVG plots |
-| [benchmark.py](benchmark.py) | Generation/inference runtime with hardware and stage evidence |
-| [resources.py](resources.py) | Separate execution profiles, CPU allocation detection and validation |
-| [target_smoke.sh](target_smoke.sh) | Actual allocated NVIDIA end-to-end verification |
-
 ## Troubleshooting
 
 | Symptom | What to check |
 |---|---|
-| `No module named ode` | Run from the repository root with `.venv/bin/python -m ode.<module>` |
-| Missing NumPy, SciPy or PyTorch | Check the interpreter and follow [environment setup](ENVIRONMENT.md) |
+| `No module named ode` | Run from the repository root: `.venv/bin/python -m ode ...` |
+| `No module named ode.train` (old commands) | Modules moved into stage folders on Oct 16; use `python -m ode train` etc. |
+| Missing NumPy, SciPy or PyTorch | Check the interpreter and follow [docs/ENVIRONMENT.md](docs/ENVIRONMENT.md) |
 | Command only prints a plan | Add `--generate` with `--output`, or `--train` with `--data` and `--run` |
-| Output directory already exists | Choose a new dataset/run name; automatic overwrite and resume are unavailable |
-| Dataset is incomplete | Inspect its manifest and ledger, resolve the interruption, and generate to a new path |
+| Run stopped part-way | Rerun the same `pipeline` command, or the same `train` command plus `--resume` |
+| Output directory already exists | Choose a new name; datasets and finished runs are never overwritten |
+| Dataset is incomplete | Generation was interrupted; delete that folder and generate again (it takes minutes) |
 | Completed dataset has failed solves | Inspect failure records and family counts before considering `--allow-failures` |
-| Scientific configuration mismatch | Use the exact generation recipe, including group counts and seed |
+| Scientific configuration mismatch | Omit `--config` to use the dataset's own recipe, or pick the matching preset |
 | Checksum mismatch | Check for edited, damaged or partially copied artifacts; retain the original evidence |
-| CUDA is unavailable | Use `--device cpu` or a compatible PyTorch installation on the GPU host |
-| Preloading conflicts with workers | Pair `--preload` with `--loader-workers 0` |
+| Training ran on CPU | `python -m ode check` shows whether PyTorch sees the GPU; `--device cuda` makes that an error instead of a fallback |
 | Finite predictions are inaccurate | Check training bounds, horizon, run losses and per-component errors; finiteness is not an accuracy test |
 
 ## Verification and remaining work
 
-Run `.venv/bin/python -m unittest discover -v` from the root. Tests cover
-closed-form reference accuracy, partition isolation, near-zero/nonfinite metric
-behavior, validation checkpoint selection, inference reload and execution
-profile precedence. Historical reference evidence lives in
-[runs/20261015-reference-validation-01](runs/20261015-reference-validation-01/README.md).
+Run `.venv/bin/python -m unittest discover -s ode/tests -v` from the root. Tests
+cover closed-form reference accuracy, partition isolation, near-zero/nonfinite
+metric behavior, validation checkpoint selection, inference reload, execution
+profile precedence, loader/DataLoader equivalence, bit-identical resume and
+chart well-formedness. Historical reference evidence lives in
+[runs/archive/20261015-reference-validation-01](runs/archive/20261015-reference-validation-01/README.md).
+Run notes written before October 16 quote the old `python -m ode.<module>`
+commands; they are historical records and are left as they were.
 New smoke/pilot/benchmark evidence and current counts are in
 [STATUS.md](../planning/STATUS.md). Reference error does not measure neural error.
 
@@ -583,3 +565,23 @@ Remaining release gates are target hardware verification, checkpoint selection
 and distribution, documented milestone test evaluation, and clean-environment
 reproduction. Padding width six does not establish neural accuracy on untrained
 orders or all-real/repeated-root families. Fluid implementation remains deferred.
+
+## First accuracy study: diagnostics and learning rate
+
+`python -m ode diagnose` produces numeric development reports for initial-state error,
+time-local error and physical-time derivative/RHS consistency. It supports
+training/validation partitions and excludes the spent test split. See
+[runs/archive/20261016-validation-diagnostics-01](runs/archive/20261016-validation-diagnostics-01/README.md)
+for the measured baseline patterns. The autograd diagnostic currently assumes
+the pointwise linear-padded-v1 MLP input path; update it explicitly if a new
+feature encoding or cross-time architecture is introduced.
+
+Training now accepts `--learning-rate-schedule constant|cosine`,
+`--minimum-learning-rate`, `--weight-decay` and `--training-seed`. The model/shuffle
+seed defaults to the scientific data seed but can vary without changing data.
+Cosine runs use the initial rate in epoch 1 and the minimum in the final epoch;
+constant scheduling remains the default. Each epoch records its actual rate.
+
+`best.pt` remains the standalone inference checkpoint; `last.pt` is the resume
+state described above. `--no-save-training-state` disables it (and therefore
+`--resume`).

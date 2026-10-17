@@ -44,6 +44,6 @@
   "max_abs_state": 1000000.0,
   "max_rhs_calls": 100000,
   "backend": "process",
-  "workers": 6,
+  "workers": "auto",
   "diagnostic_groups": 0
 }

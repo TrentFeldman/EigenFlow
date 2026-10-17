@@ -8,9 +8,18 @@ data/
 __pycache__/
 *.pyc
 
-# PyTorch checkpoints
+# PyTorch checkpoints (the one released model in ode/models/ is the exception)
 *.pt
 *.pth
+!ode/models/**/*.pt
+
+# Experiment outputs stay local: run folders (metrics, charts, checkpoints),
+# generated equation answers and animations. Publish a model via ode/models/.
+ode/runs/*
+ode/equations/*.svg
+ode/equations/*.csv
+ode/equations/*.html
+ode/equations/my_equation.*
 
 # Local experiments and scratch work
 /.experiments/

@@ -20,10 +20,10 @@ from unittest.mock import patch
 import numpy as np
 
 from ode.config import GeneratorConfig
-from ode.dataset import Normalizer, TrajectoryDataset, encode, feature_width
-from ode.equations import LinearODE
-from ode.generate_data import generate, iter_jobs, iter_results, main
-from ode.reference import SolveJob, SolveResult
+from ode.training.dataset import Normalizer, TrajectoryDataset, encode, feature_width
+from ode.generation.equations import LinearODE
+from ode.generation.generate_data import generate, iter_jobs, iter_results, main
+from ode.generation.reference import SolveJob, SolveResult
 
 
 def _write_fixture_dataset(root, records, config=None):
@@ -53,7 +53,7 @@ class DataContractTests(unittest.TestCase):
         with TemporaryDirectory() as directory:
             output = Path(directory) / "must-not-exist"
 
-            with patch("ode.generate_data.iter_jobs") as jobs, patch("ode.generate_data.generate") as writer:
+            with patch("ode.generation.generate_data.iter_jobs") as jobs, patch("ode.generation.generate_data.generate") as writer:
                 stream = StringIO()
 
                 with redirect_stdout(stream):
@@ -101,7 +101,7 @@ class DataContractTests(unittest.TestCase):
 
             return SolveResult(job, error="fabricated failure")
 
-        with patch("ode.generate_data.solve_job", side_effect=fabricated_worker):
+        with patch("ode.generation.generate_data.solve_job", side_effect=fabricated_worker):
             results = list(iter_results(iter(jobs), replace(GeneratorConfig(), workers=2)))
 
         self.assertEqual([result.job.trajectory_id for result in results], [str(i) for i in range(4)])
@@ -146,12 +146,12 @@ class DataContractTests(unittest.TestCase):
             output = Path(directory) / "fixture-metadata"
 
             with (
-                patch("ode.generate_data.iter_jobs", return_value=iter(jobs)),
+                patch("ode.generation.generate_data.iter_jobs", return_value=iter(jobs)),
                 patch(
-                    "ode.generate_data.solve_job",
+                    "ode.generation.generate_data.solve_job",
                     side_effect=lambda job, cfg: SolveResult(job, error="fixture"),
                 ),
-                patch("ode.generate_data.validate_reference", return_value={"passed": True, "cases": []}),
+                patch("ode.generation.generate_data.validate_reference", return_value={"passed": True, "cases": []}),
             ):
                 manifest = generate(replace(config, backend="serial"), output)
 
@@ -170,13 +170,13 @@ class DataContractTests(unittest.TestCase):
 
             with (
                 patch(
-                    "ode.generate_data.validate_reference",
+                    "ode.generation.generate_data.validate_reference",
                     return_value={
                         "passed": False,
                         "cases": [{"name": "fixture", "passed": False}],
                     },
                 ),
-                patch("ode.generate_data.iter_jobs") as sampler,
+                patch("ode.generation.generate_data.iter_jobs") as sampler,
             ):
                 with self.assertRaisesRegex(RuntimeError, "preflight"):
                     generate(GeneratorConfig(), output)
@@ -264,7 +264,7 @@ class DataContractTests(unittest.TestCase):
             dataset = TrajectoryDataset(root, "train", 4)
             self.assertEqual(len(dataset), 3)
 
-            with patch("ode.dataset.np.load") as loader:
+            with patch("ode.training.dataset.np.load") as loader:
                 loader.return_value.__enter__.return_value = fabricated
                 np.testing.assert_array_equal(dataset[0]["target"], [1, 0, 0, 0])
                 np.testing.assert_allclose(dataset[2]["target"], [0.2, -0.1, 0, 0])

@@ -18,7 +18,7 @@
 - Use joint parameter/initial-condition holdout partitions now. Separate parameter-only and initial-condition-only diagnostic sets remain planned.
 - Reuse the existing isolated `.venv`; add SciPy while retaining the installed NumPy and PyTorch stack. Default training to CPU and record the tested environment.
 - Add team documentation rules to `AGENTS.md` and explain all scaffold modules, math symbols, shapes and limitations for both collaborators.
-- Verify both homogeneous and sine-forced references on fixed closed-form cases, including real/repeated roots and resonance; this does not extend the random sampler's root distribution. Save the bounded validation evidence under `ode/runs/20261015-reference-validation-01/`.
+- Verify both homogeneous and sine-forced references on fixed closed-form cases, including real/repeated roots and resonance; this does not extend the random sampler's root distribution. Save the bounded validation evidence under `ode/runs/archive/20261015-reference-validation-01/`.
 - Add explicit CPU/CUDA/auto device selection and host-RAM data preloading. Preserve CPU defaults and the existing local environment. NVIDIA execution requires a compatible CUDA build on the GPU host and remains untested here.
 - Treat the stated 20,000+ cores/600+ nodes as shared cluster capacity; estimate one 32-core node until the actual allocation is known. Target GPU is RTX PRO 6000 Blackwell. Keep runtime projections separate from measured local reference timings.
 - The user explicitly chose code updates and validation only for this task: do not generate the 384-trajectory dataset or launch training.
@@ -154,7 +154,7 @@ per-family acceptance. Validation diagnostics were 3.993% for parameters and
 2.938% for ICs. Keep the unchanged 3x128 baseline and pilot size; do not launch
 100k or change architecture just to satisfy an untested capacity assumption.
 Follow-up reliability studies use validation and an explicit future test plan.
-Checkpoint/runtime/plot evidence is in `ode/runs/20261016-pilot-baseline-01/`.
+Checkpoint/runtime/plot evidence is in `ode/runs/archive/20261016-pilot-baseline-01/`.
 Actual allocation and NVIDIA execution remain unresolved pending the user's
 meeting; no further request for those details is needed during this session.
 
@@ -165,7 +165,7 @@ excluding execution. This supersedes earlier run authorization for this new
 task. Existing results remain historical evidence; no new generation, training
 or model evaluation was performed to prepare the plan.
 
-See [the staged plan](../ode/error_reduction/README.md), its saved-validation
+See [the staged plan](../ode/docs/error_reduction/README.md), its saved-validation
 review and draft experiment manifest. Proposed order: diagnose physical/time
 errors; compare longer constant-rate and scheduled optimization; compare losses
 with matched trajectory batches; add forcing-phase features; compare capacity;
@@ -192,7 +192,7 @@ until the user requests it.
 ## October 16 combined options and cost–benefit review — provisional
 
 Reviewed the new parked accuracy options in root AGENTS.md and incorporated all
-six into [the combined review](../ode/error_reduction/COST_BENEFIT.md). Added
+six into [the combined review](../ode/docs/error_reduction/COST_BENEFIT.md). Added
 natural-mode/decay feature settings, width/depth controls through 512x4, a cheaper
 pointwise relative-squared loss and conditional group-learning-curve/full-data
 comparisons to the draft manifest. All comparisons remain unexecuted.
@@ -220,3 +220,59 @@ Preserve validation cohorts across data-size comparisons, independent final-test
 identity checks, and the user instruction to prepare without executing. The
 analysis did not modify AGENTS.md, runtime code, existing datasets/checkpoints,
 the virtual environment or the fluid track.
+
+## October 16 first priority accuracy work — authorized execution
+
+The user's latest request authorizes beginning the first/high-priority work and
+supersedes the preparation-only restriction for this stage. Bound the initial
+stage to numerical validation diagnostics and the planned matched optimization
+pair. Keep equation families, references, model, loss and batch size fixed.
+
+Compare fresh 300-epoch 3x128 runs on the existing 6,656-case pilot, training seed
+20261015, batch 1024, AdamW lr 1e-3/weight decay 0.01: constant learning rate
+versus cosine decay to 1e-5. Epoch 1 uses the initial rate and epoch 300 the
+minimum. Checkpoint selection remains validation mean relative L2. No pilot-test
+evaluation is part of this stage; diagnostics also exclude test.
+
+Implement explicit training seed/weight decay and saved last optimizer/scheduler
+states alongside the existing inference checkpoint. Run controls concurrently
+on disjoint physical CPU pairs (0,1 and 2,3), two threads per process. Record
+affinity and elapsed times; concurrent host conditions limit comparison with
+the earlier sequential timing. The planned feature/loss changes remain later
+stages subject to the optimization evidence, avoiding an uncontrolled grid.
+
+## October 16 GPU correction and matched rerun
+
+The user requested GPU execution after the CPU controls had started. The sandbox
+hides `/dev/kfd` and `/dev/dri`; its negative availability check did not describe
+the host. Outside that sandbox, the existing ROCm torch build detects the AMD
+Radeon RX 7900 XTX and passed a two-epoch training/save/independent-reload check.
+No environment packages were changed. The user handles stopping the CPU jobs.
+
+Run two fresh 300-epoch controls on that GPU, sequentially to avoid mutual GPU
+contention. Use the same pilot, seed, 3x128 model, batch 1024, two CPU feeder
+threads and constant-versus-cosine settings above. The `cuda` PyTorch device name
+also selects AMD through ROCm. Record actual hardware and timings rather than
+assuming a speedup. Evaluate selected checkpoints on CPU against the same three
+validation partitions; do not score the spent pilot test. Preserve completed
+or interrupted CPU runs as separate historical evidence. This verifies the local
+AMD GPU only; the allocated NVIDIA target remains a separate gate.
+
+## October 16 matched GPU outcome
+
+Both 300-epoch runs completed on the 7900 XTX; selected epoch 295 in each.
+CPU reload evaluations on the unchanged joint validation give constant/cosine
+mean 2.27563%/2.21026%, p95 5.91763%/6.24704%, worst 20.06418%/27.07638%,
+and 83/92 of 1,024 trajectories at or above 5%, zero nonfinite predictions.
+Cosine improves the pooled mean 2.87% relative to constant, but both forced-family
+means and the second-derivative mean worsen. Retain both checkpoints: cosine is
+the pooled-mean candidate; constant is the reliability control for the next
+proposed forcing-feature experiment. No later experiment was launched.
+
+The longer constant run reduces mean by 36.4% against the historical baseline;
+its own first-100-epoch best also matches that baseline closely. Neither control
+meets the provisional reliability goals. One seed is screening evidence only.
+Training loop times were 1,158.780 and 1,156.422 seconds, without a large observed
+GPU speedup in this pipeline; this was not a reserved host speed benchmark.
+See the [full comparison](../ode/runs/archive/20261016-optimization-gpu-cosine-01/README.md).
+All three validation partitions were evaluated; the spent pilot test was not.

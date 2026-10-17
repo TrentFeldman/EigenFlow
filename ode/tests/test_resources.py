@@ -9,8 +9,8 @@ import unittest
 from unittest.mock import patch
 
 from ode.resources import available_cpus, load_resources
-from ode.train import parse_args
-from ode.generate_data import main as generate_main
+from ode.training.train import parse_args
+from ode.generation.generate_data import main as generate_main
 
 
 class ResourceTests(unittest.TestCase):

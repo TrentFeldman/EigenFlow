@@ -39,7 +39,7 @@ environment explicitly, so shell activation is optional.
 If `.venv` already exists:
 
 ```bash
-.venv/bin/python -m ode.check_environment
+.venv/bin/python -m ode check
 .venv/bin/python -m pip check
 ```
 
@@ -48,19 +48,19 @@ For a fresh clone without a virtual environment, use the tested Python 3.14.8 in
 ```bash
 python3 -m venv .venv
 .venv/bin/python -m pip install -r ode/requirements.txt
-.venv/bin/python -m ode.check_environment
+.venv/bin/python -m ode check
 .venv/bin/python -m pip check
 ```
 
 Dependencies are NumPy, SciPy and PyTorch. A GPU is optional; CPU execution is
 the default. Direct dependencies and the Python version are pinned; GPU training
 requires a PyTorch build compatible with the host. See the
-[environment guide](ode/ENVIRONMENT.md) for the locally checked versions.
+[environment guide](ode/docs/ENVIRONMENT.md) for the locally checked versions.
 
 ### 2. Verify the numerical foundation
 
 ```bash
-.venv/bin/python -m ode.validate_reference
+.venv/bin/python -m ode validate
 .venv/bin/python -m unittest discover -s ode/tests -v
 ```
 
@@ -71,25 +71,25 @@ must be measured separately.
 ### 3. Preview an experiment
 
 ```bash
-.venv/bin/python -m ode.generate_data --config ode/configs/generator.json
-.venv/bin/python -m ode.train --config ode/configs/generator.json
+.venv/bin/python -m ode generate --config ode/configs/generator.json
+.venv/bin/python -m ode train --config ode/configs/generator.json
 ```
 
 Both commands default to a dry run: they print settings without creating a
 dataset or training a model. The small preset requests 384 trajectories across
 second- and third-order equations, with and without sinusoidal forcing.
 
-### 4. Generate, train and predict
+### 4. Generate, train, evaluate and plot
 
-Follow the [complete ODE walkthrough](ode/README.md#run-the-small-example) for
-generation, training and a Python prediction example. Execution requires
-`--generate` or `--train` and a new output directory.
+```bash
+.venv/bin/python -m ode pipeline --name my-first-run --preset small --epochs 20
+```
 
-For the selected pilot and editable local/HPC settings, use the
-[resource-profile instructions](ode/README.md#resource-profiles-and-selected-pilot).
-The 100,032-case capacity option remains available for later scaling.
-Use the same scientific configuration for generation and training, and match
-worker counts to the CPUs actually allocated to the job.
+One command runs every stage and is safe to rerun if interrupted. The
+[ODE README](ode/README.md#quick-start-one-command) explains each stage, the
+individual commands, the charts it draws and how to submit it on the HPC cluster.
+Presets are `small` (384 equations), `pilot` (6,656) and `full` (100,032); worker
+and thread counts follow the CPUs allocated to the job automatically.
 
 ## What the ODE model learns
 
@@ -113,7 +113,7 @@ establish accuracy on unseen orders.
 
 The current model predicts each requested time directly. All current variables
 are nondimensional, and the presets cover linear equations over elapsed times
-from zero to five. See the [math guide](ode/MATH_GUIDE.md) for the derivation and
+from zero to five. See the [math guide](ode/docs/MATH_GUIDE.md) for the derivation and
 the [ODE README](ode/README.md) for array shapes, bounds and limitations.
 
 ```text
@@ -179,12 +179,12 @@ the [fluid blueprint](fluid/BLUEPRINT.md) for later stage gates.
 | Read this | For |
 |---|---|
 | [ODE README](ode/README.md) | Runnable examples, settings, data layout and troubleshooting |
-| [ODE math guide](ode/MATH_GUIDE.md) | Equations, derivatives and numerical reasoning |
-| [Roots and extensions](ode/ROOTS_AND_EXTENSIONS.md) | Characteristic roots and possible family extensions |
-| [Environment guide](ode/ENVIRONMENT.md) | Interpreter, dependencies and device setup |
-| [Compute estimates](ode/COMPUTE_ESTIMATES.md) | Measured local timings and unresolved target allocation |
+| [ODE math guide](ode/docs/MATH_GUIDE.md) | Equations, derivatives and numerical reasoning |
+| [Roots and extensions](ode/docs/ROOTS_AND_EXTENSIONS.md) | Characteristic roots and possible family extensions |
+| [Environment guide](ode/docs/ENVIRONMENT.md) | Interpreter, dependencies and device setup |
+| [Compute estimates](ode/docs/COMPUTE_ESTIMATES.md) | Measured local timings and unresolved target allocation |
 | [Project status](planning/STATUS.md) | Dated milestone tracking and next actions |
-| [Project blueprint](planning/BLUEPRINT.md) and [ODE blueprint](ode/BLUEPRINT.md) | Architecture and frozen scientific contract |
+| [Project blueprint](planning/BLUEPRINT.md) and [ODE blueprint](ode/docs/BLUEPRINT.md) | Architecture and frozen scientific contract |
 | [Decision register](planning/DECISIONS.md) | Design choices and unresolved proposals |
 | [Working system](planning/WORKFLOW.md) | Experiment records, reviews and release evidence |
 | [Repository instructions](AGENTS.md) | Team conventions and mission |

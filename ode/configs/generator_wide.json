@@ -1,0 +1,49 @@
+{
+  "seed": 20261017,
+  "orders": [
+    2,
+    3
+  ],
+  "max_order": 6,
+  "families": [
+    "linear_homogeneous",
+    "linear_sinusoidal"
+  ],
+  "groups_per_split": [
+    25000,
+    2500,
+    2500
+  ],
+  "initial_conditions_per_group": 4,
+  "decay_range": [
+    0.01,
+    1.5
+  ],
+  "frequency_range": [
+    0.5,
+    4.0
+  ],
+  "initial_state_range": [
+    -1.0,
+    1.0
+  ],
+  "amplitude_range": [
+    0.1,
+    1.0
+  ],
+  "t_start": 0.0,
+  "t_stop": 5.0,
+  "time_points": 101,
+  "method": "DOP853",
+  "rtol": 1e-09,
+  "atol": 1e-11,
+  "refinement_factor": 10.0,
+  "reference_rtol": 1e-06,
+  "reference_atol": 1e-08,
+  "independent_check_points": 5,
+  "max_abs_state": 1000000.0,
+  "max_rhs_calls": 100000,
+  "backend": "process",
+  "workers": "auto",
+  "diagnostic_groups": 0
+}
