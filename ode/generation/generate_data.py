@@ -75,7 +75,7 @@ def iter_jobs(config: GeneratorConfig):
     for split_index, split in enumerate(SPLITS):
         for order in config.orders:
             for family in config.families:
-                for group in range(config.groups_per_split[split_index]):
+                for group in range(config.groups(split_index, order)):
                     yield from _group_jobs(config, split_index, order, family, group)
 
     # Cross existing train/validation pools without using any test identity.

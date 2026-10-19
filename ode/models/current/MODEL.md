@@ -2,29 +2,29 @@
 
 `best.pt`: a 336,646-parameter network (6 hidden layers of 256 SiLU units, encoding `linear-padded-v1`) that predicts the solution
 of linear constant-coefficient ODEs of order 2 or 3, homogeneous or forced by a sine wave.
-SHA-256 `2966482c67447394cf87ec219a7674a2e6970f41d2902831615e0853182de291`.
+SHA-256 `4aa0cca3a9f6282644bdb68d3d023c87385efd800adfc88f29c3dc9e0e33b04e`.
 
 ## Accuracy (validation split, 40,000 equations held out from training)
 
-Metric: relative L2 error of the whole trajectory, `trajectory-rms-v1` (defined in `ode/docs/BLUEPRINT.md`).
+Metric: relative L2 error of the whole trajectory, `trajectory-rms-v1` (defined in `ode/README.md`).
 **The sealed test split has not been scored for this model.**
 
 | | Error |
 |---|---|
-| Average | **0.176%** |
-| Median | 0.146% |
-| 95% of equations under | 0.385% |
-| Worst case | 7.9% |
+| Average | **0.149%** |
+| Median | 0.123% |
+| 95% of equations under | 0.327% |
+| Worst case | 7.6% |
 | Equations at or above 5% | 1 of 40,000 |
 
 | Family | Average | 95% under | Worst |
 |---|---|---|---|
-| order2 / homogeneous | 0.092% | 0.172% | 2.5% |
-| order2 / sinusoidal | 0.216% | 0.421% | 7.9% |
-| order3 / homogeneous | 0.138% | 0.265% | 2.5% |
-| order3 / sinusoidal | 0.257% | 0.495% | 3.3% |
+| order2 / homogeneous | 0.079% | 0.140% | 2.0% |
+| order2 / sinusoidal | 0.183% | 0.357% | 7.6% |
+| order3 / homogeneous | 0.118% | 0.222% | 1.9% |
+| order3 / sinusoidal | 0.217% | 0.425% | 2.7% |
 
-Full numbers: [evaluation_summary.json](evaluation_summary.json).
+Per-equation numbers (`evaluation_summary.json`, 54 MB) stay local; `python -m ode evaluate` regenerates them.
 
 ## Where it works
 
@@ -40,8 +40,10 @@ growing or purely undamped modes.
 Stage 1, from scratch, dataset `wide` (hash `f29324eed0ae391d...`):
 `python -m ode pipeline --name wide-w256-d6-cosine --preset wide --epochs 280 --batch-size 1024 --width 256 --depth 6 --learning-rate-schedule cosine`
 
-Stage 2, 100 more epochs from the stage-1 weights:
-`python -m ode pipeline --name wide-finetune-relative-focus --preset wide --epochs 100 --batch-size 1024 --width 256 --depth 6 --learning-rate-schedule cosine --learning-rate 0.0001 --minimum-learning-rate 0.000001 --initialize-from <stage-1 best.pt> --compile --loss relative --focus-hard`
+Stage 2, 100 more epochs from the stage-1 weights (`wide-finetune-relative-focus`), same flags as stage 3 below.
+
+Stage 3, 250 more epochs from the stage-2 weights (9,437 s on the local 7900 XTX):
+`python -m ode pipeline --name wide-finetune-2 --preset wide --epochs 250 --batch-size 1024 --width 256 --depth 6 --learning-rate-schedule cosine --learning-rate 0.00005 --minimum-learning-rate 0.000001 --initialize-from <stage-2 best.pt> --compile --loss relative --focus-hard`
 
 ## Try it
 

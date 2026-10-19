@@ -85,6 +85,7 @@ class GeneratorConfig:
     Args:
         seed, orders, max_order, families: Reproducibility and equation scope.
         groups_per_split, initial_conditions_per_group: Core dataset population.
+        train_order_weights: Optional per-order multipliers for the train split only.
         diagnostic_groups: Extra crossed train/validation groups per order/family.
         decay_range, frequency_range, initial_state_range, amplitude_range:
             Sampling bounds in the nondimensional units documented below.
@@ -111,6 +112,11 @@ class GeneratorConfig:
 
     # Train/validation/test group counts PER ORDER AND FAMILY, not total counts.
     groups_per_split: tuple[int, int, int] = (16, 4, 4)
+
+    # Optional multiplier on the TRAIN group count for each entry of orders, e.g.
+    # (0.5, 1, 1, 1.5) to spend more data on harder orders. Validation and test
+    # stay balanced so every order is scored on equal footing.
+    train_order_weights: tuple[float, ...] | None = None
 
     # Initial-state count for each shared parameter group; multiplies dataset size.
     initial_conditions_per_group: int = 4
@@ -250,6 +256,22 @@ class GeneratorConfig:
         if self.diagnostic_groups > min(self.groups_per_split[:2]):
             raise ValueError("diagnostic_groups cannot exceed train or validation group count")
 
+        if self.train_order_weights is not None:
+            weights = self.train_order_weights
+            if len(weights) != len(self.orders) or not all(
+                    isinstance(w, (int, float)) and not isinstance(w, bool) and np.isfinite(w) and w > 0
+                    for w in weights):
+                raise ValueError("train_order_weights needs one positive number per order")
+            if min(self.groups(0, order) for order in self.orders) < max(1, self.diagnostic_groups):
+                raise ValueError("train_order_weights leaves an order with too few train groups")
+
+    def groups(self, split_index: int, order: int) -> int:
+        """Return groups per family for one split and order (train scaled by train_order_weights)."""
+        count = self.groups_per_split[split_index]
+        if split_index == 0 and self.train_order_weights is not None:
+            count = round(count * self.train_order_weights[self.orders.index(order)])
+        return count
+
     def _validate_ranges(self):
         """Check finite increasing endpoints and positive decay/forcing bounds."""
         for name in ("decay_range", "frequency_range", "initial_state_range", "amplitude_range"):
@@ -329,7 +351,7 @@ class GeneratorConfig:
 
         settings = data.copy()
 
-        # "auto" means every CPU this process/SLURM job may use (see resources.py).
+        # "auto" means every CPU this process/job may use (see resources.py).
         if settings.get("workers") == "auto":
             settings["workers"] = available_cpus()
 
@@ -337,12 +359,13 @@ class GeneratorConfig:
             "orders",
             "families",
             "groups_per_split",
+            "train_order_weights",
             "decay_range",
             "frequency_range",
             "initial_state_range",
             "amplitude_range",
         ):
-            if name in settings:
+            if settings.get(name) is not None:
                 settings[name] = tuple(settings[name])
 
         return cls(**settings)
@@ -369,9 +392,9 @@ class GeneratorConfig:
             Integer count, including every initial condition in each group.
         """
         return (
-            len(self.orders)
-            * len(self.families)
-            * (sum(self.groups_per_split) + 2 * self.diagnostic_groups)
+            len(self.families)
+            * sum(sum(self.groups(split, order) for split in range(len(SPLITS))) + 2 * self.diagnostic_groups
+                  for order in self.orders)
             * self.initial_conditions_per_group
         )
 
@@ -385,9 +408,9 @@ class GeneratorConfig:
         # Two orders (2, 3) with 101 times store 505 floats per family/group/IC.
         total_stored_floats = (
             self.time_points
-            * sum(self.orders)
             * len(self.families)
-            * (sum(self.groups_per_split) + 2 * self.diagnostic_groups)
+            * sum(order * (sum(self.groups(split, order) for split in range(len(SPLITS))) + 2 * self.diagnostic_groups)
+                  for order in self.orders)
             * self.initial_conditions_per_group
         )
 

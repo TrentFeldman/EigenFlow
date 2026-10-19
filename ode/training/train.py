@@ -284,8 +284,9 @@ def parse_args(argv=None):
                         help="Every N epochs (and at epoch 0 of a fresh run) save the weights to "
                              "<run>/snapshots/ so `python -m ode neurons` can animate the learning; 0 = off")
     parser.add_argument("--initialize-from", type=Path,
-                        help="Start from another run's best.pt (same dataset, width and depth) instead of "
-                             "random weights, e.g. to train an under-trained model further with a fresh schedule")
+                        help="Start from another run's best.pt (same width and depth) instead of random weights, "
+                             "e.g. to train an under-trained model further. A checkpoint from a different "
+                             "dataset also lends its input/target scaling")
     parser.add_argument("--loader-workers", type=int, default=0)
     parser.add_argument("--threads", type=int, default=available_cpus(),
                         help="CPU threads for PyTorch; defaults to the CPUs this job may use")
@@ -388,6 +389,12 @@ def _load_datasets(args, config):
         raise ValueError("Scientific training config must match the dataset generation config")
 
     normalizer = Normalizer.fit(training)
+    if args.initialize_from:
+        # Copied weights only make sense on the input scale they learned, so a different dataset
+        # keeps the source's preprocessing instead of refitting it.
+        source = torch.load(args.initialize_from, map_location="cpu", weights_only=True)
+        if source["dataset_manifest_sha256"] != sha256((args.data / "manifest.json").read_bytes()).hexdigest():
+            normalizer = Normalizer(**source["normalizer"])
     training.normalizer = validation.normalizer = normalizer
 
     if args.preload:
@@ -643,13 +650,10 @@ def _fit(model, optimizer, loaders, device, normalizer, config, args, report, sc
 def _initialize(args, model):
     """Copy weights from args.initialize_from and return its SHA-256.
 
-    The checkpoint must come from the same dataset: normalization is refit
-    from that dataset's training split, so only then do the copied weights see
-    inputs on the scale they learned. A mismatch raises ValueError.
+    A checkpoint from another dataset is fine: _load_datasets then keeps its
+    normalizer. The architecture must match; a mismatch raises ValueError.
     """
     source = torch.load(args.initialize_from, map_location="cpu", weights_only=True)
-    if source["dataset_manifest_sha256"] != sha256((args.data / "manifest.json").read_bytes()).hexdigest():
-        raise ValueError(f"{args.initialize_from} was trained on a different dataset than {args.data}")
     if source["architecture"] != model.architecture:
         raise ValueError(f"{args.initialize_from} holds a {source['architecture']} model; "
                          "pass its --width/--depth")

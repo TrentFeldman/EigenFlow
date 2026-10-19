@@ -16,9 +16,9 @@ __pycache__/
 # Experiment outputs stay local: run folders (metrics, charts, checkpoints),
 # generated equation answers and animations. Publish a model via ode/models/.
 ode/runs/*
-ode/equations/*.svg
-ode/equations/*.csv
-ode/equations/*.html
+ode/equations/**/*.svg
+ode/equations/**/*.csv
+ode/equations/**/*.html
 ode/equations/my_equation.*
 
 # Local experiments and scratch work
@@ -27,3 +27,9 @@ ode/equations/my_equation.*
 # Agent instruction files
 /AGENTS.md
 /CLAUDE.md
+
+# Per-equation evaluation dumps (tens of MB) and training videos stay local;
+# the scores that matter are in each model's MODEL.md.
+ode/models/**/evaluation_summary.json
+ode/models/**/*.mp4
+*.log

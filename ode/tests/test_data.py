@@ -129,6 +129,22 @@ class DataContractTests(unittest.TestCase):
                 self.assertIn(assignments.get(identity), (None, job.split))
                 assignments[identity] = job.split
 
+    def test_train_order_weights_scale_only_the_train_split(self):
+        """Weighted orders get more train groups; validation/test stay balanced; counts agree."""
+        config = GeneratorConfig(orders=(1, 2, 4), groups_per_split=(4, 2, 2), initial_conditions_per_group=1,
+                                 train_order_weights=(0.5, 1, 1.5))
+        jobs = list(iter_jobs(config))
+        self.assertEqual(len(jobs), config.trajectory_count)
+        count = lambda split, order: sum(job.split == split and job.equation.order == order for job in jobs)
+        self.assertEqual([count("train", order) for order in (1, 2, 4)], [4, 8, 12])  # 2 families each
+        self.assertEqual({count(split, order) for split in ("validation", "test") for order in (1, 2, 4)}, {4})
+        self.assertEqual(GeneratorConfig.from_dict(asdict(config)), config)
+        self.assertEqual(GeneratorConfig.from_dict({**asdict(GeneratorConfig()), "train_order_weights": None}),
+                         GeneratorConfig())
+        for bad in ((1, 1), (1, 0, 1), (1, 1, 0.01)):
+            with self.assertRaises(ValueError):
+                replace(config, train_order_weights=bad)
+
     def test_failed_jobs_recorded_and_existing_output_preserved(self):
         """Verify every failed request is recorded and existing output is protected."""
         config = GeneratorConfig(

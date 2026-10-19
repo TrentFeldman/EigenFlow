@@ -1,0 +1,15 @@
+{
+  "equation": {
+    "coefficients": [
+      0.0048,
+      0.16
+    ],
+    "initial_state": [
+      20.0,
+      -1.6
+    ],
+    "amplitude": 0.0,
+    "frequency": 0.0,
+    "phase": 0.0
+  }
+}

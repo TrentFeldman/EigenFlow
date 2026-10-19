@@ -12,18 +12,18 @@
     "linear_sinusoidal"
   ],
   "groups_per_split": [
-    20000,
-    2000,
-    2000
+    21480,
+    2150,
+    2150
   ],
   "initial_conditions_per_group": 4,
   "decay_range": [
     0.01,
-    1.5
+    3.0
   ],
   "frequency_range": [
-    0.5,
-    4.0
+    0.25,
+    8.0
   ],
   "initial_state_range": [
     -1.0,
@@ -34,7 +34,7 @@
     1.0
   ],
   "t_start": 0.0,
-  "t_stop": 5.0,
+  "t_stop": 10.0,
   "time_points": 101,
   "method": "DOP853",
   "rtol": 1e-10,

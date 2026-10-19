@@ -165,7 +165,7 @@ def main(argv=None):
               "dataset_manifest_sha256": manifest_hash, "device": args.device,
               "test_evaluated": "test" in args.splits, "splits": {}}
     for split in args.splits:
-        dataset = TrajectoryDataset(args.data, split, predictor.model.max_order)
+        dataset = TrajectoryDataset(args.data, split, predictor.model.max_order, allow_failures=True)
         report["splits"][split] = evaluate_model(predictor.model, predictor.normalizer, dataset,
                                                  predictor.device, args.batch_size)
     args.output.parent.mkdir(parents=True, exist_ok=True)

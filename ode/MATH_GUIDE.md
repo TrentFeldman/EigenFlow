@@ -4,7 +4,7 @@ This guide assumes Python knowledge, not prior differential-equation coursework.
 
 ## What are we predicting?
 
-An ordinary differential equation (ODE) relates a quantity to how it changes over one independent variable, here time. We write the quantity as `y(t)`. A prime means a time derivative: `y'` is the rate of change of `y`, and `y''` is the rate of change of `y'`. For position, these would be velocity and acceleration. Our initial dataset uses nondimensional values, so do not assume meters or seconds.
+An ordinary differential equation (ODE) relates a quantity to how it changes over one independent variable, here time. We write the quantity as `y(t)`. A prime means a time derivative: `y'` is the rate of change of `y`, and `y''` is the rate of change of `y'`. For position, these would be velocity and acceleration. All values are nondimensional, so do not assume meters or seconds.
 
 The **order** is the highest derivative in the equation. A second-order equation needs two starting values, `y(0)` and `y'(0)`. A third-order equation needs three, adding `y''(0)`. An order-n equation needs n starting values. Order is different from the numerical solver's accuracy order or the neural network's depth.
 
@@ -18,7 +18,7 @@ We store `state = [y, y']`. Rearranging the equation gives `y'' = -2*y - 3*y'`. 
 
 `state_derivative = [state[1], -2*state[0] - 3*state[1]]`
 
-This is the job of `LinearODE.rhs`. `rhs` means “right-hand side” of the first-order state equation. The coefficients in our code are `(2, 3)`, in increasing derivative order.
+This is the job of `LinearODE.rhs`. `rhs` means "right-hand side" of the first-order state equation. The coefficients in our code are `(2, 3)`, in increasing derivative order.
 
 For `y''' + 6*y'' + 11*y' + 6*y = 0`, the state is `[y, y', y'']`, coefficients are `(6, 11, 6)`, and its derivative is `[y', y'', -6*y - 11*y' - 6*y'']`. The same shift-and-combine rule extends to higher orders without a separate solver for each one.
 
@@ -26,9 +26,9 @@ For `y''' + 6*y'' + 11*y' + 6*y = 0`, the state is `[y, y', y'']`, coefficients 
 
 Forcing is an external input driving the system. We currently support `amplitude * sin(frequency * elapsed_time + phase)`. Amplitude controls strength; frequency controls oscillation rate in radians per nondimensional time unit; phase controls where the cycle begins. Amplitude zero means no forcing, also called a homogeneous equation.
 
-We sample coefficients by first choosing decaying modes and then multiplying their polynomial factors. A mode describes a basic exponential decay or damped oscillation in the solution. This biases the first experiments toward stable unforced systems. It does not cover every stable system or guarantee small intermediate values. Higher order, widely separated time scales and large coefficients can make numerical solving difficult even when the unforced solution eventually decays.
+We sample coefficients by first choosing decaying modes and then multiplying their polynomial factors. A mode describes a basic exponential decay or damped oscillation in the solution. This biases the data toward stable unforced systems. It does not cover every stable system or guarantee small intermediate values. Higher order, widely separated time scales and large coefficients can make numerical solving difficult even when the unforced solution eventually decays.
 
-## What does “accurate reference” mean?
+## What does "accurate reference" mean?
 
 The numerical trajectory is the answer we train against. `rtol` is a relative local-error tolerance and `atol` is an absolute tolerance for values near zero. Smaller settings request tighter numerical control; they are not guarantees of a global trajectory error.
 
@@ -36,7 +36,7 @@ Each trajectory is solved twice, with the second solve using tighter tolerances.
 
 Each trajectory is also checked at selected times using a matrix exponential: a separate way to evolve a constant linear system directly, rather than taking adaptive steps. Sine forcing becomes two extra internal states, sine and cosine, so this approach checks both homogeneous and nonhomogeneous equations, including resonance. Its pointwise allowance is `reference_atol + reference_rtol * abs(reference component)`. This is a floating-point numerical check, not symbolic exact arithmetic or a proof between the selected times. See [SciPy's matrix-exponential documentation](https://docs.scipy.org/doc/scipy/reference/generated/scipy.linalg.expm.html).
 
-Before any dataset is written, `validate_reference.py` compares both numerical approaches with derivatives of explicit closed-form solutions. The current example passes 13 small cases covering distinct/repeated roots, damped oscillations, orders 2/3/6 and resonant forcing. These checks validate those cases; they do not certify every coefficient range or the neural model's accuracy.
+Before any dataset is written, `validate_reference.py` compares both numerical approaches with derivatives of explicit closed-form solutions. The default configuration passes 13 small cases covering distinct/repeated roots, damped oscillations, orders 2/3/6 and resonant forcing. These checks validate those cases; they do not certify every coefficient range or the neural model's accuracy.
 
 The default DOP853 method is intended for high-accuracy non-stiff problems. A stiff problem has time scales so different that an explicit solver may need extremely small steps; Radau or BDF are configurable alternatives. See [SciPy's method and tolerance descriptions](https://docs.scipy.org/doc/scipy/reference/generated/scipy.integrate.solve_ivp.html).
 
@@ -48,12 +48,11 @@ The model receives padded coefficients, padded initial values, that mask, forcin
 
 Normalization rescales values using means and standard deviations measured on training data only. The checkpoint stores these values so inference uses exactly the same scaling. Per-example loss is averaged over real derivatives, preventing higher-order examples from automatically receiving more weight.
 
-Supporting an order in the input format does not mean the model learned it. A model trained only on orders 2 and 3 has no demonstrated accuracy on order 4. Generalization across parameters, initial conditions, equation families and orders are separate questions that require separate held-out evaluations.
+Supporting an order in the input format does not mean the model learned it. A model has no demonstrated accuracy on orders it was not trained on. Generalization across parameters, initial conditions, equation families and orders are separate questions that require separate held-out evaluations.
 
 ## Why keep full trajectories together?
 
-Randomly assigning individual time points to train and test would expose nearly the same curve during training and evaluation. That can make apparent accuracy misleading. We assign whole equation-parameter groups to a split first; all their initial-condition trajectories stay there. Current partitions are a joint holdout of parameters and initial states. The pilot additionally crosses validation parameters with training ICs, and training parameters with validation ICs, to diagnose each source of generalization error. These diagnostics deliberately share one identity with training and never use test identities.
-
+Randomly assigning individual time points to train and test would expose nearly the same curve during training and evaluation. That can make apparent accuracy misleading. We assign whole equation-parameter groups to a split first; all their initial-condition trajectories stay there. Splits hold out both equation parameters and initial states.
 
 ## The frozen neural error metric
 
@@ -74,5 +73,22 @@ and floored relative error 0.2. Interpret the absolute error for such cases.
 Average per-trajectory errors with equal weights; never combine all trajectories
 into one norm. Report tails and failures as well as the mean. A nonfinite
 prediction prevents passing, and the report labels finite-only summaries.
-The <5% release target applies to the reserved joint test split, while validation
-chooses checkpoints. Standardized training MSE is a different quantity.
+Validation chooses checkpoints; the test split is kept for final scoring. Standardized training MSE is a different quantity.
+
+## Real roots, repeated roots and other equation types
+
+The sampler builds equations from damped oscillating root pairs, plus one
+negative real root for odd orders. The solver handles any constant-coefficient
+equation, but the model has not been trained on all-real or repeated roots.
+
+A double root `lambda` gives `y(t) = (C1 + C2*t) * exp(lambda*t)`; a root of
+multiplicity m multiplies `exp(lambda*t)` by a polynomial of degree m-1. For
+example `y'' + 3*y' + 2*y = 0` (roots -1, -2) gives `C1*exp(-t) + C2*exp(-2*t)`,
+and `y'' + 2*y' + y = 0` (root -1 twice) gives `(C1 + C2*t)*exp(-t)`.
+
+Euler-Cauchy equations, `x^2*y'' + a*x*y' + b*y = f(x)` with `x > 0`, become
+constant-coefficient ones with `s = ln(x)` and `u(s) = y(exp(s))`:
+`u'' + (a - 1)*u' + b*u = f(exp(s))`. The code does not do this transformation.
+
+Forcing other than one sine wave (polynomials, exponentials, sums) would need
+changes to both the forcing calculation and the model inputs.

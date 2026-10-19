@@ -1,6 +1,8 @@
 # Tested scientific stack, Python 3.14.8 (recorded in .python-version).
-# Install torch separately for the host; see ENVIRONMENT.md.
+# Install torch separately for the host; see ode/README.md.
 numpy==2.5.2
 scipy==1.18.1
+# Only `python -m ode video` uses Pillow (it also needs the ffmpeg program).
+pillow==12.3.0
 # Public version pin accepts the matching CUDA/ROCm local build suffix.
 torch==2.14.1

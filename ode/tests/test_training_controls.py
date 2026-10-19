@@ -6,6 +6,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from types import SimpleNamespace
 import json
+import shutil
 import unittest
 from unittest.mock import patch
 
@@ -15,6 +16,7 @@ import torch
 from ode.config import GeneratorConfig
 from ode.generation.generate_data import generate
 from ode.tools.neurons import main as neurons_main
+from ode.tools.video import main as video_main
 from ode.training.dataset import Normalizer, TrajectoryDataset, feature_width
 from ode.training.model import OrderConditionedMLP, masked_mse
 from ode.training.train import (RELATIVE_LOSS_FLOOR, TensorLoader, build_scheduler, main, parse_args,
@@ -151,6 +153,10 @@ class TrainingControlTests(unittest.TestCase):
             with redirect_stdout(StringIO()):
                 neurons_main(['--run', str(root / 'snap'), '--input', str(equation)])
             self.assertIn('Watching a neural network learn', (root / 'snap' / 'neurons.html').read_text())
+            if shutil.which('ffmpeg'):
+                with redirect_stdout(StringIO()):
+                    video_main(['--run', str(root / 'snap'), '--input', str(equation)])
+                self.assertGreater((root / 'snap' / 'training.mp4').stat().st_size, 0)
 
             # The hard-case sampler's weights live in last.pt, so resuming stays exact with it on.
             focused = [*common, '--loss', 'relative', '--focus-hard']

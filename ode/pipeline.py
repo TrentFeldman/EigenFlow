@@ -3,7 +3,7 @@
     python -m ode pipeline --name 20261017-pilot-02 --preset pilot --epochs 300
 
 Stages run in order. A stage whose output already exists is skipped, so
-rerunning the exact same command after a crash, Ctrl-C or a SLURM time limit
+rerunning the exact same command after a crash, Ctrl-C or a job time limit
 continues where the last attempt stopped:
 
   1. generate  ode/data/<preset>-<count>/         solve the ODEs (shared by runs)
@@ -43,7 +43,7 @@ def main(argv=None):
     parser.add_argument("--name", required=True, help="Run folder under ode/runs/, e.g. 20261017-pilot-02")
     parser.add_argument("--preset", default="pilot",
                         help="small (384 equations), pilot (6,656), full (100,032), wide (480,000, wider "
-                             "damping/frequency), final (768,000, orders 1-4), or a generator JSON path")
+                             "damping/frequency), final (824,960, orders 1-4, decay to 3, frequency 0.25-8, times 0-10), or a generator JSON path")
     parser.add_argument("--data", type=Path, help="Dataset folder to create or reuse; default ode/data/<preset>-<count>")
     args, train_args = parser.parse_known_args(argv)
 

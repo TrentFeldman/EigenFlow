@@ -6,5 +6,5 @@ inputs -> trained network), evaluation/ (metrics, charts, prediction), with
 config.py (scientific recipe) and resources.py (hardware settings) shared by all.
 Symbols: T time points, M max_order (padding width), B batch size, n equation
 order; state = [y, y', ..., y^(n-1)]. All values are nondimensional. See
-docs/MATH_GUIDE.md for the math and README.md for usage.
+MATH_GUIDE.md for the math and README.md for usage.
 """

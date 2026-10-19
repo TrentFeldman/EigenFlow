@@ -181,7 +181,7 @@ def main(argv=None):
     manifest_hash = sha256((args.data/'manifest.json').read_bytes()).hexdigest()
     if manifest_hash != predictor.checkpoint.get('dataset_manifest_sha256'):
         raise ValueError('Diagnostic dataset must match the training manifest')
-    dataset = TrajectoryDataset(args.data, args.split, predictor.model.max_order)
+    dataset = TrajectoryDataset(args.data, args.split, predictor.model.max_order, allow_failures=True)
     report = {'checkpoint_sha256': sha256(args.checkpoint.read_bytes()).hexdigest(),
               'dataset_manifest_sha256': manifest_hash, 'metric': METRIC,
               **provenance(('numpy', 'scipy', 'torch')),

@@ -297,7 +297,7 @@ def main(argv=None):
         raise ValueError('Plot checkpoint/dataset does not match evaluation')
     torch.set_num_threads(4)
     predictor = Predictor(checkpoint)
-    dataset = TrajectoryDataset(data, args.split, predictor.model.max_order)
+    dataset = TrajectoryDataset(data, args.split, predictor.model.max_order, allow_failures=True)
     split_report = report['splits'][args.split]
     output.mkdir(parents=True, exist_ok=False)
     (output / 'summary.svg').write_text(summary_svg(split_report, args.split))

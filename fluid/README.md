@@ -1,15 +1,15 @@
-# Fluid prototype blueprint
+# Fluid prototype
 
 Status: deferred implementation until the October ODE release. Target: working demo December 4 and evaluated release December 11, 2026.
 
-Scope: two-dimensional incompressible flow, periodic boundaries, initial 64×64 grid, configurable viscosity and initial velocity fields. Domain size, discretization, time step, viscosity bounds and validation tolerances remain open scientific decisions.
+Scope: two-dimensional incompressible flow, periodic boundaries, initial 64x64 grid, configurable viscosity and initial velocity fields. Domain size, discretization, time step, viscosity bounds and validation tolerances remain open scientific decisions.
 
 ## Reserved files
 
 | Documentation-only file | Future responsibility |
 |---|---|
-| `solver.py` | Numerical Navier–Stokes reference solver |
-| `validate_solver.py` | Taylor–Green or benchmark validation and refinement studies |
+| `solver.py` | Numerical Navier-Stokes reference solver |
+| `validate_solver.py` | Taylor-Green or benchmark validation and refinement studies |
 | `generate_data.py` | Trajectories, provenance and grouped partitions |
 | `dataset.py` | Field loading, time-step pairs and training-only preprocessing |
 | `model.py` | Initial U-Net-style single-step predictor |
@@ -22,8 +22,6 @@ Scope: two-dimensional incompressible flow, periodic boundaries, initial 64×64 
 | `tests/test_rollout.py` | Future horizon, stability and saved-model checks |
 
 `configs/`, ignored `data/` and `runs/` reserve settings, generated fields and run artifacts, respectively.
-
-Each Python placeholder now explains its intended role for both collaborators. Future implementation must define mathematical terms, grid/tensor shapes, units, assumptions and the reasons for numerical choices as required by root `AGENTS.md`.
 
 ## Stage gates
 

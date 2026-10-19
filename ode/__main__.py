@@ -3,7 +3,7 @@
 Each command forwards its options to one module's own CLI, so
 `python -m ode train --help` shows every training option. `pipeline` chains
 generate -> train -> evaluate -> plot and is safe to rerun after a crash or a
-SLURM time limit: finished stages are skipped and training resumes.
+job time limit: finished stages are skipped and training resumes.
 """
 
 from importlib import import_module
@@ -22,6 +22,7 @@ COMMANDS = {
     "predict": ("evaluation.predict", "Predict one equation from a JSON request"),
     "runs": ("tools.runs", "List trained runs and datasets with their scores and sizes"),
     "neurons": ("tools.neurons", "Animate the neurons changing during training (needs --snapshot-every)"),
+    "video": ("tools.video", "Render the neurons-learning animation as an MP4 (needs --snapshot-every, ffmpeg)"),
     "check": ("tools.check_environment", "Report Python, packages and GPU visibility"),
     "benchmark": ("tools.benchmark", "Time generation or inference on this machine"),
 }
