@@ -217,10 +217,10 @@ def main(argv=None):
     with tempfile.TemporaryDirectory() as folder:
         rendered = {}
         for index, key in enumerate(plan):
-            if key not in rendered:  # repeated frames are drawn once and linked
+            if key not in rendered:  # repeated frames are drawn once and hard-linked (symlinks need admin on Windows)
                 rendered[key] = Path(folder) / f"f{len(rendered):05d}.png"
                 frame(*key).resize(OUTPUT, Image.Resampling.LANCZOS).save(rendered[key])
-            (Path(folder) / f"seq{index:05d}.png").symlink_to(rendered[key])
+            (Path(folder) / f"seq{index:05d}.png").hardlink_to(rendered[key])
         output.parent.mkdir(parents=True, exist_ok=True)
         subprocess.run(["ffmpeg", "-y", "-loglevel", "error", "-framerate", str(FPS), "-i", f"{folder}/seq%05d.png",
                         "-c:v", "libx264", "-pix_fmt", "yuv420p", "-crf", "20", str(output)], check=True)

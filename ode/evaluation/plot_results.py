@@ -367,7 +367,7 @@ def main(argv=None):
                          'times': times, 'exact': exact[:, 0], 'predicted': predicted[:, 0]})
     title = args.title or f"{args.run.name}: how close the network gets to the exact answer"
     output.parent.mkdir(parents=True, exist_ok=True)
-    with output.open('x') as handle:
+    with output.open('x', encoding='utf-8') as handle:
         handle.write(report_svg(split_report, run['epochs'], examples, title))
     print(f"wrote {output}")
     return 0

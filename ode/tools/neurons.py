@@ -86,7 +86,7 @@ def main(argv=None):
             "exact": np.round(linear_reference(equation, times)[shown], 5).tolist(),
             "predicted": [np.round(p[shown], 5).tolist() for p in predictions]}
     output.parent.mkdir(parents=True, exist_ok=True)
-    output.write_text(PAGE.replace("__DATA__", json.dumps(data)))
+    output.write_text(PAGE.replace("__DATA__", json.dumps(data)), encoding="utf-8")
     print(f"wrote {output} ({output.stat().st_size / 1e6:.1f} MB, {len(epochs)} snapshots): open it in a browser")
     return 0
 

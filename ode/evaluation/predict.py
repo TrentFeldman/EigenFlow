@@ -226,9 +226,9 @@ def main(argv=None):
     exact = linear_reference(equation, times)
     error = trajectory_metrics(exact, states)["relative_l2"]
     if args.csv:
-        names = [f"y{'′' * k}" for k in range(equation.order)]
+        names = [f"y{chr(39) * k}" for k in range(equation.order)]  # ASCII y' so Excel reads the header
         args.csv.parent.mkdir(parents=True, exist_ok=True)
-        np.savetxt(args.csv, np.column_stack([times, exact, states]), delimiter=",", comments="",
+        np.savetxt(args.csv, np.column_stack([times, exact, states]), delimiter=",", comments="", encoding="utf-8",
                    header=",".join(["time", *(f"exact {n}" for n in names), *(f"predicted {n}" for n in names)]))
         print(f"wrote {args.csv}")
     if args.output:
@@ -251,7 +251,7 @@ def main(argv=None):
             subtitle.append("Outside what the model was trained on: " + "; ".join(violations))
         title = f"Your equation: {_family_name(equation.order, equation.family)} — off by {error:.1%}"
         args.plot.parent.mkdir(parents=True, exist_ok=True)
-        args.plot.write_text(trajectory_svg(times, exact, states, title, subtitle))
+        args.plot.write_text(trajectory_svg(times, exact, states, title, subtitle), encoding="utf-8")
         print(f"wrote {args.plot}: model is off by {error:.2%} from the exact answer")
     return 0
 

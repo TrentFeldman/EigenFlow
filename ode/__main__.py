@@ -31,6 +31,9 @@ COMMANDS = {
 def main(argv=None):
     """Dispatch to a command's main(); print the command list on misuse."""
     argv = sys.argv[1:] if argv is None else argv
+    # Windows pipes default to cp1252, which cannot print the y′ and — used in output.
+    for stream in (sys.stdout, sys.stderr):
+        stream.reconfigure(encoding="utf-8", errors="replace")
     if not argv or argv[0] not in COMMANDS:
         print("usage: python -m ode <command> [options]   (add --help after a command)\n")
         for name, (_, description) in COMMANDS.items():

@@ -8,6 +8,7 @@ The CLI prints a plan unless --train requests execution with data/run paths.
 import argparse
 from dataclasses import asdict, replace
 from hashlib import sha256
+from importlib.util import find_spec
 import json
 import math
 import os
@@ -739,6 +740,9 @@ def main(argv=None) -> int:
     optimizer = torch.optim.AdamW(model.parameters(), lr=args.learning_rate, weight_decay=args.weight_decay,
                                   fused=device.type == "cuda")
     # reduce-overhead replays recorded CUDA graphs, removing most per-step launch cost.
+    if args.compile and device.type == "cuda" and find_spec("triton") is None:
+        print("--compile needs the triton package (not available on Windows); training without it")
+        args.compile = False
     compiled = torch.compile(model, mode="reduce-overhead") if args.compile and device.type == "cuda" else None
     scheduler = build_scheduler(optimizer, args)
     loaders = _build_loaders(training, validation, args, device, args.training_seed)
