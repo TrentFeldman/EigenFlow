@@ -9,7 +9,7 @@ continues where the last attempt stopped:
   1. generate  ode/data/<preset>-<count>/         solve the ODEs (shared by runs)
   2. train     ode/runs/<name>/best.pt, run.json   resumes from last.pt
   3. evaluate  ode/runs/<name>/evaluation.json     validation splits only
-  4. plot      ode/runs/<name>/plots/*.svg
+  4. plot      ode/runs/<name>/report.svg
 
 The test split is never scored here; it stays sealed for the final release.
 Options this command does not know are passed to `train` unchanged (see
@@ -91,15 +91,15 @@ def main(argv=None):
                   "--output", str(run / "evaluation.json"),
                   "--device", "cuda" if torch.cuda.is_available() else "cpu"])
 
-    if (run / "plots").exists():
-        _stage(4, "plot", "plots/ exists")
+    if (run / "report.svg").exists():
+        _stage(4, "plot", "report.svg exists")
     elif _stage(4, "plot"):
-        plot(["--run", str(run), "--data", str(data)])
+        plot(["--run", str(run)])
 
     report = json.loads(run_record.read_text())
     print(f"\nDone. Best validation error {report['best_validation_relative_l2']:.2%} at epoch "
           f"{report['best_epoch']} of {len(report['epochs'])}.\n"
-          f"  model:  {run / 'best.pt'}\n  scores: {run / 'evaluation.json'}\n  charts: {run / 'plots'}/summary.svg")
+          f"  model:  {run / 'best.pt'}\n  scores: {run / 'evaluation.json'}\n  chart:  {run / 'report.svg'}")
     return 0
 
 

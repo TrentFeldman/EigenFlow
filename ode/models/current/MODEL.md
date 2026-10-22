@@ -6,6 +6,8 @@ SHA-256 `4aa0cca3a9f6282644bdb68d3d023c87385efd800adfc88f29c3dc9e0e33b04e`.
 
 ## Accuracy (validation split, 40,000 equations held out from training)
 
+Chart (open in a browser): [report.svg](report.svg).
+
 Metric: relative L2 error of the whole trajectory, `trajectory-rms-v1` (defined in `ode/README.md`).
 **The sealed test split has not been scored for this model.**
 

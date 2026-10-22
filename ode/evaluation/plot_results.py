@@ -1,18 +1,19 @@
-"""Draw charts of a finished run that someone outside the project can read.
+"""Draw one chart of a finished run that someone outside the project can read.
 
-Writes standalone SVG files (open them in any browser) into <run>/plots/:
+Writes report.svg (open it in any browser) into the run folder:
 
-- summary.svg: how far off the predictions are, per equation type, and how
-  many validation equations land in each error range.
-- training.svg: validation error after every epoch, so you can see whether
-  training was still improving when it stopped.
-- example-*.svg: individual equations (the typical case of each type and the
-  worst few), exact solution and prediction drawn on top of each other.
+- the headline: average error, and what half, 95% and the worst of the
+  validation equations stay under;
+- three validation equations (typical, 1-in-100 and worst) with the exact
+  answer and the prediction drawn on top of each other;
+- average error per equation type (rows: order, columns: forcing), so it
+  works for any number of orders;
+- validation error after every epoch, to show whether training had finished.
 
-Needs only NumPy and the standard library. Inputs come from files the other
-stages already wrote: best.pt, run.json and evaluation.json in the run folder.
-Every chart has a plain-English title, a "how to read this" line, labelled
-axes and hover tooltips. Light and dark themes follow the viewer's setting.
+Needs only NumPy and the standard library, plus the files the other stages
+already wrote: best.pt, run.json and evaluation.json. No dataset is needed:
+the three example equations are rebuilt from their seeds and solved exactly.
+Light and dark themes follow the viewer's setting; every mark has a tooltip.
 """
 
 import argparse
@@ -21,11 +22,16 @@ from html import escape
 import json
 from pathlib import Path
 
+import re
+
 import numpy as np
 import torch
 
-from ..training.dataset import TrajectoryDataset
+from ..config import FAMILIES, SPLITS, GeneratorConfig
+from ..generation.analytic import linear_reference
 from ..generation.equations import LinearODE
+from ..generation.generate_data import _group_jobs
+from .evaluate import trajectory_metrics
 from .predict import Predictor
 
 
@@ -42,18 +48,21 @@ DARK = {**LIGHT, "surface": "#1a1a19", "ink": "#f0efec", "ink2": "#c3c2b7", "gri
 def _colour_rules(colours):
     """CSS rules: .<name>-fill / .<name>-line plus text, tick, grid and axis ink."""
     rules = [f".{name}-fill {{ fill: {value}; }} .{name}-line {{ stroke: {value}; }}" for name, value in colours.items()]
-    rules += [f"text {{ fill: {colours['ink2']}; }} .title, .label {{ fill: {colours['ink']}; }}",
+    rules += [f"text {{ fill: {colours['ink2']}; }} .title, .label, .section, .hero, .stat {{ fill: {colours['ink']}; }}",
               f".tick {{ fill: {colours['muted']}; }} .grid {{ stroke: {colours['grid']}; }}",
               f".axis {{ stroke: {colours['axis']}; }}"]
     return "\n".join(rules)
 
 
 STYLE = f"""<style>
-text {{ font-family: system-ui, -apple-system, 'Segoe UI', sans-serif; font-size: 12px; }}
+text {{ font-family: system-ui, -apple-system, 'Segoe UI', sans-serif; font-size: 13px; }}
 .title {{ font-size: 18px; font-weight: 600; }}
 .note {{ font-size: 13px; }}
 .tick {{ font-size: 11px; font-variant-numeric: tabular-nums; }}
 .label {{ font-weight: 600; }}
+.section {{ font-size: 15px; font-weight: 600; }}
+.hero {{ font-size: 52px; font-weight: 600; }}
+.stat {{ font-size: 28px; font-weight: 600; }}
 {_colour_rules(LIGHT)}
 @media (prefers-color-scheme: dark) {{
 {_colour_rules(DARK)}
@@ -91,7 +100,8 @@ def _ticks(lower, upper, count=5):
     step = (upper - lower) / max(count - 1, 1) or 1.0
     magnitude = 10 ** np.floor(np.log10(step))
     step = min((m * magnitude for m in (1, 2, 2.5, 5, 10) if m * magnitude >= step), default=step)
-    return np.arange(np.ceil(lower / step) * step, upper + step * 1e-9, step)
+    ticks = np.arange(np.ceil(lower / step) * step, upper + step * 1e-9, step)
+    return np.where(np.abs(ticks) < step * 1e-6, 0.0, ticks)  # no '-5.4e-20' for zero
 
 
 def _svg(width, height, body):
@@ -185,148 +195,181 @@ def trajectory_svg(times, reference, prediction, title, subtitle):
     return _svg(1110, height, body)
 
 
-def training_svg(epochs):
-    """Return an SVG of validation error (%) after each epoch, on a log scale.
-
-    epochs is run.json's list of per-epoch dicts with 'epoch' and
-    'validation_relative_l2' (a fraction). The best epoch is marked.
-    """
-    numbers = np.array([row["epoch"] for row in epochs], dtype=float)
-    errors = np.array([row["validation_relative_l2"] for row in epochs]) * 100
-    best = int(np.argmin(errors))
-    body = ['<text class="title" x="32" y="34">How the model improved during training</text>',
-            '<text class="note" x="32" y="58">Average prediction error on validation equations '
-            '(held back from training) after each epoch — one full pass over the training data.</text>',
-            '<text class="note" x="32" y="77">Lower is better. A line that is still falling at the right '
-            'edge means more epochs would likely help.</text>',
-            f'<text class="label" x="32" y="100">● Best: {errors[best]:.2f}% at epoch {numbers[best]:g} '
-            '(those weights are saved as best.pt)</text>']
-    x_range = (numbers[0], numbers[-1]) if len(numbers) > 1 else (numbers[0] - 1, numbers[0] + 1)
-    x, y = _panel(body, (80, 140, 860, 280), x_range, (errors.min() * 0.8, errors.max() * 1.2),
-                  "epoch", "validation error (log scale)", percent_log=True)
-    body.append(_polyline(x(numbers), y(errors), "exact", tooltip="validation error after each epoch"))
-    body.append(f'<circle cx="{x(numbers[best]):.1f}" cy="{y(errors[best]):.1f}" r="5" class="exact-fill surface-line" '
-                f'stroke-width="2"><title>best epoch {numbers[best]:g}: {errors[best]:.2f}%</title></circle>')
-    return _svg(980, 480, body)
+def _percent(fraction):
+    """0.0023 -> '0.23%', 0.076 -> '7.6%', 0.31 -> '31%': two significant-ish digits."""
+    value = fraction * 100
+    return f"{value:.0f}%" if value >= 10 else f"{value:.1f}%" if value >= 1 else f"{value:.2f}%"
 
 
-def summary_svg(split_report, split_name):
-    """Return an SVG with error per equation type and the error histogram.
+def _families(by_family):
+    """by_family keys 'order<n>/<family>' -> sorted orders, families and {(order, family): stats}."""
+    cells = {}
+    for key, item in by_family.items():
+        order, family = key.removeprefix("order").split("/")
+        cells[int(order), family] = item
+    orders = sorted({order for order, _ in cells})
+    families = [family for family in FAMILIES if any(f == family for _, f in cells)]
+    return orders, families, cells
 
-    split_report is one split from evaluation.json: 'overall', 'by_family'
-    (keys 'order<n>/<family>') and 'trajectories' with 'relative_l2' fractions.
+
+def report_svg(split_report, epochs, examples, title):
+    """Return the one-page SVG report for a run.
+
+    split_report: one split from evaluation.json ('overall', 'by_family',
+    'trajectories' with 'relative_l2' fractions). epochs: run.json's list with
+    'epoch' and 'validation_relative_l2'. examples: dicts with 'label',
+    'error' (fraction), 'kind', 'equation', 'times', 'exact' and 'predicted'
+    (the solution y only), plus optional 'note' lines shown under the plot. Any number of orders and forcing types fits.
     """
     overall = split_report["overall"]
     values = np.array([row["relative_l2"] for row in split_report["trajectories"]
-                       if row["relative_l2"] is not None]) * 100
-    threshold = 5.0
-    within = float(np.mean(values < threshold) * 100)
-    mean = "n/a" if overall["mean"] is None else f"{overall['mean']:.1%}"
-    body = [f'<text class="title" x="32" y="34">On {overall["count"]:,} equations it never trained on, the '
-            f'prediction is off by {mean} on average</text>',
-            f'<text class="note" x="32" y="58">{within:.0f}% of them are within {threshold:g}% of the exact '
-            f'answer. Error = size of the miss relative to the size of the solution ({escape(split_name)} split).</text>']
-    # Left: average error per equation type, one colour (one series).
-    families = sorted(split_report["by_family"].items())
-    left, top, bar_width = 260, 120, 300
-    largest = max(max(item["mean"] or 0 for _, item in families), 1e-9) * 100
-    body.append('<text class="label" x="32" y="104">Average error by type of equation</text>')
-    for i, (key, item) in enumerate(families):
-        order, family = key.removeprefix("order").split("/")
-        row_y = top + i * 54
-        length = item["mean"] * 100 / largest * bar_width if item["mean"] is not None else 0
-        body.append(f'<text x="{left - 10}" y="{row_y + 15}" text-anchor="end">'
-                    f'{escape(_family_name(int(order), family))}</text>')
-        body.append(f'<rect x="{left}" y="{row_y}" width="{max(length, 1):.1f}" height="20" rx="4" '
-                    f'class="exact-fill"><title>{item["count"]} equations: average {item["mean"]:.2%}, '
-                    f'typical {item["median"]:.2%}, 95% below {item["p95"]:.2%}, worst {item["worst"]:.2%}'
-                    f'</title></rect>')
-        body.append(f'<text class="label" x="{left + length + 8:.1f}" y="{row_y + 15}">{item["mean"]:.1%}'
-                    f'<tspan class="tick" dx="8">95% under {item["p95"]:.1%}</tspan></text>')
-    # Right: histogram of per-equation errors with the 5% line.
-    edges = [0, 0.5, 1, 2, 3, 5, 10, 20, float("inf")]
-    counts = [int(np.sum((values >= a) & (values < b))) for a, b in zip(edges, edges[1:])]
-    hx, htop, hwidth, hheight = 700, 120, 420, 210
-    body.append('<text class="label" x="700" y="104">How many equations fall in each error range</text>')
-    slot = hwidth / len(counts)
-    for i, count in enumerate(counts):
-        bar_height = count / max(max(counts), 1) * hheight
-        name = f"{edges[i]:g}–{edges[i + 1]:g}%" if edges[i + 1] != float("inf") else f"over {edges[i]:g}%"
-        color = "bad" if edges[i] >= threshold else "exact"
-        body.append(f'<rect x="{hx + i * slot + 1:.1f}" y="{htop + hheight - bar_height:.1f}" width="{slot - 2:.1f}" '
-                    f'height="{max(bar_height, 0.5):.1f}" rx="2" class="{color}-fill">'
-                    f'<title>{count} equations with error {name}</title></rect>')
-        body.append(f'<text class="tick" x="{hx + (i + 0.5) * slot:.1f}" y="{htop + hheight + 16}" '
-                    f'text-anchor="middle">{name.replace("over ", "&gt;")}</text>')
-        body.append(f'<text x="{hx + (i + 0.5) * slot:.1f}" y="{htop + hheight - bar_height - 6:.1f}" '
-                    f'text-anchor="middle">{count}</text>')
-    body.append(f'<line class="axis" x1="{hx}" x2="{hx + hwidth}" y1="{htop + hheight}" y2="{htop + hheight}"/>')
-    body.append(f'<text class="note" x="{hx}" y="{htop + hheight + 40}">Red bars: off by {threshold:g}% or more '
-                f'({100 - within:.0f}% of equations). Fewer is better.</text>')
-    return _svg(1160, 400, body)
+                       if row["relative_l2"] is not None])
+    orders, families, cells = _families(split_report["by_family"])
+    order_names = [ORDINALS.get(order, f"{order}th") for order in orders]
+    span = order_names[0] if len(orders) == 1 else f"{order_names[0]}- to {order_names[-1]}"
+    over = int(np.sum(values >= 0.05))
+    body = [f'<text class="title" x="32" y="38">{escape(title)}</text>',
+            f'<text class="note" x="32" y="62">Tested on {overall["count"]:,} equations it never saw while '
+            f'training: {span}-order linear ODEs, '
+            f'{" or ".join(FAMILY_NAMES[f] for f in families)}.</text>']
+
+    # Headline: one hero number, three supporting tiles.
+    tiles = [("half of the equations are under", overall["median"], None),
+             ("95% of the equations are under", overall["p95"], None),
+             ("worst single equation", overall["worst"],
+              f"{over:,} of {overall['count']:,} are off by 5% or more")]
+    body += ['<text x="32" y="104">average error</text>',
+             f'<text class="hero" x="32" y="156">{_percent(overall["mean"])}</text>']
+    for i, (label, value, extra) in enumerate(tiles):
+        x = 300 + i * 240
+        body += [f'<text x="{x}" y="104">{label}</text>',
+                 f'<text class="stat" x="{x}" y="140">{_percent(value)}</text>']
+        if extra:
+            body.append(f'<text class="tick" x="{x}" y="162">{extra}</text>')
+    body.append('<text class="note" x="32" y="196">Error = how far the prediction is from the exact answer, '
+                'compared with the size of the answer. 1% means the two curves differ by about '
+                'a hundredth of their height.</text>')
+
+    # Proof: three equations, exact vs predicted.
+    body += ['<text class="section" x="32" y="246">What that looks like on three of the test equations</text>',
+             '<line x1="720" x2="748" y1="242" y2="242" class="exact-line" stroke-width="2"/>',
+             '<text x="754" y="246">exact answer (numerical solver)</text>',
+             '<line x1="958" x2="986" y1="242" y2="242" class="model-line" stroke-width="2" stroke-dasharray="7 4"/>',
+             '<text x="992" y="246">network prediction</text>']
+    gap, width = 40, (1200 - 64 - 2 * 40) / 3
+    for i, example in enumerate(examples):
+        left = 32 + i * (width + gap)
+        times, exact, predicted = example["times"], example["exact"], example["predicted"]
+        low, high = float(min(exact.min(), predicted.min())), float(max(exact.max(), predicted.max()))
+        pad = max((high - low) * 0.08, 1e-6)
+        body += [f'<text class="label" x="{left}" y="282">{escape(example["label"])} — off by '
+                 f'{_percent(example["error"])}</text>',
+                 f'<text class="tick" x="{left}" y="300">{escape(example["kind"])}</text>']
+        x, y = _panel(body, (left + 44, 332, width - 44, 150), (times[0], times[-1]), (low - pad, high + pad),
+                      "time", "y, the solution")
+        tooltip = example["equation"]
+        body.append(_polyline(x(times), y(exact), "exact", tooltip=f"exact: {tooltip}"))
+        body.append(_polyline(x(times), y(predicted), "model", dashed=True, tooltip=f"predicted: {tooltip}"))
+        for k, line in enumerate(example.get("note", ())):
+            body.append(f'<text class="tick" x="{left}" y="{536 + 15 * k}">{escape(line)}</text>')
+
+    # Error per type: rows are orders, columns are forcing types.
+    top, row = 630, 30
+    body.append('<text class="section" x="32" y="596">Average error by type of equation</text>')
+    column = (620 - 140) / len(families)
+    largest = max(item["mean"] or 0 for item in cells.values()) or 1
+    for j, family in enumerate(families):
+        body.append(f'<text class="label" x="{140 + j * column}" y="{top - 8}">{FAMILY_NAMES[family]}</text>')
+    for i, (order, name) in enumerate(zip(orders, order_names)):
+        y_row = top + i * row
+        body.append(f'<text x="32" y="{y_row + 16}">{name} order</text>')
+        for j, family in enumerate(families):
+            x0, item = 140 + j * column, cells.get((order, family))
+            if item is None or item["mean"] is None:
+                body.append(f'<text class="tick" x="{x0}" y="{y_row + 16}">not trained</text>')
+                continue
+            length = max(item["mean"] / largest * (column - 80), 2)
+            body += [f'<rect x="{x0}" y="{y_row + 5}" width="{length:.1f}" height="14" rx="3" class="muted-fill">'
+                     f'<title>{item["count"]:,} equations: average {_percent(item["mean"])}, half under '
+                     f'{_percent(item["median"])}, 95% under {_percent(item["p95"])}, worst '
+                     f'{_percent(item["worst"])}</title></rect>',
+                     f'<text class="label" x="{x0 + length + 6:.1f}" y="{y_row + 16}">'
+                     f'{_percent(item["mean"])}</text>']
+    table_height = len(orders) * row
+
+    # Training: validation error after every epoch.
+    numbers = np.array([entry["epoch"] for entry in epochs], dtype=float)
+    errors = np.array([entry["validation_relative_l2"] for entry in epochs]) * 100
+    best = int(np.argmin(errors))
+    plot_height = max(table_height, 150)
+    body.append('<text class="section" x="700" y="596">How the error fell during training</text>')
+    x_range = (numbers[0], numbers[-1]) if len(numbers) > 1 else (numbers[0] - 1, numbers[0] + 1)
+    x, y = _panel(body, (744, top + 4, 416, plot_height), x_range, (errors.min() * 0.8, errors.max() * 1.2),
+                  "epoch (one pass over the training data)", f"validation error, log scale — best "
+                  f"{_percent(errors[best] / 100)} at epoch {numbers[best]:g}", percent_log=True)
+    body.append(_polyline(x(numbers), y(errors), "ink2", tooltip="validation error after each epoch"))
+    body.append(f'<circle cx="{x(numbers[best]):.1f}" cy="{y(errors[best]):.1f}" r="5" class="ink2-fill surface-line" '
+                f'stroke-width="2"><title>best epoch {numbers[best]:g}: {errors[best]:.2f}%</title></circle>')
+    bottom = top + 4 + plot_height + 34
+    body.append(f'<text class="tick" x="744" y="{bottom + 20}">Still falling at the right edge = more epochs '
+                f'would likely help.</text>')
+    return _svg(1200, bottom + 40, body)
 
 
-def _select_examples(rows, worst):
-    """Pick the worst `worst` trajectories and the median one of each type."""
-    ranked = sorted(rows, key=lambda row: float('inf') if row['relative_l2'] is None else row['relative_l2'])
-    selected = {row['trajectory_id']: f'worst case #{rank} of {worst}'
-                for rank, row in enumerate(reversed(ranked[-worst:]), 1)}
-    for order, family in sorted({(row['order'], row['family']) for row in rows}):
-        group = [row for row in ranked if row['order'] == order and row['family'] == family]
-        selected.setdefault(group[len(group) // 2]['trajectory_id'], 'typical case')
-    return [(row, selected[row['trajectory_id']]) for row in ranked if row['trajectory_id'] in selected]
+def _size_note(row, typical_size):
+    """Explain a big percentage that comes from a tiny answer rather than a big miss."""
+    ratio = typical_size / max(row['reference_rms'], 1e-12)
+    return ((f"This answer is {ratio:,.0f}x smaller than a typical one,",
+             "so even a tiny miss is a big percentage.") if ratio >= 10 else ())
+
+
+def _equation_for(identity, config):
+    """Rebuild a core-split equation from its trajectory id, e.g. 'validation-o2-linear_homogeneous-g5-i1'."""
+    split, order, family, group, _ = re.fullmatch(r"(\w+)-o(\d+)-(\w+)-g(\d+)-i(\d+)", identity).groups()
+    jobs = _group_jobs(config, SPLITS.index(split), int(order), family, int(group))
+    return next(job.equation for job in jobs if job.trajectory_id == identity)
 
 
 def main(argv=None):
-    """Write summary, training-progress and example charts for one run folder."""
+    """Write report.svg for one evaluated run folder."""
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument('--run', type=Path, required=True, help='Run folder with best.pt, run.json, evaluation.json')
-    parser.add_argument('--data', type=Path, help="Dataset folder; defaults to the one recorded in run.json")
-    parser.add_argument('--output', type=Path, help='New folder for the SVGs; defaults to <run>/plots')
-    parser.add_argument('--split', default='validation')
-    parser.add_argument('--worst', type=int, default=3)
+    parser.add_argument('--output', type=Path, help='New SVG file; defaults to <run>/report.svg')
+    parser.add_argument('--title', help="Chart title; defaults to one naming the run folder")
+    parser.add_argument('--split', default='validation', choices=['validation'])
     args = parser.parse_args(argv)
-    if args.worst < 1:
-        parser.error('--worst must be positive')
-    checkpoint, output = args.run / 'best.pt', args.output or args.run / 'plots'
+    checkpoint, output = args.run / 'best.pt', args.output or args.run / 'report.svg'
     run = json.loads((args.run / 'run.json').read_text())
     report = json.loads((args.run / 'evaluation.json').read_text())
-    data = args.data or Path(run['data'])
-    if (report['checkpoint_sha256'] != sha256(checkpoint.read_bytes()).hexdigest()
-            or report['dataset_manifest_sha256'] != sha256((data / 'manifest.json').read_bytes()).hexdigest()):
-        raise ValueError('Plot checkpoint/dataset does not match evaluation')
+    if report['checkpoint_sha256'] != sha256(checkpoint.read_bytes()).hexdigest():
+        raise ValueError('best.pt does not match evaluation.json')
     torch.set_num_threads(4)
     predictor = Predictor(checkpoint)
-    dataset = TrajectoryDataset(data, args.split, predictor.model.max_order, allow_failures=True)
+    config = GeneratorConfig.from_dict(run['config'])
+    times = np.linspace(0, config.t_stop - config.t_start, config.time_points)
     split_report = report['splits'][args.split]
-    output.mkdir(parents=True, exist_ok=False)
-    (output / 'summary.svg').write_text(summary_svg(split_report, args.split))
-    (output / 'training.svg').write_text(training_svg(run['epochs']))
-    index = {record['trajectory_id']: i for i, record in enumerate(dataset.records)}
-    average = split_report['overall']['mean'] or float('nan')
-    artifacts = [{'path': 'summary.svg', 'selection': 'error summary'},
-                 {'path': 'training.svg', 'selection': 'training progress'}]
-    for row, selection in _select_examples(split_report['trajectories'], args.worst):
-        identity = row['trajectory_id']
-        if row['nonfinite']:
-            artifacts.append({'trajectory_id': identity, 'selection': selection,
-                              'status': 'nonfinite prediction; cannot draw a finite curve'})
-            continue
-        record = dataset.records[index[identity]]
-        features, targets, _ = dataset.raw_trajectory(index[identity])
-        times = features[:, -1]
-        equation = LinearODE(**record['equation'])
-        prediction = predictor.predict(equation, times)
-        title = (f"{selection.capitalize()}: {_family_name(equation.order, equation.family)} — "
-                 f"off by {row['relative_l2']:.1%}")
-        subtitle = [*_equation_text(equation),
-                    f"For comparison, the average error across all {split_report['overall']['count']:,} "
-                    f"validation equations is {average:.1%}. (Case {identity}.)"]
-        filename = f"example-{selection.split(' of')[0].replace(' #', '-').replace(' ', '-')}-{identity}.svg"
-        (output / filename).write_text(trajectory_svg(times, targets[:, :equation.order], prediction, title, subtitle))
-        artifacts.append({'trajectory_id': identity, 'selection': selection, 'path': filename})
-    (output / 'plots.json').write_text(json.dumps(artifacts, indent=2) + '\n')
-    print(f"wrote {len(artifacts)} charts to {output}")
+    ranked = sorted((row for row in split_report['trajectories'] if row['relative_l2'] is not None),
+                    key=lambda row: row['relative_l2'])
+    picks = [("Typical equation", ranked[len(ranked) // 2]),
+             ("1-in-100 equation", ranked[int(0.99 * (len(ranked) - 1))]),
+             (f"Worst of {len(ranked):,}", ranked[-1])]
+    typical_size = float(np.median([row['reference_rms'] for row in ranked]))
+    examples = []
+    for label, row in picks:
+        equation = _equation_for(row['trajectory_id'], config)
+        exact, predicted = linear_reference(equation, times), predictor.predict(equation, times)
+        # The rebuilt equation must be the one that was scored, or the chart would lie.
+        if not np.isclose(trajectory_metrics(exact, predicted)['relative_l2'], row['relative_l2'], rtol=1e-3):
+            raise ValueError(f"Rebuilt {row['trajectory_id']} does not reproduce its evaluated error")
+        examples.append({'label': label, 'error': row['relative_l2'],
+                         'kind': _family_name(equation.order, equation.family), 'note': _size_note(row, typical_size),
+                         'equation': "; ".join(_equation_text(equation)) + f" (case {row['trajectory_id']})",
+                         'times': times, 'exact': exact[:, 0], 'predicted': predicted[:, 0]})
+    title = args.title or f"{args.run.name}: how close the network gets to the exact answer"
+    output.parent.mkdir(parents=True, exist_ok=True)
+    with output.open('x') as handle:
+        handle.write(report_svg(split_report, run['epochs'], examples, title))
+    print(f"wrote {output}")
     return 0
 
 

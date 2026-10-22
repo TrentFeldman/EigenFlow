@@ -18,7 +18,8 @@ from ode.generation.generate_data import generate, iter_jobs
 from ode.evaluation.predict import domain_violations
 from ode.generation.equations import LinearODE
 from ode.training.train import _fit
-from ode.evaluation.plot_results import summary_svg, training_svg, trajectory_svg
+from ode.evaluation.plot_results import _equation_for, report_svg, trajectory_svg
+from ode.config import GeneratorConfig
 
 
 class EvaluationTests(unittest.TestCase):
@@ -123,12 +124,28 @@ class EvaluationTests(unittest.TestCase):
         split = {'overall': stats, 'by_family': {'order2/linear_homogeneous': stats}, 'trajectories': rows}
         times = np.linspace(0, 5, 11)
         states = np.stack((np.cos(times), -np.sin(times)), axis=1)
-        for svg in (summary_svg(split, 'validation'),
-                    training_svg([{'epoch': 1, 'validation_relative_l2': .4}, {'epoch': 2, 'validation_relative_l2': .1}]),
+        epochs = [{'epoch': 1, 'validation_relative_l2': .4}, {'epoch': 2, 'validation_relative_l2': .1}]
+        examples = [{'label': 'Typical', 'error': .02, 'kind': '2nd-order', 'equation': 'y′′ + y = 0',
+                     'times': times, 'exact': states[:, 0], 'predicted': states[:, 0] + .01,
+                     'note': ('tiny answer',)}]
+        many = dict(split, by_family={f'order{n}/{f}': stats for n in (10, *range(1, 9))
+                                      for f in ('linear_homogeneous', 'linear_sinusoidal')})
+        for svg in (report_svg(split, epochs, examples, 'Test model'), report_svg(many, epochs, examples, 'Many'),
                     trajectory_svg(times, states, states + .01, 'Typical case', ['y′′ + y = 0'])):
             ElementTree.fromstring(svg)
-        self.assertIn('off by 4.0% on average', summary_svg(split, 'validation'))
+        self.assertIn('4.0%</text>', report_svg(split, epochs, examples, 'Test model'))
+        svg = report_svg(many, epochs, examples, 'Many')
+        self.assertLess(svg.index('>2nd order<'), svg.index('>10th order<'))
+        self.assertGreater(int(ElementTree.fromstring(svg).get('height')), 630 + 9 * 30)
 
+    def test_report_rebuilds_the_scored_equation(self):
+        """_equation_for must return the exact equation the generator made for that id."""
+        config = GeneratorConfig()
+        equation = _equation_for('validation-o2-linear_sinusoidal-g1-i1', config)
+        self.assertEqual(equation.order, 2)
+        self.assertNotEqual(equation.amplitude, 0)
+        self.assertNotEqual(_equation_for('validation-o2-linear_sinusoidal-g1-i0', config).initial_state,
+                            equation.initial_state)
 
 if __name__ == '__main__':
     unittest.main()

@@ -13,6 +13,33 @@ Every result is scored against that solver. The math is explained in
 
 All commands run from the **repository root**.
 
+## Linux vs Windows
+
+Examples use Linux/macOS (bash). On Windows use PowerShell and translate:
+
+| Linux / macOS | Windows (PowerShell) |
+|---|---|
+| `python3 -m venv .venv` | `py -m venv .venv` |
+| `.venv/bin/python` | `.venv\Scripts\python` |
+| `source .venv/bin/activate` | `.venv\Scripts\Activate.ps1` |
+| `ode/models/current/best.pt` | `ode\models\current\best.pt` (forward slashes also work) |
+| `cmd \` (line continuation) | `` cmd ` `` (backtick) |
+| `export VAR=1` | `$env:VAR = "1"` |
+| `ls`, `cat`, `rm -r` | `dir`, `type`, `rmdir /s` |
+| `sudo apt install ffmpeg` | `winget install ffmpeg` |
+| `ode/flagship.sh` | No equivalent; use WSL or run its commands by hand |
+
+Windows has no ROCm PyTorch build; AMD GPUs there run on CPU (or use WSL).
+
+NVIDIA on Windows: plain `pip install torch` gives the CPU build. Install the
+CUDA build first (pick the `cuXXX` suffix at [pytorch.org](https://pytorch.org/get-started/locally/)):
+
+```powershell
+.venv\Scripts\python -m pip install torch --index-url https://download.pytorch.org/whl/cu128
+.venv\Scripts\python -m pip install -r ode\requirements.txt
+.venv\Scripts\python -m ode check   # should list the GPU
+```
+
 ## Setup
 
 Tested with Python 3.14.8 (`.python-version`).
@@ -93,7 +120,7 @@ states = Predictor("ode/models/current/best.pt").predict(equation, times)  # (10
 | 1. generate | `ode/data/<preset>-<count>/`, reused by later runs |
 | 2. train | `ode/runs/<name>/best.pt`, `last.pt`, `run.json` |
 | 3. evaluate | `ode/runs/<name>/evaluation.json` (validation only) |
-| 4. plot | `ode/runs/<name>/plots/*.svg`, start with `summary.svg` |
+| 4. plot | `ode/runs/<name>/report.svg`, one chart of the model's accuracy |
 
 If it stops, rerun the same command: finished stages are skipped and training
 resumes. `python -m ode runs` lists every run and dataset with its score.

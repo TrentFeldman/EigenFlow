@@ -8,6 +8,8 @@ Trained range: decay 0.01-1.5, frequency 0.5-4, starting values within +-1, forc
 
 ## Error (validation, 39,999 equations; test split not scored)
 
+Chart (open in a browser): [report.svg](report.svg).
+
 | | Mean | p95 | p99 |
 |---|---|---|---|
 | **All** | **0.227%** | 0.509% | 0.946% |
