@@ -18,7 +18,7 @@ class ResourceTests(unittest.TestCase):
 
     def test_auto_respects_scheduler_and_affinity(self):
         with patch('ode.resources.os.cpu_count', return_value=64), \
-                patch('ode.resources.os.sched_getaffinity', return_value=set(range(16))), \
+                patch('ode.resources.os.sched_getaffinity', return_value=set(range(16)), create=True), \
                 patch.dict('os.environ', {'SLURM_CPUS_PER_TASK': '8'}):
             self.assertEqual(available_cpus(), 8)
 
