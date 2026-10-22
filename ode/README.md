@@ -11,51 +11,58 @@ Training data comes from a numerical solver whose answers are checked twice.
 Every result is scored against that solver. The math is explained in
 [MATH_GUIDE.md](MATH_GUIDE.md).
 
-All commands run from the **repository root**.
+## Setup
 
-## Linux vs Windows
+Needs Python 3.14 (tested with 3.14.8) and git. Every command below, and in the
+rest of this README, runs from the **repository root** (the `EigenFlow`
+folder), never from inside `ode/`.
 
-Examples use Linux/macOS (bash). On Windows use PowerShell and translate:
+**Linux / macOS**
+
+```bash
+git clone https://github.com/TrentFeldman/EigenFlow.git
+cd EigenFlow
+python3 -m venv .venv                                  # 1. private Python in .venv/
+.venv/bin/python -m pip install -r ode/requirements.txt  # 2. packages
+.venv/bin/python -m ode check                          # 3. Python, packages, GPU
+.venv/bin/python -m unittest discover -s ode/tests     # 4. tests pass?
+```
+
+**Windows (PowerShell)**
+
+```powershell
+git clone https://github.com/TrentFeldman/EigenFlow.git
+cd EigenFlow
+py -3.14 -m venv .venv
+.venv\Scripts\python -m pip install -r ode\requirements.txt
+.venv\Scripts\python -m ode check
+.venv\Scripts\python -m unittest discover -s ode\tests
+```
+
+On Windows the venv's Python is `.venv\Scripts\python`, not `.venv/bin/python`.
+
+**GPU (optional).** Install the matching PyTorch build *before* step 2:
+
+- NVIDIA: `<venv python> -m pip install torch --index-url https://download.pytorch.org/whl/cu128`
+  (pick the `cuXXX` suffix for your driver at [pytorch.org](https://pytorch.org/get-started/locally/)).
+- AMD (Linux only, ROCm): see pytorch.org; `requirements-local.txt` pins the exact
+  ROCm wheel used locally. ROCm still uses `--device cuda`. Windows has no ROCm build,
+  so AMD there runs on CPU (or use WSL).
+
+`ode check` should then list the GPU. `python -m ode video` also needs the
+`ffmpeg` program (`sudo apt install ffmpeg` / `winget install ffmpeg`).
+
+### Reading the commands on Windows
+
+The rest of this README uses Linux syntax. Translate:
 
 | Linux / macOS | Windows (PowerShell) |
 |---|---|
-| `python3 -m venv .venv` | `py -m venv .venv` |
 | `.venv/bin/python` | `.venv\Scripts\python` |
-| `source .venv/bin/activate` | `.venv\Scripts\Activate.ps1` |
 | `ode/models/current/best.pt` | `ode\models\current\best.pt` (forward slashes also work) |
-| `cmd \` (line continuation) | `` cmd ` `` (backtick) |
+| `\` at line end (continue command) | `` ` `` at line end |
 | `export VAR=1` | `$env:VAR = "1"` |
-| `ls`, `cat`, `rm -r` | `dir`, `type`, `rmdir /s` |
-| `sudo apt install ffmpeg` | `winget install ffmpeg` |
 | `ode/flagship.sh` | No equivalent; use WSL or run its commands by hand |
-
-Windows has no ROCm PyTorch build; AMD GPUs there run on CPU (or use WSL).
-
-NVIDIA on Windows: plain `pip install torch` gives the CPU build. Install the
-CUDA build first (pick the `cuXXX` suffix at [pytorch.org](https://pytorch.org/get-started/locally/)):
-
-```powershell
-.venv\Scripts\python -m pip install torch --index-url https://download.pytorch.org/whl/cu128
-.venv\Scripts\python -m pip install -r ode\requirements.txt
-.venv\Scripts\python -m ode check   # should list the GPU
-```
-
-## Setup
-
-Tested with Python 3.14.8 (`.python-version`).
-
-```bash
-python3 -m venv .venv
-.venv/bin/python -m pip install -r ode/requirements.txt
-.venv/bin/python -m ode check       # Python, packages, GPU
-.venv/bin/python -m unittest discover -s ode/tests
-```
-
-A GPU is optional. For one, install the PyTorch build that matches your
-hardware from [pytorch.org](https://pytorch.org/get-started/locally/) before
-the requirements. AMD ROCm builds also use `--device cuda`.
-`requirements-local.txt` pins the exact ROCm wheel used locally.
-`python -m ode video` also needs the `ffmpeg` program.
 
 ## Predict with a released model
 
