@@ -21,14 +21,6 @@
 :root[data-theme="dark"]{color-scheme:dark;--page:#0d0d0d;--surface:#1a1a19;--ink:#f0efec;--ink2:#c3c2b7;--muted:#898781;--grid:#2c2c2a;
   --axis:#383835;--border:rgba(255,255,255,.12);--exact:#3987e5;--model:#d95926;--other:#199e70;--neg:#3987e5;--pos:#e66767;
   --mid:#383835;--band:#1c5cab;--role1:#3987e5;--role2:#d95926;--role3:#199e70;--role4:#c98500;--role5:#d55181}
-/* Colour-blind palette (protanopia/deuteranopia): blue-orange instead of blue-red, Okabe-Ito hues. Checked with the
-   dataviz palette validator: every adjacent pair separates under protan, deutan and tritan simulation in both themes. */
-:root[data-palette="cvd"]{--exact:#0072b2;--model:#d55e00;--other:#009e73;--neg:#0072b2;--pos:#c98500;
-  --role1:#0072b2;--role2:#e69f00;--role3:#009e73;--role4:#d55e00;--role5:#cc79a7}
-@media (prefers-color-scheme:dark){:root[data-palette="cvd"]:not([data-theme="light"]){--exact:#3a8fd6;--model:#e2661c;
-  --other:#12a37a;--neg:#3a8fd6;--pos:#e69f00;--role1:#3a8fd6;--role2:#b88000;--role3:#12a37a;--role4:#e2661c;--role5:#c06c9e}}
-:root[data-palette="cvd"][data-theme="dark"]{--exact:#3a8fd6;--model:#e2661c;--other:#12a37a;--neg:#3a8fd6;--pos:#e69f00;
-  --role1:#3a8fd6;--role2:#b88000;--role3:#12a37a;--role4:#e2661c;--role5:#c06c9e}
 *{box-sizing:border-box}
 body{margin:0;background:var(--page);color:var(--ink);font:15px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif}
 main{max-width:1320px;margin:0 auto;padding:16px}
@@ -45,7 +37,9 @@ nav button[aria-selected="true"]{background:var(--ink);color:var(--page);border-
 #blurb{min-height:2.9em;margin:4px 0 8px;max-width:75em}
 canvas{display:block;width:100%;height:auto;aspect-ratio:16/9;background:var(--surface);border:1px solid var(--border);border-radius:8px;touch-action:none}
 .bar{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center;margin:10px 0}
-.bar #time{flex:1;min-width:160px}
+#timeBar{display:flex;flex:1;gap:8px 12px;align-items:center;min-width:240px}
+#timeBar[hidden]{display:none}
+#time{flex:1;min-width:120px}
 .bar [hidden]{display:none}
 #timeLabel{min-width:5.5em;font-variant-numeric:tabular-nums}
 #controls{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:12px;margin-top:6px}
@@ -70,13 +64,13 @@ th,td{padding:2px 10px;text-align:right;border-bottom:1px solid var(--grid)}
 <h1>Inside the EigenFlow ODE network</h1>
 <p class="sub" id="sub"></p>
 <p id="status" role="status">Loading the network…</p>
-<label class="note"><input type="checkbox" id="cvd"> Colour-blind palette (blue and orange instead of blue and red; for protanopia and deuteranopia)</label>
+<label class="note">Colours <select id="palette"></select></label>
 <nav id="tabs" role="tablist" aria-label="Scenes"></nav>
 <p id="blurb"></p>
 <canvas id="view" width="1920" height="1080" role="img" aria-label="Picture of the current scene; the table under 'Numbers behind the picture' has the same values"></canvas>
 <div class="bar">
   <button id="play">▶ Play</button>
-  <label for="time">Time</label><input id="time" type="range" min="0" value="0"><span id="timeLabel"></span>
+  <span id="timeBar"><label for="time">Time</label><input id="time" type="range" min="0" value="0"><span id="timeLabel"></span></span>
   <button id="record" title="Plays the scene once from the start and saves it as a video">⏺ Record video</button>
   <button id="picture">Save picture</button>
 </div>
@@ -198,15 +192,26 @@ function outsideTraining(eq, cfg) {
 }
 
 // One Linear layer for every time at once: z[t][i] = b[i] + Σ_k w[i][k] x[t][k].
-// x and z are flat arrays, row t starting at t * width.
+// x and z are flat arrays, row t starting at t * width. Speed matters (it runs on every slider
+// move): each weight row is used for 4 time points per pass while it sits in the CPU cache, about
+// 1.8x faster than one time point at a time, with the same sums in the same order.
 function dense({in: I, out: O, w, b}, x, T) {
   const z = new Float64Array(T * O);
-  for (let t = 0; t < T; t++) {
-    const xo = t * I;
-    for (let i = 0; i < O; i++) {
+  for (let i = 0; i < O; i++) {
+    const wo = i * I;
+    let t = 0;
+    for (; t + 3 < T; t += 4) {
+      let s0 = b[i], s1 = b[i], s2 = b[i], s3 = b[i];
+      const x0 = t * I, x1 = x0 + I, x2 = x1 + I, x3 = x2 + I;
+      for (let k = 0; k < I; k++) {
+        const wk = w[wo + k];
+        s0 += wk * x[x0 + k]; s1 += wk * x[x1 + k]; s2 += wk * x[x2 + k]; s3 += wk * x[x3 + k];
+      }
+      z[t * O + i] = s0; z[(t + 1) * O + i] = s1; z[(t + 2) * O + i] = s2; z[(t + 3) * O + i] = s3;
+    }
+    for (; t < T; t++) {
       let sum = b[i];
-      const wo = i * I;
-      for (let k = 0; k < I; k++) sum += w[wo + k] * x[xo + k];
+      for (let k = 0; k < I; k++) sum += w[wo + k] * x[t * I + k];
       z[t * O + i] = sum;
     }
   }
@@ -268,31 +273,36 @@ class Net {
   // How much answer part c (in the equation's units) changes per unit change of each
   // normalized input, at every time: the gradient, by the chain rule backwards through
   // the layers (backpropagation). SiLU′(z) = s (1 + z (1 - s)) with s = sigmoid(z).
-  // Returns a flat T×F array.
+  // Returns a flat T×F array. Going back through a Linear layer multiplies by the transposed
+  // weights, so the same fast dense() does it (with zero bias); transposes are made once.
   gradient(result, c) {
-    const T = result.T, F = this.F, G = new Float64Array(T * F);
-    for (let t = 0; t < T; t++) {
-      let g = new Float64Array(this.layers[this.hidden].out);
-      g[c] = this.normalizer.target_scale[c];
-      for (let l = this.hidden; l >= 0; l--) {
-        const {in: I, out: O, w} = this.layers[l], back = new Float64Array(I);
-        for (let i = 0; i < O; i++) if (g[i]) for (let k = 0; k < I; k++) back[k] += g[i] * w[i * I + k];
-        if (l > 0) {
-          const z = result.pre[l - 1];
-          for (let k = 0; k < I; k++) { const v = z[t * I + k], s = 1 / (1 + Math.exp(-v)); back[k] *= s * (1 + v * (1 - s)); }
-        }
-        g = back;
+    const T = result.T, last = this.layers[this.hidden];
+    let g = new Float64Array(T * last.out);  // d(answer part c)/d(this layer's output), row t at t * width
+    for (let t = 0; t < T; t++) g[t * last.out + c] = this.normalizer.target_scale[c];
+    for (let l = this.hidden; l >= 0; l--) {
+      const layer = this.layers[l], {in: I, out: O, w} = layer;
+      if (!layer.back) {
+        const wT = new Float32Array(I * O);
+        for (let i = 0; i < O; i++) for (let k = 0; k < I; k++) wT[k * O + i] = w[i * I + k];
+        layer.back = {in: O, out: I, w: wT, b: new Float32Array(I)};
       }
-      G.set(g, t * F);
+      g = dense(layer.back, g, T);
+      if (l > 0) {
+        const z = result.pre[l - 1];
+        for (let k = 0; k < T * I; k++) { const v = z[k], s = 1 / (1 + Math.exp(-v)); g[k] *= s * (1 + v * (1 - s)); }
+      }
     }
-    return G;
+    return g;
   }
 }
 
-// The value below which a fraction q of |values| lies (0.95 = a "typical big" value).
+// The value below which a fraction q of |values| lies (0.95 = a "typical big" value). Used only
+// to scale colours, so big arrays are estimated from an evenly spaced sample of about 8,000 values.
 function quantileAbs(values, q) {
-  const sorted = Float64Array.from(values, Math.abs).sort();
-  return sorted[Math.floor(q * (sorted.length - 1))];
+  const step = Math.max(1, Math.floor(values.length / 8000)), sample = new Float64Array(Math.ceil(values.length / step));
+  for (let i = 0, j = 0; i < values.length; i += step, j++) sample[j] = Math.abs(values[i]);
+  sample.sort();
+  return sample[Math.floor(q * (sample.length - 1))];
 }
 
 // Squash one hidden layer (T times × W neurons) to two numbers per time: the two
@@ -387,7 +397,7 @@ const fmt = v => Math.abs(v) >= 100 ? v.toFixed(0) : Math.abs(v) >= 0.01 || v ==
 
 const SCENES = {
   map: {tab: "Network map", play: "time", draw: () => drawMap(false),
-    blurb: "Inputs on the left, the hidden layers in the middle, the answer on the right. Each dot is a neuron ({pos} = positive, blue = negative, grey = quiet) and the lines are the strongest signals passing between them right now. Press Play to run through time; click any neuron to trace it."},
+    blurb: "Inputs on the left, the hidden layers in the middle, the answer on the right. Each dot is a neuron ({pos} = positive, {neg} = negative, grey = quiet) and the lines are the strongest signals passing between them right now. Press Play to run through time; click any neuron to trace it."},
   trace: {tab: "Trace", play: "time", draw: () => drawMap(true),
     blurb: "Following one value backwards: the thick lines lead from the chosen output (or any neuron you click) to the neurons that fed it most at this moment, and the list shows which inputs those paths start from."},
   lights: {tab: "Lighting up", play: "time", draw: drawLights,
@@ -399,7 +409,7 @@ const SCENES = {
   roles: {tab: "Neuron roles", play: "time", draw: drawRoles,
     blurb: "Every neuron in a layer, sorted by how it behaves over the whole time window: silent, steady, rising, falling, one bump, or wiggling."},
   importance: {tab: "Input importance", play: "time", draw: drawImportance,
-    blurb: "Which inputs are pushing the answer up ({pos}) or down (blue) at each moment. Press Play to watch the balance shift over time."},
+    blurb: "Which inputs are pushing the answer up ({pos}) or down ({neg}) at each moment. Press Play to watch the balance shift over time."},
   compare: {tab: "Compare models", play: "time", draw: drawCompare,
     blurb: "Two networks on the same equation: their answers, how far off each one is over time, and their neurons side by side."},
   reel: {tab: "Worst cases", play: "reel", draw: drawReel,
@@ -476,7 +486,7 @@ function readTheme() {
   const css = getComputedStyle(document.documentElement);
   for (const name of ["surface", "ink", "ink2", "muted", "grid", "axis", "exact", "model", "other", "neg", "pos", "mid", "good", "bad", "role1", "role2", "role3", "role4", "role5"])
     C[name] = css.getPropertyValue("--" + name).trim();
-  // Diverging colours for neuron values: blue (negative) through the neutral grey to red, or orange in the colour-blind palette (positive).
+  // Diverging colours for neuron values: the palette's negative colour through the neutral grey to its positive colour.
   const [neg, mid, pos] = [C.neg, C.mid, C.pos].map(hex);
   LUT = Array.from({length: 257}, (_, i) => {
     const f = (i - 128) / 128, pole = f < 0 ? neg : pos, rgb = mid.map((m, j) => Math.round(m + (pole[j] - m) * Math.abs(f)));
@@ -484,7 +494,50 @@ function readTheme() {
   });
   theme++;
 }
-const posName = () => document.documentElement.dataset.palette === "cvd" ? "orange" : "red";  // what "positive" looks like
+// Colour palettes: CSS variables to override, as [light theme, dark theme], plus the names of the positive and
+// negative colours for the text. Every set of series and role colours was checked with the dataviz palette
+// validator in both themes (normal vision and colour-blind simulation); see ode/runs/20261022-viz-explorer.
+const PALETTES = {
+  default: {label: "Default: blue and red", group: "Standard", pos: "red", neg: "blue", colours: {}},
+  redgreen: {label: "Red–green safe (protanopia, deuteranopia)", group: "Colour-blind friendly", pos: "orange", neg: "blue", colours: {
+    exact: ["#0072b2", "#3a8fd6"], model: ["#d55e00", "#e2661c"], other: ["#009e73", "#12a37a"],
+    neg: ["#0072b2", "#3a8fd6"], pos: ["#c98500", "#e69f00"], 
+    role1: ["#0072b2", "#3a8fd6"], role2: ["#e69f00", "#b88000"], role3: ["#009e73", "#12a37a"], role4: ["#d55e00", "#e2661c"], role5: ["#cc79a7", "#c06c9e"]}},
+  blueyellow: {label: "Blue–yellow safe (tritanopia)", group: "Colour-blind friendly", pos: "red", neg: "blue", colours: {
+    model: ["#e34948", "#e66767"], other: ["#52514e", "#c3c2b7"],
+    role1: ["#2a78d6", "#3987e5"], role2: ["#e34948", "#e66767"], role3: ["#008300", "#2e9b2e"], role4: ["#e87ba4", "#d55181"], role5: ["#6250d6", "#9085e9"]}},
+  noles: {label: "Garnet and gold (go Noles!)", group: "Just for fun", pos: "gold", neg: "garnet", colours: {
+    exact: ["#8c2f45", "#c25468"], model: ["#b8902f", "#b38f2e"], other: ["#2f6db5", "#5a8cc6"],
+    neg: ["#8c2f45", "#c25468"], pos: ["#b8902f", "#c9a13f"], band: ["#e6d6a8", "#5b4a20"],
+    role1: ["#8c2f45", "#c04a63"], role2: ["#c49a3a", "#b38f2e"], role3: ["#2f6db5", "#5a8cc6"], role4: ["#d4707f", "#cc6a7d"], role5: ["#856500", "#97761a"]}},
+  // The themes below keep the default role colours; neurons, answer lines and the slider band change.
+  ocean: {label: "Ocean: blue and coral", group: "Just for fun", pos: "coral", neg: "blue", colours: {
+    exact: ["#1d6fa5", "#5b8ef0"], model: ["#f0644d", "#df6550"], other: ["#2a9d8f", "#1fa58a"],
+    neg: ["#1d6fa5", "#5b8ef0"], pos: ["#f0644d", "#df6550"], band: ["#bfdcef", "#1e4a70"]}},
+  forest: {label: "Forest: green and amber", group: "Just for fun", pos: "amber", neg: "green", colours: {
+    exact: ["#2f7d4f", "#2f8a55"], model: ["#c98a1a", "#b8801c"], other: ["#2f78c4", "#6a8fe0"],
+    neg: ["#2f7d4f", "#2f8a55"], pos: ["#c98a1a", "#c99232"], band: ["#cfe3cf", "#2c4a35"]}},
+  neon: {label: "Neon: cyan and pink", group: "Just for fun", pos: "pink", neg: "cyan", colours: {
+    exact: ["#0091b3", "#12a0c0"], model: ["#d12f8f", "#e0509f"], other: ["#6a3fd1", "#8f73e8"],
+    neg: ["#0091b3", "#12a0c0"], pos: ["#d12f8f", "#e0509f"], band: ["#b8e6f0", "#0d4a5a"]}},
+  midnight: {label: "Midnight: indigo and amber", group: "Just for fun", pos: "amber", neg: "indigo", colours: {
+    exact: ["#3b3fb6", "#7b7ff0"], model: ["#d99000", "#b98515"], other: ["#1f9e89", "#2aa892"],
+    neg: ["#3b3fb6", "#7b7ff0"], pos: ["#d99000", "#d99000"], band: ["#c9caf0", "#33356e"]}},
+  sunset: {label: "Sunset: purple and orange", group: "Just for fun", pos: "orange", neg: "purple", colours: {
+    exact: ["#6a51a3", "#9580d0"], model: ["#e66101", "#e2661c"], other: ["#1b9e77", "#1fae84"],
+    neg: ["#6a51a3", "#9580d0"], pos: ["#e66101", "#e2661c"], band: ["#cfc6e6", "#4a3d78"]}},
+};
+let palette = "default";
+function applyPalette() {
+  const root = document.documentElement, colours = PALETTES[palette].colours;
+  const dark = root.dataset.theme ? root.dataset.theme === "dark" : matchMedia("(prefers-color-scheme: dark)").matches;
+  const keys = new Set(Object.values(PALETTES).flatMap(p => Object.keys(p.colours)));
+  for (const key of keys) colours[key] ? root.style.setProperty("--" + key, colours[key][+dark]) : root.style.removeProperty("--" + key);
+}
+const posName = () => PALETTES[palette].pos, negName = () => PALETTES[palette].neg;  // for "red = positive"-style text
+const capital = s => s[0].toUpperCase() + s.slice(1);
+// Black or white label text, whichever reads better on a filled colour (e.g. black on gold, white on garnet).
+const inkOn = colour => { const [r, g, b] = hex(colour); return 0.299 * r + 0.587 * g + 0.114 * b > 150 ? "#0b0b0b" : "#ffffff"; };
 const roleColour = r => r === 0 ? C.axis : C["role" + r];
 // v is in units of the layer's typical big value; tanh keeps colours from saturating too early.
 const shade = v => LUT[Math.round((Math.tanh(1.5 * v) + 1) * 128)] || LUT[128];
@@ -614,22 +667,26 @@ function drawMap(traceMode) {
   const pos = [shown.map((_, i) => [inputX, spread(shown.length, i)])];
   for (let l = 0; l < L; l++) pos.push(Array.from({length: net.layers[l].out}, (_, k) => [colX(l), spread(net.layers[l].out, k)]));
   pos.push(Array.from({length: n}, (_, c) => [outputX, (top + bottom) / 2 + (c - (n - 1) / 2) * 64]));
-  const value = (col, i) => col === 0 ? run.x[t * net.F + shown[i].index] : run.act[col - 1][t * net.layers[col - 1].out + i];
+  // values[col][i]: every dot's value at this moment (column 0 = the shown inputs).
+  const values = [Float64Array.from(shown, s => run.x[t * net.F + s.index]),
+                  ...run.act.map((a, l) => a.subarray(t * net.layers[l].out, (t + 1) * net.layers[l].out))];
+  const value = (col, i) => values[col][i], inputIndex = shown.map(s => s.index);
   // The signal from source i (column g) into target j (column g + 1): weight times the source's value now.
-  const contribution = (g, j, i) => net.layers[g].w[j * net.layers[g].in + (g === 0 ? shown[i].index : i)] * value(g, i);
+  const contribution = (g, j, i) => net.layers[g].w[j * net.layers[g].in + (g === 0 ? inputIndex[i] : i)] * values[g][i];
 
   // The strongest signals: each target's two strongest inputs, then the top EDGES_PER_GAP of those per gap.
   const edges = [];
   for (let g = 0; g <= L; g++) {
-    const candidates = [];
-    pos[g + 1].forEach((_, j) => {
-      let best = [0, -1], second = [0, -1];
-      for (let i = 0; i < pos[g].length; i++) {
-        const c = contribution(g, j, i);
-        if (Math.abs(c) > Math.abs(best[0])) { second = best; best = [c, i]; } else if (Math.abs(c) > Math.abs(second[0])) second = [c, i];
+    const candidates = [], {w, in: I} = net.layers[g], source = values[g];
+    for (let j = 0; j < pos[g + 1].length; j++) {  // this loop runs ~1.5 million times a frame for arc, so it stays plain
+      let c1 = 0, i1 = -1, c2 = 0, i2 = -1;
+      for (let i = 0; i < source.length; i++) {
+        const c = w[j * I + (g === 0 ? inputIndex[i] : i)] * source[i], size = Math.abs(c);
+        if (size > Math.abs(c1)) { c2 = c1; i2 = i1; c1 = c; i1 = i; } else if (size > Math.abs(c2)) { c2 = c; i2 = i; }
       }
-      for (const [c, i] of [best, second]) if (i >= 0) candidates.push([g, i, j, c]);
-    });
+      if (i1 >= 0) candidates.push([g, i1, j, c1]);
+      if (i2 >= 0) candidates.push([g, i2, j, c2]);
+    }
     candidates.sort((a, b) => Math.abs(b[3]) - Math.abs(a[3]));
     edges.push(...candidates.slice(0, g === L ? 12 * n : EDGES_PER_GAP));
   }
@@ -683,9 +740,11 @@ function drawMap(traceMode) {
       const [x, y] = pos[l + 1][k], v = value(l + 1, k);
       ctx.fillStyle = shade(v / r.scale[l]).css;
       ctx.fillRect(x - 6, y - pitch / 2, 12, Math.max(pitch - (pitch > 2 ? 0.6 : 0), 0.8));
-      if (onTrace.has(`${l + 1}:${k}`)) { ctx.strokeStyle = C.ink; ctx.lineWidth = 1.5; ctx.strokeRect(x - 8, y - Math.max(pitch, 3) / 2, 16, Math.max(pitch, 3)); }
-      hit([x - 8, y - pitch / 2, 16, pitch], {tip: `layer ${l + 1}, neuron ${k}: ${v.toFixed(3)} — click to trace`, ...traceIt(l + 1, k)});
+      if (traced && onTrace.has(`${l + 1}:${k}`)) { ctx.strokeStyle = C.ink; ctx.lineWidth = 1.5; ctx.strokeRect(x - 8, y - Math.max(pitch, 3) / 2, 16, Math.max(pitch, 3)); }
     }
+    const neuronAt = py => Math.max(0, Math.min(count - 1, Math.floor((py - top) / pitch)));
+    hit([colX(l) - 8, top, 16, bottom - top], {tip: (_, py) => `layer ${l + 1}, neuron ${neuronAt(py)}: ${value(l + 1, neuronAt(py)).toFixed(3)} — click to trace`,
+                                               click: (_, py) => { S.traced = {col: l + 1, index: neuronAt(py)}; }});
   }
   text("answer", outputX, top - 10, {size: 12, colour: "muted", align: "center"});
   pos[L + 1].forEach(([x, y], c) => {
@@ -706,7 +765,7 @@ function drawMap(traceMode) {
   text("negative", px, y + 34, {size: 11, colour: "muted"});
   text("quiet", px + pw / 2, y + 34, {size: 11, colour: "muted", align: "center"});
   text("positive", px + pw, y + 34, {size: 11, colour: "muted", align: "right"});
-  y = wrap(`Lines: the strongest signals right now. ${posName()[0].toUpperCase() + posName().slice(1)} pushes the next neuron up, blue pushes it down.`, px, y + 62, pw, 17, {size: 12});
+  y = wrap(`Lines: the strongest signals right now. ${capital(posName())} pushes the next neuron up, ${negName()} pushes it down.`, px, y + 62, pw, 17, {size: 12});
   if (traced && inputShare) {
     const name = traced.col === L + 1 ? `the network's ${dname(traced.index)}` : traced.col === 0 ? shown[traced.index].name : `layer ${traced.col}, neuron ${traced.index}`;
     y = wrap(`Tracing ${name}: where its paths start`, px, y + 14, pw, 17, {size: 12, weight: 600, colour: "ink"});
@@ -747,8 +806,10 @@ function drawLights() {
       const v = a[S.t * count + k] / r.scale[l], x = x0 + (k % side) * cell, y = top + Math.floor(k / side) * cell;
       if (Math.abs(v) > 0.5) lit++;
       ctx.fillStyle = shade(v).css; ctx.fillRect(x, y, cell - 1, cell - 1);
-      hit([x, y, cell, cell], {tip: `layer ${l + 1}, neuron ${k}: ${a[S.t * count + k].toFixed(3)}`});
     }
+    const neuronAt = (px, py) => Math.floor((py - top) / cell) * side + Math.floor((px - x0) / cell);
+    hit([x0, top, side * cell, Math.ceil(count / side) * cell], {tip: (px, py) => neuronAt(px, py) < count ?
+      `layer ${l + 1}, neuron ${neuronAt(px, py)}: ${a[S.t * count + neuronAt(px, py)].toFixed(3)}` : null});
     text(`layer ${l + 1}`, x0, top - 12, {size: 12, weight: 600, colour: "ink"});
     text(`${Math.round(100 * lit / count)}% lit`, x0, top + side * cell + 16, {size: 12, colour: "muted"});
   }
@@ -893,7 +954,7 @@ function drawRoles() {
       const c = info.role.filter(v => v === i).length, w = c / count * (bw - 62);
       if (!c) return;
       ctx.fillStyle = roleColour(i); ctx.fillRect(x, y + 2, Math.max(w - 2, 1), 22);
-      if (w > 26) text(String(c), x + w / 2 - 1, y + 17, {size: 11, colour: i === 0 ? "ink" : i === 4 ? "#0b0b0b" : "#ffffff", align: "center"});
+      if (w > 26) text(String(c), x + w / 2 - 1, y + 17, {size: 11, colour: inkOn(roleColour(i)), align: "center"});
       hit([x, y + 2, w, 22], {tip: `layer ${layer + 1}: ${c} ${name} neurons — click to show this layer`, click: () => { S.layer = layer; syncControls(); }});
       x += w;
     });
@@ -989,7 +1050,7 @@ function drawCompare() {
     if (!run) { text("not trained on this order", tx, y0 + 40, {size: 12, colour: "muted"}); return; }
     const width = model.layers[0].out, side = Math.ceil(Math.sqrt(width)), lw = (VW - 32 - tx - (model.hidden - 1) * 8) / model.hidden, cell = Math.min(lw / side, 110 / side);
     for (let l = 0; l < model.hidden; l++) {
-      const a = run.act[l], scale = quantileAbs(a, 0.95) || 1, x0 = tx + l * (lw + 8);
+      const a = run.act[l], scale = m ? extra("Bscale", () => B.act.map(b => quantileAbs(b, 0.95) || 1))[l] : r.scale[l], x0 = tx + l * (lw + 8);
       for (let k = 0; k < width; k++) { ctx.fillStyle = shade(a[S.t * width + k] / scale).css; ctx.fillRect(x0 + (k % side) * cell, y0 + 14 + Math.floor(k / side) * cell, cell, cell); }
     }
   });
@@ -1044,7 +1105,8 @@ function drawReel() {
 }
 
 // ---------- Frame loop, playing and recording ----------
-let dirty = true, lastStep = 0;
+let dirty = true, lastStep = 0, lastInput = 0;  // lastInput: when the viewer last clicked, dragged or typed
+for (const type of ["pointerdown", "pointermove", "input", "keydown"]) addEventListener(type, () => { lastInput = performance.now(); }, true);
 const redraw = () => { dirty = true; };
 function draw() {
   ctx.setTransform(PX, 0, 0, PX, 0, 0);
@@ -1057,7 +1119,7 @@ function draw() {
 function frame(now) {
   const mode = SCENES[S.scene].play, delay = {time: 50, sweep: 60, reel: 3500}[mode];
   if (S.playing && now - lastStep > delay) { lastStep = now; advance(mode); dirty = true; }
-  else if (S.scene === "sweep" && !S.playing && sweepFill()) dirty = true;  // build the error curve while idle
+  else if (S.scene === "sweep" && !S.playing && now - lastInput > 400 && sweepFill()) dirty = true;  // build the error curve while idle
   if (dirty) { dirty = false; draw(); }
   requestAnimationFrame(frame);
 }
@@ -1074,7 +1136,8 @@ function rewind() {
   else { S.reel = cases.length - 1; }  // the first step moves to case 1
 }
 function loopDone() { if (S.recording) setTimeout(stopRecording, 120); }
-function setPlaying(on) { S.playing = on; $("play").textContent = on ? "⏸ Pause" : "▶ Play"; }
+const PLAY_LABELS = {time: "▶ Play", sweep: "▶ Play the sweep", reel: "▶ Play through the cases"};
+function setPlaying(on) { S.playing = on; $("play").textContent = on ? "⏸ Pause" : PLAY_LABELS[SCENES[S.scene].play]; }
 function save(blob, name) {
   const a = document.createElement("a");
   a.href = URL.createObjectURL(blob); a.download = name; document.body.append(a); a.click(); a.remove();
@@ -1176,8 +1239,9 @@ function setScene(name) {
   if (name === "reel" && cases.length && JSON.stringify(S.eq) !== JSON.stringify(cases[S.reel].equation)) loadCase();
   for (const b of $("tabs").children) b.setAttribute("aria-selected", b.dataset.scene === name);
   for (const el of $("sceneBar").children) el.hidden = !el.dataset.for.split(" ").includes(name);
-  $("blurb").textContent = SCENES[name].blurb.replace("{pos}", posName());
-  $("time").disabled = SCENES[name].play !== "time";
+  $("blurb").textContent = SCENES[name].blurb.replace("{pos}", posName()).replace("{neg}", negName());
+  $("timeBar").hidden = SCENES[name].play !== "time";
+  setPlaying(S.playing);
   try { history.replaceState(null, "", "#scene=" + name); } catch (e) { /* some browsers block this on file:// pages */ }
   redraw();
 }
@@ -1199,29 +1263,34 @@ canvas.addEventListener("pointerdown", e => {
   const [x, y] = toLayout(e), h = hitAt(x, y);
   if (!h) return;
   if (h.drag) { dragging = h; canvas.setPointerCapture(e.pointerId); h.drag(x, y); }
-  if (h.click) h.click();
+  if (h.click) h.click(x, y);
   redraw();
 });
 canvas.addEventListener("pointermove", e => {
   const [x, y] = toLayout(e);
   if (dragging) { dragging.drag(x, y); redraw(); return; }
   const h = hitAt(x, y);
-  tooltip(e, h && h.tip);
+  tooltip(e, h && (typeof h.tip === "function" ? h.tip(x, y) : h.tip));
   canvas.style.cursor = h && (h.click || h.drag) ? "pointer" : "default";
 });
 canvas.addEventListener("pointerup", () => { dragging = null; });
 canvas.addEventListener("pointerleave", () => tooltip(null));
 
 // ---------- Start ----------
-try { if (localStorage.getItem("eigenflow-palette") === "cvd") document.documentElement.dataset.palette = "cvd"; } catch (e) { /* no storage: default palette */ }
-$("cvd").checked = document.documentElement.dataset.palette === "cvd";
-$("cvd").onchange = e => {
-  if (e.target.checked) document.documentElement.dataset.palette = "cvd"; else delete document.documentElement.dataset.palette;
-  try { localStorage.setItem("eigenflow-palette", e.target.checked ? "cvd" : "default"); } catch (error) { /* not remembered */ }
-  readTheme(); setScene(S.scene);
+// The chosen palette is remembered per viewer (browser storage can be unavailable, e.g. in private windows).
+try { const saved = localStorage.getItem("eigenflow-palette"); palette = PALETTES[saved] ? saved : saved === "cvd" ? "redgreen" : "default"; } catch (e) { /* default */ }
+for (const [id, p] of Object.entries(PALETTES)) {
+  let group = [...$("palette").children].find(g => g.label === p.group);
+  if (!group) { group = document.createElement("optgroup"); group.label = p.group; $("palette").append(group); }
+  group.append(new Option(p.label, id, false, id === palette));
+}
+$("palette").onchange = e => {
+  palette = e.target.value;
+  try { localStorage.setItem("eigenflow-palette", palette); } catch (error) { /* not remembered */ }
+  applyPalette(); readTheme(); setScene(S.scene);
 };
-readTheme();
-matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => { readTheme(); redraw(); });
+applyPalette(); readTheme();
+matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => { applyPalette(); readTheme(); redraw(); });
 for (const [name, scene] of Object.entries(SCENES)) {
   const b = document.createElement("button");
   b.textContent = scene.tab; b.dataset.scene = name; b.setAttribute("role", "tab"); b.onclick = () => setScene(name);

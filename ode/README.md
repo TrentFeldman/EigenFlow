@@ -139,8 +139,10 @@ from far below to far above the trained range, with the error at each value),
 cases** (the worst validation equations from the model's evaluation file, with
 likely reasons). **Record video** plays the scene once and saves a WebM
 (`ffmpeg -i in.webm out.mp4` converts it); **Save picture** saves a PNG.
-The **colour-blind palette** checkbox (blue and orange instead of blue and red, for
-protanopia and deuteranopia) is remembered by the browser for that file.
+The **Colours** menu switches palettes: the default, two colour-blind friendly ones (red–green
+safe for protanopia and deuteranopia, blue–yellow safe for tritanopia), and for fun garnet and gold,
+ocean, forest, neon, midnight and sunset.
+The browser remembers the choice for that file. Palettes are one table (`PALETTES`) in `ode/tools/viz.html`.
 
 Options: `--model` (default `ode/models/current`), `--input` (equation JSON to
 start on), `--worst N` (reel length, 0 for none), `--output`. With `--compare`
