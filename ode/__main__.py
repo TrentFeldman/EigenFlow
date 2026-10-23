@@ -21,6 +21,7 @@ COMMANDS = {
     "diagnose": ("evaluation.diagnose", "Break validation error down by regime and residual"),
     "predict": ("evaluation.predict", "Predict one equation from a JSON request"),
     "runs": ("tools.runs", "List trained runs and datasets with their scores and sizes"),
+    "viz": ("tools.viz", "Build the interactive explorer page of a trained model (one portable HTML file)"),
     "neurons": ("tools.neurons", "Animate the neurons changing during training (needs --snapshot-every)"),
     "video": ("tools.video", "Render the neurons-learning animation as an MP4 (needs --snapshot-every, ffmpeg)"),
     "check": ("tools.check_environment", "Report Python, packages and GPU visibility"),

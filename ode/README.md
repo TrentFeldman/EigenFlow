@@ -116,6 +116,35 @@ times = np.linspace(0.0, 5.0, 101)
 states = Predictor("ode/models/current/best.pt").predict(equation, times)  # (101, 2): y, y'
 ```
 
+## Look inside a model (the demo explorer)
+
+```bash
+.venv/bin/python -m ode viz --compare ode/models/arc     # writes ode/models/current/explorer.html
+```
+
+This writes one self-contained HTML file. Open it in any browser: it needs no
+internet, Python or server, so it can be emailed or opened on Windows by
+double-clicking. The model's weights are inside the page and the page runs the
+network itself, so moving a slider (fade rate, wiggle speed, starting values,
+push) re-solves the equation instantly, next to the exact answer. Sliders show
+the trained range as a darker band, and the page warns when you leave it.
+
+Scenes (tabs): **network map** (every neuron and the strongest connections at
+one moment), **trace** (click any neuron or output to see which neurons and
+inputs fed it), **lighting up** (neuron grids over time), **sweep** (one setting
+from far below to far above the trained range, with the error at each value),
+**phase portrait** (hidden layers squeezed to 2D next to y against y′),
+**neuron roles** (silent, rising, wiggling, ...), **input importance**
+(gradient × input over time), **compare models** (`--compare`) and **worst
+cases** (the worst validation equations from the model's evaluation file, with
+likely reasons). **Record video** plays the scene once and saves a WebM
+(`ffmpeg -i in.webm out.mp4` converts it); **Save picture** saves a PNG.
+
+Options: `--model` (default `ode/models/current`), `--input` (equation JSON to
+start on), `--worst N` (reel length, 0 for none), `--output`. With `--compare`
+the file is about 9 MB, otherwise about 2 MB. On load, the page recomputes the
+starting equation and checks it against PyTorch's numbers stored in the file.
+
 ## Train a model
 
 ```bash
@@ -186,6 +215,7 @@ scored during development.
 | `runs` | List runs and datasets with scores and sizes |
 | `diagnose` | Break validation error down by regime |
 | `validate` | Check the solver against exact formulas |
+| `viz` | Interactive explorer of a trained model: one portable HTML file ([details](#look-inside-a-model-the-demo-explorer)) |
 | `neurons`, `video` | Animate training as HTML or MP4 (needs `--snapshot-every`) |
 | `check`, `benchmark` | Environment report; generation or inference timing |
 

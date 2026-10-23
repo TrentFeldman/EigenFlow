@@ -1,0 +1,1246 @@
+<!doctype html>
+<!--
+  Template for `python -m ode viz` (ode/tools/viz.py fills in the data placeholder with the
+  model's weights and settings). Everything runs in the browser: the first
+  <script> is the maths (no page access, so tests can run it in Node), the
+  second draws the scenes and wires up the controls.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>EigenFlow Explorer</title>
+<style>
+:root{color-scheme:light;--page:#f9f9f7;--surface:#fcfcfb;--ink:#0b0b0b;--ink2:#52514e;--muted:#898781;--grid:#e1e0d9;--axis:#c3c2b7;
+  --border:rgba(11,11,11,.12);--exact:#2a78d6;--model:#eb6834;--other:#1baf7a;--neg:#2a78d6;--pos:#e34948;--mid:#f0efec;
+  --good:#0ca30c;--bad:#d03b3b;--band:#9ec5f4;--role1:#2a78d6;--role2:#eb6834;--role3:#1baf7a;--role4:#eda100;--role5:#e87ba4}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){color-scheme:dark;--page:#0d0d0d;--surface:#1a1a19;--ink:#f0efec;
+  --ink2:#c3c2b7;--muted:#898781;--grid:#2c2c2a;--axis:#383835;--border:rgba(255,255,255,.12);--exact:#3987e5;--model:#d95926;
+  --other:#199e70;--neg:#3987e5;--pos:#e66767;--mid:#383835;--band:#1c5cab;--role1:#3987e5;--role2:#d95926;--role3:#199e70;
+  --role4:#c98500;--role5:#d55181}}
+:root[data-theme="dark"]{color-scheme:dark;--page:#0d0d0d;--surface:#1a1a19;--ink:#f0efec;--ink2:#c3c2b7;--muted:#898781;--grid:#2c2c2a;
+  --axis:#383835;--border:rgba(255,255,255,.12);--exact:#3987e5;--model:#d95926;--other:#199e70;--neg:#3987e5;--pos:#e66767;
+  --mid:#383835;--band:#1c5cab;--role1:#3987e5;--role2:#d95926;--role3:#199e70;--role4:#c98500;--role5:#d55181}
+*{box-sizing:border-box}
+body{margin:0;background:var(--page);color:var(--ink);font:15px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif}
+main{max-width:1320px;margin:0 auto;padding:16px}
+h1{font-size:22px;margin:0}
+p{margin:2px 0}
+.sub,#blurb{color:var(--ink2)}
+.note{color:var(--muted);font-size:13px}
+#status{font-size:13px;margin-top:4px}
+#status.bad{color:var(--bad);font-weight:600}
+nav{display:flex;flex-wrap:wrap;gap:6px;margin:12px 0 6px}
+button,select{font:inherit;padding:5px 12px;border:1px solid var(--border);background:var(--surface);color:var(--ink);border-radius:6px;cursor:pointer}
+button:disabled{opacity:.5;cursor:default}
+nav button[aria-selected="true"]{background:var(--ink);color:var(--page);border-color:var(--ink)}
+#blurb{min-height:2.9em;margin:4px 0 8px;max-width:75em}
+canvas{display:block;width:100%;height:auto;aspect-ratio:16/9;background:var(--surface);border:1px solid var(--border);border-radius:8px;touch-action:none}
+.bar{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center;margin:10px 0}
+.bar #time{flex:1;min-width:160px}
+.bar [hidden]{display:none}
+#timeLabel{min-width:5.5em;font-variant-numeric:tabular-nums}
+#controls{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:12px;margin-top:6px}
+fieldset{border:1px solid var(--border);border-radius:8px;padding:6px 12px 10px;margin:0;min-width:0}
+legend{font-weight:600;padding:0 4px}
+.slider{display:grid;grid-template-columns:8.5em 1fr 3.4em;gap:8px;align-items:center;margin:6px 0}
+.slider output{text-align:right;font-variant-numeric:tabular-nums}
+.slider.off{opacity:.45}
+input[type=range]{-webkit-appearance:none;appearance:none;width:100%;min-width:0;height:6px;border-radius:3px;background:var(--grid);margin:8px 0}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;height:16px;border-radius:50%;background:var(--ink);border:2px solid var(--surface)}
+input[type=range]::-moz-range-thumb{width:13px;height:13px;border-radius:50%;background:var(--ink);border:2px solid var(--surface)}
+input[type=range]:focus-visible{outline:2px solid var(--exact);outline-offset:4px}
+#tip{position:fixed;pointer-events:none;background:var(--ink);color:var(--page);padding:4px 8px;border-radius:6px;font-size:13px;white-space:nowrap;z-index:2}
+details{margin-top:14px}
+summary{cursor:pointer;color:var(--ink2)}
+table{border-collapse:collapse;font-variant-numeric:tabular-nums;font-size:13px;margin-top:6px}
+th,td{padding:2px 10px;text-align:right;border-bottom:1px solid var(--grid)}
+</style>
+</head>
+<body>
+<main>
+<h1>Inside the EigenFlow ODE network</h1>
+<p class="sub" id="sub"></p>
+<p id="status" role="status">Loading the network…</p>
+<nav id="tabs" role="tablist" aria-label="Scenes"></nav>
+<p id="blurb"></p>
+<canvas id="view" width="1920" height="1080" role="img" aria-label="Picture of the current scene; the table under 'Numbers behind the picture' has the same values"></canvas>
+<div class="bar">
+  <button id="play">▶ Play</button>
+  <label for="time">Time</label><input id="time" type="range" min="0" value="0"><span id="timeLabel"></span>
+  <button id="record" title="Plays the scene once from the start and saves it as a video">⏺ Record video</button>
+  <button id="picture">Save picture</button>
+</div>
+<div class="bar" id="sceneBar">
+  <label data-for="sweep">Change <select id="sweepParam"></select></label>
+  <label data-for="phase roles">Layer <select id="layer"></select></label>
+  <label data-for="importance trace">Answer part <select id="output"></select></label>
+  <button data-for="map trace" id="clearTrace">Clear trace</button>
+  <button data-for="reel" id="prevCase">◀ Previous case</button>
+  <button data-for="reel" id="nextCase">Next case ▶</button>
+</div>
+<section id="controls" aria-label="Equation settings"></section>
+<p class="note" id="foot"></p>
+<details id="numbers"><summary>Numbers behind the picture</summary><div id="table"></div></details>
+</main>
+<div id="tip" hidden></div>
+<noscript><p>This page needs JavaScript: the network runs inside it.</p></noscript>
+
+<script id="core">
+"use strict";
+// ===================== The maths: no page access, so Node can test it =====================
+const D = __DATA__;
+
+// viz.py stores float32 weights as base64 bytes (little-endian, which every
+// mainstream CPU uses, so the bytes can be viewed directly as floats).
+function floats(b64) {
+  const text = atob(b64), bytes = new Uint8Array(text.length);
+  for (let i = 0; i < text.length; i++) bytes[i] = text.charCodeAt(i);
+  return new Float32Array(bytes.buffer);
+}
+
+// 0 -> "y", 1 -> "y′", 2 -> "y″"-style names (the notation in ode/MATH_GUIDE.md).
+const dname = k => "y" + (k < 4 ? "′".repeat(k) : `⁽${k}⁾`);
+
+// The page describes an equation by its modes, the way the training data was made
+// (generation/equations.py stable_coefficients): eq = {order, pairs: [[d, w], ...],
+// real: [r], init: [y(0), y′(0), ...], amplitude, frequency, phase}. A pair is a
+// part that wiggles at speed w while fading at rate d (roots -d ± iw); a real mode
+// fades at rate r without wiggling (root -r).
+// coefficients() multiplies the factors s² + 2ds + d² + w² and s + r together and
+// returns a_0..a_(n-1) of y^(n) + Σ a_k y^(k), the order LinearODE.coefficients uses.
+// Example: one pair d = 0.3, w = 1.4 gives s² + 0.6s + 2.05, so [2.05, 0.6].
+function coefficients(eq) {
+  let poly = [1];  // highest power first
+  const times = factor => {
+    const out = new Array(poly.length + factor.length - 1).fill(0);
+    poly.forEach((p, i) => factor.forEach((q, j) => out[i + j] += p * q));
+    poly = out;
+  };
+  eq.pairs.forEach(([d, w]) => times([1, 2 * d, d * d + w * w]));
+  eq.real.forEach(r => times([1, r]));
+  return poly.slice(1).reverse();
+}
+
+// The trained time grid: time_points evenly spaced elapsed times from 0.
+function timeGrid(cfg) {
+  const span = cfg.t_stop - cfg.t_start;
+  return Array.from({length: cfg.time_points}, (_, i) => span * i / (cfg.time_points - 1));
+}
+
+// The exact answer, built like generation/analytic.py: write the ODE as a first-order
+// system x′ = A x (two extra states hold sin and cos when there is a push), then step
+// along the evenly spaced grid with E = exp(A h), the exact propagator for one step h.
+// Returns states[t] = [y, y′, ...] at every time.
+function exactStates(eq, times) {
+  const n = eq.order, a = coefficients(eq), forced = eq.amplitude !== 0, m = n + (forced ? 2 : 0);
+  const A = Array.from({length: m}, () => new Array(m).fill(0));
+  for (let i = 0; i < n - 1; i++) A[i][i + 1] = 1;
+  for (let k = 0; k < n; k++) A[n - 1][k] = -a[k];
+  let x = [...eq.init];
+  if (forced) {
+    A[n - 1][n] = eq.amplitude; A[n][n + 1] = eq.frequency; A[n + 1][n] = -eq.frequency;
+    x.push(Math.sin(eq.phase), Math.cos(eq.phase));
+  }
+  const E = expm(A, times[1] - times[0]), states = [];
+  for (let t = 0; t < times.length; t++) {
+    states.push(x.slice(0, n));
+    x = E.map(row => row.reduce((sum, v, j) => sum + v * x[j], 0));
+  }
+  return states;
+}
+
+// exp(A h) by scaling and squaring: shrink A h by 2^s until it is small (norm <= 1/4),
+// sum 18 Taylor terms (error far below 1e-15), then square the result s times.
+function expm(A, h) {
+  const norm = Math.max(...A.map(row => row.reduce((sum, v) => sum + Math.abs(v), 0))) * h;
+  const halvings = Math.max(0, Math.ceil(Math.log2(norm / 0.25)));
+  const B = A.map(row => row.map(v => v * h / 2 ** halvings));
+  const mul = (P, Q) => P.map(row => Q[0].map((_, j) => row.reduce((sum, v, k) => sum + v * Q[k][j], 0)));
+  let term = A.map((row, i) => row.map((_, j) => +(i === j))), E = term.map(row => row.slice());
+  for (let k = 1; k <= 18; k++) {
+    term = mul(term, B).map(row => row.map(v => v / k));
+    E = E.map((row, i) => row.map((v, j) => v + term[i][j]));
+  }
+  for (let s = 0; s < halvings; s++) E = mul(E, E);
+  return E;
+}
+
+// trajectory-rms-v1, as in evaluation/evaluate.py: the RMS of the miss over every time
+// and component, divided by the RMS of the exact answer (floored at 1e-6). 0.01 = 1%.
+function relativeError(exact, predicted) {
+  let miss = 0, size = 0, count = 0;
+  exact.forEach((row, t) => row.forEach((v, c) => { miss += (predicted[t][c] - v) ** 2; size += v * v; count++; }));
+  return Math.sqrt(miss / count) / Math.max(Math.sqrt(size / count), 1e-6);
+}
+
+// Plain-language version of evaluation/predict.py domain_violations(): which settings
+// are outside what this network saw in training. Empty list = inside.
+function outsideTraining(eq, cfg) {
+  const out = [], inside = (v, [lo, hi]) => v >= lo - 1e-7 && v <= hi + 1e-7;
+  if (!cfg.orders.includes(eq.order)) out.push(`order ${eq.order}`);
+  if (!cfg.families.includes(eq.amplitude ? "linear_sinusoidal" : "linear_homogeneous")) out.push(eq.amplitude ? "any push" : "no push");
+  if (![...eq.pairs.map(p => p[0]), ...eq.real].every(d => inside(d, cfg.decay_range))) out.push("fade rate");
+  if (!eq.pairs.every(p => inside(p[1], cfg.frequency_range))) out.push("wiggle speed");
+  if (!eq.init.every(v => inside(v, cfg.initial_state_range))) out.push("starting value");
+  if (eq.amplitude && !inside(eq.amplitude, cfg.amplitude_range)) out.push("push strength");
+  if (eq.amplitude && !inside(eq.frequency, cfg.frequency_range)) out.push("push speed");
+  return out;
+}
+
+// One Linear layer for every time at once: z[t][i] = b[i] + Σ_k w[i][k] x[t][k].
+// x and z are flat arrays, row t starting at t * width.
+function dense({in: I, out: O, w, b}, x, T) {
+  const z = new Float64Array(T * O);
+  for (let t = 0; t < T; t++) {
+    const xo = t * I;
+    for (let i = 0; i < O; i++) {
+      let sum = b[i];
+      const wo = i * I;
+      for (let k = 0; k < I; k++) sum += w[wo + k] * x[xo + k];
+      z[t * O + i] = sum;
+    }
+  }
+  return z;
+}
+
+// One trained network (training/model.py OrderConditionedMLP): Linear+SiLU layers, then
+// a final Linear. Weights are float32 like PyTorch; sums here run in float64, so answers
+// agree with PyTorch to about 1e-6 (the page checks this on load).
+class Net {
+  constructor(model) {
+    Object.assign(this, model);  // name, architecture, parameters, normalizer, config, validation_error
+    this.layers = model.layers.map(l => ({in: l.in, out: l.out, w: floats(l.w), b: floats(l.b)}));
+    this.M = model.architecture.max_order;  // padding width: blocks of M slots in the input
+    this.F = 3 * this.M + 5;                // input width, as dataset.feature_width
+    this.hidden = this.layers.length - 1;   // number of hidden (SiLU) layers
+    this.times = timeGrid(model.config);
+  }
+
+  supports(eq) { return this.config.orders.includes(eq.order); }
+
+  // The network's input at every time, built like training/dataset.py encode() and then
+  // Normalizer.transform_features(). Layout for M = 6: [0:6) coefficients | [6:12) starting
+  // values | [12:18) order flags (1 = derivative in use) | 18-21 push strength, speed,
+  // sin(phase), cos(phase) (all 0 without a push) | 22 time. Unused slots stay exactly 0.
+  inputs(eq) {
+    const {M, F, times} = this, n = eq.order, mean = this.normalizer.input_mean, scale = this.normalizer.input_scale;
+    const raw = new Array(F).fill(0), a = coefficients(eq);
+    for (let k = 0; k < n; k++) { raw[k] = a[k]; raw[M + k] = eq.init[k]; raw[2 * M + k] = 1; }
+    if (eq.amplitude) [raw[3 * M], raw[3 * M + 1], raw[3 * M + 2], raw[3 * M + 3]] =
+      [eq.amplitude, eq.frequency, Math.sin(eq.phase), Math.cos(eq.phase)];
+    const x = new Float64Array(times.length * F);
+    times.forEach((time, t) => {
+      raw[F - 1] = time;
+      for (let k = 0; k < F; k++) {
+        const padding = k < 2 * M && k % M >= n;
+        x[t * F + k] = padding ? 0 : (raw[k] - mean[k]) / scale[k];
+      }
+    });
+    return x;
+  }
+
+  // Run every time point. Returns the inputs x (T×F), every hidden layer before (pre) and
+  // after (act) its SiLU (T×width each), and out[t][c], the answer in the equation's units.
+  run(eq) {
+    const T = this.times.length, x = this.inputs(eq), pre = [], act = [];
+    let h = x;
+    this.layers.forEach((layer, l) => {
+      const z = dense(layer, h, T);
+      if (l === this.hidden) { h = z; return; }
+      const a = z.map(v => v / (1 + Math.exp(-v)));  // SiLU(z) = z * sigmoid(z)
+      pre.push(z); act.push(a); h = a;
+    });
+    const {target_mean: mu, target_scale: sd} = this.normalizer, O = this.layers[this.hidden].out;
+    const out = Array.from({length: T}, (_, t) => Array.from({length: eq.order}, (_, c) => h[t * O + c] * sd[c] + mu[c]));
+    return {eq, x, pre, act, out, T};
+  }
+
+  // How much answer part c (in the equation's units) changes per unit change of each
+  // normalized input, at every time: the gradient, by the chain rule backwards through
+  // the layers (backpropagation). SiLU′(z) = s (1 + z (1 - s)) with s = sigmoid(z).
+  // Returns a flat T×F array.
+  gradient(result, c) {
+    const T = result.T, F = this.F, G = new Float64Array(T * F);
+    for (let t = 0; t < T; t++) {
+      let g = new Float64Array(this.layers[this.hidden].out);
+      g[c] = this.normalizer.target_scale[c];
+      for (let l = this.hidden; l >= 0; l--) {
+        const {in: I, out: O, w} = this.layers[l], back = new Float64Array(I);
+        for (let i = 0; i < O; i++) if (g[i]) for (let k = 0; k < I; k++) back[k] += g[i] * w[i * I + k];
+        if (l > 0) {
+          const z = result.pre[l - 1];
+          for (let k = 0; k < I; k++) { const v = z[t * I + k], s = 1 / (1 + Math.exp(-v)); back[k] *= s * (1 + v * (1 - s)); }
+        }
+        g = back;
+      }
+      G.set(g, t * F);
+    }
+    return G;
+  }
+}
+
+// The value below which a fraction q of |values| lies (0.95 = a "typical big" value).
+function quantileAbs(values, q) {
+  const sorted = Float64Array.from(values, Math.abs).sort();
+  return sorted[Math.floor(q * (sorted.length - 1))];
+}
+
+// Squash one hidden layer (T times × W neurons) to two numbers per time: the two
+// directions along which the neuron values change most (principal component analysis).
+// Works on the small T×T matrix of dot products between times, whose top eigenvectors
+// (found by repeated multiplication, "power iteration") are the scores over time.
+// Returns {paths: [pc1[t], pc2[t]], explained: share of all variation the two hold}.
+function pca2(act, T, W) {
+  const X = new Float64Array(T * W);
+  for (let k = 0; k < W; k++) {
+    let mean = 0;
+    for (let t = 0; t < T; t++) mean += act[t * W + k] / T;
+    for (let t = 0; t < T; t++) X[t * W + k] = act[t * W + k] - mean;
+  }
+  const G = Array.from({length: T}, () => new Float64Array(T));
+  let total = 0;
+  for (let i = 0; i < T; i++) for (let j = i; j < T; j++) {
+    let sum = 0;
+    for (let k = 0; k < W; k++) sum += X[i * W + k] * X[j * W + k];
+    G[i][j] = G[j][i] = sum;
+  }
+  for (let i = 0; i < T; i++) total += G[i][i];
+  const vectors = [], values = [];
+  for (let c = 0; c < 2; c++) {
+    let v = Array.from({length: T}, (_, i) => Math.cos(i * (c + 1) / T) + 0.1), value = 0;
+    for (let iteration = 0; iteration < 200; iteration++) {
+      let u = G.map(row => row.reduce((sum, g, j) => sum + g * v[j], 0));
+      for (const p of vectors) {  // remove the direction already found ("deflation")
+        const dot = p.reduce((sum, pv, j) => sum + pv * u[j], 0);
+        u = u.map((x, j) => x - dot * p[j]);
+      }
+      value = Math.hypot(...u);
+      if (!value) break;
+      v = u.map(x => x / value);
+    }
+    if (v[0] > 0) v = v.map(x => -x);  // the sign is arbitrary; start on the low side so pictures don't flip
+    vectors.push(v); values.push(value);
+  }
+  return {paths: vectors.map((v, c) => v.map(x => x * Math.sqrt(values[c]))), explained: total ? (values[0] + values[1]) / total : 0};
+}
+
+// What each neuron of one layer does over the whole time window. A swing counts only
+// if it is more than 10% of the neuron's own range, so tiny ripples are ignored.
+// silent: never moves and sits near 0; steady: never moves, away from 0; rising/falling:
+// moves one way only; one bump: turns around once; wiggling: turns around 2+ times.
+// scale is the layer's typical big value; "never moves" means range < 3% of it.
+const ROLES = ["silent", "steady", "rising", "falling", "one bump", "wiggling"];
+function neuronRoles(act, T, W, scale) {
+  const role = new Int8Array(W), peak = new Int16Array(W), range = new Float64Array(W);
+  for (let k = 0; k < W; k++) {
+    const v = Array.from({length: T}, (_, t) => act[t * W + k]);
+    const mean = v.reduce((sum, x) => sum + x, 0) / T;
+    range[k] = Math.max(...v) - Math.min(...v);
+    peak[k] = v.reduce((best, x, t) => Math.abs(x - mean) > Math.abs(v[best] - mean) ? t : best, 0);
+    if (range[k] < 0.03 * scale) { role[k] = Math.abs(mean) < 0.03 * scale ? 0 : 1; continue; }
+    const tolerance = 0.1 * range[k];
+    let direction = 0, extreme = v[0], turns = 0;
+    for (const x of v) {
+      if (!direction) { if (Math.abs(x - v[0]) > tolerance) { direction = Math.sign(x - v[0]); extreme = x; } }
+      else if ((x - extreme) * direction > 0) extreme = x;                                // still going the same way
+      else if (Math.abs(x - extreme) > tolerance) { turns++; direction = -direction; extreme = x; }  // turned around
+    }
+    role[k] = turns === 0 ? (v[T - 1] > v[0] ? 2 : 3) : turns === 1 ? 4 : 5;
+  }
+  return {role, peak, range};
+}
+
+// Recompute the starting equation and compare with the PyTorch numbers viz.py stored:
+// the largest difference relative to the answer's size, for the exact solver and each model.
+function selfCheck(nets) {
+  const worst = (a, b) => {
+    const size = Math.max(...b.flat().map(Math.abs)) || 1;
+    return Math.max(...a.flatMap((row, t) => row.map((v, c) => Math.abs(v - b[t][c])))) / size;
+  };
+  return {exact: worst(exactStates(D.start, nets[0].times), D.check.exact),
+          models: nets.map((net, i) => D.check.predicted[i] ? worst(net.run(D.start).out, D.check.predicted[i]) : null)};
+}
+</script>
+
+<script>
+"use strict";
+// ===================== The page: scenes, drawing and controls =====================
+const nets = D.models.map(m => new Net(m)), net = nets[0], other = nets[1] || null;
+const times = net.times, T = times.length, L = net.hidden;
+const canvas = document.getElementById("view"), ctx = canvas.getContext("2d");
+const VW = 1280, VH = 720, PX = canvas.width / VW;  // layout units; the canvas has 1.5x the pixels for sharp recordings
+const $ = id => document.getElementById(id);
+const cases = D.reel ? D.reel.cases : [];
+const clone = eq => JSON.parse(JSON.stringify(eq));
+const pct = v => !isFinite(v) ? "—" : (v * 100 >= 10 ? (v * 100).toFixed(0) : v * 100 >= 1 ? (v * 100).toFixed(1) : v * 100 >= 0.1 ? (v * 100).toFixed(2) : (v * 100).toPrecision(1)) + "%";
+const fmt = v => Math.abs(v) >= 100 ? v.toFixed(0) : Math.abs(v) >= 0.01 || v === 0 ? String(+v.toFixed(2)) : String(+v.toPrecision(2));
+
+const SCENES = {
+  map: {tab: "Network map", play: "time", draw: () => drawMap(false),
+    blurb: "Inputs on the left, the hidden layers in the middle, the answer on the right. Each dot is a neuron (red = positive, blue = negative, grey = quiet) and the lines are the strongest signals passing between them right now. Press Play to run through time; click any neuron to trace it."},
+  trace: {tab: "Trace", play: "time", draw: () => drawMap(true),
+    blurb: "Following one value backwards: the thick lines lead from the chosen output (or any neuron you click) to the neurons that fed it most at this moment, and the list shows which inputs those paths start from."},
+  lights: {tab: "Lighting up", play: "time", draw: drawLights,
+    blurb: "Each square is one neuron. Press Play and watch them switch on and off as time runs through the solution."},
+  sweep: {tab: "Sweep", play: "sweep", draw: drawSweep,
+    blurb: "One setting moves from well below to well above what the network was trained on. The right chart fills in the network's error at every value; the shaded band is the trained range. Press Play to watch the answer change."},
+  phase: {tab: "Phase portrait", play: "time", draw: drawPhase,
+    blurb: "Left: the real motion, position against speed. Right: one hidden layer squeezed from hundreds of neurons to its two most important directions. When the shapes match, that layer has captured the motion."},
+  roles: {tab: "Neuron roles", play: "time", draw: drawRoles,
+    blurb: "Every neuron in a layer, sorted by how it behaves over the whole time window: silent, steady, rising, falling, one bump, or wiggling."},
+  importance: {tab: "Input importance", play: "time", draw: drawImportance,
+    blurb: "Which inputs are pushing the answer up (red) or down (blue) at each moment. Press Play to watch the balance shift over time."},
+  compare: {tab: "Compare models", play: "time", draw: drawCompare,
+    blurb: "Two networks on the same equation: their answers, how far off each one is over time, and their neurons side by side."},
+  reel: {tab: "Worst cases", play: "reel", draw: drawReel,
+    blurb: "The equations this model gets most wrong among its validation equations, with likely reasons. Play steps through them; any tab then shows the case on screen."},
+};
+
+const S = {scene: "map", t: Math.floor(T / 2), playing: false, recording: null, eq: clone(D.start), traced: null,
+           layer: L - 1, output: 0, sweepParam: null, sweep: {key: "", values: [], errors: [], index: 0}, reel: 0};
+
+// ---------- Results for the current equation (recomputed only when it changes) ----------
+let R = null;
+function results() {
+  const key = JSON.stringify(S.eq);
+  if (!R || R.key !== key) {
+    const run = net.run(S.eq), exact = exactStates(S.eq, times);
+    R = {key, run, exact, error: relativeError(exact, run.out), scale: run.act.map(a => quantileAbs(a, 0.95) || 1), extra: {}};
+  }
+  return R;
+}
+// Expensive extras are made only by the scenes that show them, once per equation.
+function extra(name, make) { const r = results(); return name in r.extra ? r.extra[name] : (r.extra[name] = make(r)); }
+
+// ---------- Settings: one list drives the sliders and the sweep ----------
+const PUSH = ["amplitude", "frequency", "phase"];
+// ranges: what was trained, and the slider range, half the trained span wider on both sides.
+const wide = ([lo, hi], floor = 0) => [Math.max(floor, lo - (hi - lo) / 2), hi + (hi - lo) / 2];
+function settings(eq) {
+  const cfg = net.config, list = [];
+  eq.pairs.forEach((_, p) => {
+    const tag = eq.pairs.length > 1 ? ` ${p + 1}` : "";
+    list.push({id: `fade${p}`, group: "move", label: `fade rate${tag}`, get: e => e.pairs[p][0], set: (e, v) => e.pairs[p][0] = v, trained: cfg.decay_range, range: wide(cfg.decay_range)});
+    list.push({id: `speed${p}`, group: "move", label: `wiggle speed${tag}`, get: e => e.pairs[p][1], set: (e, v) => e.pairs[p][1] = v, trained: cfg.frequency_range, range: wide(cfg.frequency_range, 0.05)});
+  });
+  eq.real.forEach((_, r) => list.push({id: `real${r}`, group: "move", label: "extra fade rate", get: e => e.real[r], set: (e, v) => e.real[r] = v, trained: cfg.decay_range, range: wide(cfg.decay_range)}));
+  eq.init.forEach((_, k) => list.push({id: `init${k}`, group: "start", label: `starting ${dname(k)}`, get: e => e.init[k], set: (e, v) => e.init[k] = v, trained: cfg.initial_state_range, range: wide(cfg.initial_state_range, -Infinity)}));
+  list.push({id: "amplitude", group: "push", label: "push strength", get: e => e.amplitude, set: (e, v) => e.amplitude = v, trained: cfg.amplitude_range, range: wide(cfg.amplitude_range, 0.02)});
+  list.push({id: "frequency", group: "push", label: "push speed", get: e => e.frequency, set: (e, v) => e.frequency = v, trained: cfg.frequency_range, range: wide(cfg.frequency_range, 0.05)});
+  list.push({id: "phase", group: "push", label: "push timing", get: e => e.phase, set: (e, v) => e.phase = v, trained: [-Math.PI, Math.PI], range: [-Math.PI, Math.PI]});
+  return list;
+}
+
+// ---------- Text describing the equation ----------
+function equationText(eq) {
+  const a = coefficients(eq);
+  let left = dname(eq.order);
+  for (let k = eq.order - 1; k >= 0; k--) left += ` ${a[k] < 0 ? "−" : "+"} ${Math.abs(a[k]).toFixed(2)} ${dname(k)}`;
+  const right = eq.amplitude ? `${eq.amplitude.toFixed(2)} sin(${eq.frequency.toFixed(2)} t ${eq.phase < 0 ? "−" : "+"} ${Math.abs(eq.phase).toFixed(2)})` : "0";
+  return `${left} = ${right}`;
+}
+function plainText(eq) {
+  const parts = eq.pairs.map(([d, w]) => `wiggles at speed ${w.toFixed(2)} while fading at rate ${d.toFixed(2)}`);
+  eq.real.forEach(r => parts.push(`has a part fading at rate ${r.toFixed(2)}`));
+  parts.push(eq.amplitude ? `is pushed by a sine wave (strength ${eq.amplitude.toFixed(2)}, speed ${eq.frequency.toFixed(2)})` : "has no outside push");
+  return "starting from " + eq.init.map((v, k) => `${dname(k)}(0) = ${v.toFixed(2)}`).join(", ") + "; it " + parts.join(", ");
+}
+
+// The inputs worth drawing for order n (unused padding slots are always 0 and are left out).
+function shownInputs(n) {
+  const M = net.M, list = [];
+  for (let k = 0; k < n; k++) list.push({index: k, name: `${dname(k)} coefficient`});
+  for (let k = 0; k < n; k++) list.push({index: M + k, name: `starting ${dname(k)}`});
+  for (let k = 0; k < n; k++) list.push({index: 2 * M + k, name: `order flag ${k + 1}`});
+  ["push strength", "push speed", "push sin(timing)", "push cos(timing)"].forEach((name, k) => list.push({index: 3 * M + k, name}));
+  list.push({index: 3 * M + 4, name: "time"});
+  return list;
+}
+const rawInput = (index, value) => value * net.normalizer.input_scale[index] + net.normalizer.input_mean[index];
+
+// ---------- Drawing kit ----------
+const C = {};  // theme colours, read from the CSS variables so light and dark both work
+let LUT = [], theme = 0;
+const hex = h => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16));
+function readTheme() {
+  const css = getComputedStyle(document.documentElement);
+  for (const name of ["surface", "ink", "ink2", "muted", "grid", "axis", "exact", "model", "other", "neg", "pos", "mid", "good", "bad", "role1", "role2", "role3", "role4", "role5"])
+    C[name] = css.getPropertyValue("--" + name).trim();
+  // Diverging colours for neuron values: blue (negative) through the neutral grey to red (positive).
+  const [neg, mid, pos] = [C.neg, C.mid, C.pos].map(hex);
+  LUT = Array.from({length: 257}, (_, i) => {
+    const f = (i - 128) / 128, pole = f < 0 ? neg : pos, rgb = mid.map((m, j) => Math.round(m + (pole[j] - m) * Math.abs(f)));
+    return {rgb, css: `rgb(${rgb})`};
+  });
+  theme++;
+}
+const roleColour = r => r === 0 ? C.axis : C["role" + r];
+// v is in units of the layer's typical big value; tanh keeps colours from saturating too early.
+const shade = v => LUT[Math.round((Math.tanh(1.5 * v) + 1) * 128)] || LUT[128];
+const font = ({size = 13, weight = 400} = {}) => `${weight} ${size}px system-ui, -apple-system, "Segoe UI", sans-serif`;
+function text(s, x, y, {size = 13, weight = 400, colour = "ink2", align = "left"} = {}) {
+  ctx.font = font({size, weight}); ctx.fillStyle = C[colour] || colour; ctx.textAlign = align; ctx.textBaseline = "alphabetic";
+  ctx.fillText(s, x, y);
+}
+// Text broken into lines of at most `width`; returns the y below the last line.
+function wrap(s, x, y, width, lineHeight, options = {}) {
+  ctx.font = font(options);
+  let current = "";
+  for (const word of s.split(" ")) {
+    const test = current ? current + " " + word : word;
+    if (ctx.measureText(test).width > width && current) { text(current, x, y, options); y += lineHeight; current = word; }
+    else current = test;
+  }
+  if (current) text(current, x, y, options);
+  return y + lineHeight;
+}
+function line(points, colour, width = 2, dash = []) {
+  ctx.beginPath();
+  points.forEach(([x, y], i) => i ? ctx.lineTo(x, y) : ctx.moveTo(x, y));
+  ctx.strokeStyle = C[colour] || colour; ctx.lineWidth = width; ctx.setLineDash(dash); ctx.lineJoin = ctx.lineCap = "round";
+  ctx.stroke(); ctx.setLineDash([]);
+}
+function dot(x, y, r, colour, ring = true) {
+  ctx.beginPath(); ctx.arc(x, y, r, 0, 2 * Math.PI); ctx.fillStyle = C[colour] || colour; ctx.fill();
+  if (ring) { ctx.lineWidth = 2; ctx.strokeStyle = C.surface; ctx.stroke(); }
+}
+function message(s) { wrap(s, VW / 2 - 330, VH / 2 - 20, 660, 26, {size: 18, colour: "ink2"}); }
+
+// Round tick values (port of plot_results._ticks), and 1-2-5 ticks for log scales.
+function ticks(lo, hi, count) {
+  const raw = (hi - lo) / Math.max(count - 1, 1) || 1, magnitude = 10 ** Math.floor(Math.log10(raw));
+  const step = [1, 2, 2.5, 5, 10].map(m => m * magnitude).find(s => s >= raw), out = [];
+  for (let v = Math.ceil(lo / step) * step; v <= hi + step * 1e-9; v += step) out.push(Math.abs(v) < step * 1e-6 ? 0 : v);
+  return out;
+}
+function logTicks(lo, hi) {
+  const out = [], steps = Math.log10(hi / lo) > 4 ? [1] : [1, 2, 5];
+  for (let e = Math.floor(Math.log10(lo)); e <= Math.ceil(Math.log10(hi)); e++)
+    for (const m of steps) { const v = m * 10 ** e; if (v >= lo && v <= hi) out.push(v); }
+  return out;
+}
+
+// A chart frame in box b = [x, y, width, height]: title, gridlines, ticks. Returns X(), Y()
+// mapping data to the canvas. log draws y on a log scale with percentage ticks.
+function axes(b, xRange, yRange, {title = "", xLabel = "", log = false, yTicks = true} = {}) {
+  const [x0, y0, w, h] = b, f = log ? Math.log10 : v => v, lo = f(yRange[0]), hi = f(yRange[1]);
+  const X = v => x0 + (v - xRange[0]) / (xRange[1] - xRange[0]) * w;
+  const Y = v => y0 + h - (f(Math.max(v, log ? yRange[0] / 10 : -Infinity)) - lo) / (hi - lo) * h;
+  if (title) text(title, x0, y0 - 12, {size: 13, weight: 600, colour: "ink"});
+  if (yTicks) for (const v of log ? logTicks(yRange[0], yRange[1]) : ticks(yRange[0], yRange[1], 5)) {
+    line([[x0, Y(v)], [x0 + w, Y(v)]], "grid", 1);
+    text(log ? pct(v) : fmt(v), x0 - 6, Y(v) + 4, {size: 11, colour: "muted", align: "right"});
+  }
+  for (const v of ticks(xRange[0], xRange[1], 6)) text(fmt(v), X(v), y0 + h + 15, {size: 11, colour: "muted", align: "center"});
+  line([[x0, y0 + h], [x0 + w, y0 + h]], "axis", 1);
+  if (xLabel) text(xLabel, x0 + w, y0 + h + 30, {size: 12, colour: "muted", align: "right"});
+  return {X, Y};
+}
+// Legend drawn right-aligned above a chart: items [{colour, label, width, dash}].
+function legend(right, y, items) {
+  let x = right;
+  for (const item of [...items].reverse()) {
+    ctx.font = font({size: 12});
+    x -= ctx.measureText(item.label).width;
+    text(item.label, x, y, {size: 12});
+    line([[x - 30, y - 4], [x - 8, y - 4]], item.colour, item.width || 2, item.dash || []);
+    x -= 48;
+  }
+}
+// Hit regions for the mouse: each frame lists boxes with a tooltip, click or drag action.
+let HITS = [];
+const hit = (box, action) => HITS.push({box, ...action});
+// Dragging across a chart with time along the bottom moves the time cursor.
+const timeDrag = b => hit(b, {drag: x => { S.t = Math.max(0, Math.min(T - 1, Math.round((x - b[0]) / b[2] * (T - 1)))); }});
+function cursor(b, X) { line([[X(times[S.t]), b[1]], [X(times[S.t]), b[1] + b[3]]], "ink2", 1); }
+
+// The solution over time: series [{values, colour, width, dash, label}] with the time cursor.
+function answerPlot(b, series, title) {
+  const peak = Math.max(...series.flatMap(s => s.values).map(Math.abs)) * 1.15 || 1;
+  const {X, Y} = axes(b, [0, times[T - 1]], [-peak, peak], {title, xLabel: "time"});
+  for (const s of series) line(s.values.map((v, t) => [X(times[t]), Y(v)]), s.colour, s.width || 2, s.dash || []);
+  cursor(b, X);
+  for (const s of series) if (s.dot !== false) dot(X(times[S.t]), Y(s.values[S.t]), 4, s.colour);
+  legend(b[0] + b[2], b[1] - 12, series.filter(s => s.label));
+  timeDrag(b);
+  return peak;
+}
+const exactSeries = (values, label = "exact answer") => ({values, colour: "exact", width: 6, label, dot: false});
+const networkSeries = (values, label = "network") => ({values, colour: "model", width: 2, label});
+// The network's miss over time, zoomed in so small errors are visible.
+function missPlot(b, miss, answerPeak, colour = "model") {
+  const peak = Math.max(...miss.map(Math.abs)) * 1.15 || 1e-12, zoom = answerPeak / peak;
+  const {X, Y} = axes(b, [0, times[T - 1]], [-peak, peak],
+    {title: `network minus exact${zoom >= 2 ? `, zoomed in ${Math.round(zoom).toLocaleString()}× compared with the chart above` : ""}`, xLabel: "time"});
+  ctx.beginPath(); ctx.moveTo(X(0), Y(0));
+  miss.forEach((v, t) => ctx.lineTo(X(times[t]), Y(v)));
+  ctx.lineTo(X(times[T - 1]), Y(0)); ctx.globalAlpha = 0.18; ctx.fillStyle = C[colour]; ctx.fill(); ctx.globalAlpha = 1;
+  line(miss.map((v, t) => [X(times[t]), Y(v)]), colour, 2);
+  cursor(b, X); timeDrag(b);
+}
+
+// Title, equation and the network's score, shared by every scene.
+function header(title) {
+  const r = results(), outside = outsideTraining(S.eq, net.config);
+  text(title, 32, 40, {size: 24, weight: 600, colour: "ink"});
+  text(equationText(S.eq), 32, 66, {size: 15, colour: "ink"});
+  ctx.font = font({size: 13});
+  const plain = plainText(S.eq);
+  text(ctx.measureText(plain).width > VW - 64 ? plain.slice(0, 170) + "…" : plain, 32, 88, {size: 13, colour: "muted"});
+  text(`network off by ${pct(r.error)}`, VW - 32, 40, {size: 20, weight: 600, colour: "ink", align: "right"});
+  if (outside.length) text("⚠ outside what it was trained on: " + outside.join(", "), VW - 32, 64, {size: 13, weight: 600, colour: "bad", align: "right"});
+  else text("✓ inside what it was trained on", VW - 32, 64, {size: 13, colour: "ink2", align: "right"});
+}
+
+// ---------- Scene: network map (and trace) ----------
+const EDGES_PER_GAP = 150;
+function drawMap(traceMode) {
+  const r = results(), run = r.run, t = S.t, n = S.eq.order, shown = shownInputs(n);
+  header(traceMode ? "Tracing where one value comes from" : "Every neuron, lit up for one moment");
+  const top = 124, bottom = 694, inputX = 132, outputX = 905, colX = l => 240 + l * 580 / Math.max(L - 1, 1);
+  // pos[col][i]: column 0 = inputs, 1..L = hidden layers, L + 1 = answer.
+  const spread = (count, i) => top + (i + 0.5) * (bottom - top) / count;
+  const pos = [shown.map((_, i) => [inputX, spread(shown.length, i)])];
+  for (let l = 0; l < L; l++) pos.push(Array.from({length: net.layers[l].out}, (_, k) => [colX(l), spread(net.layers[l].out, k)]));
+  pos.push(Array.from({length: n}, (_, c) => [outputX, (top + bottom) / 2 + (c - (n - 1) / 2) * 64]));
+  const value = (col, i) => col === 0 ? run.x[t * net.F + shown[i].index] : run.act[col - 1][t * net.layers[col - 1].out + i];
+  // The signal from source i (column g) into target j (column g + 1): weight times the source's value now.
+  const contribution = (g, j, i) => net.layers[g].w[j * net.layers[g].in + (g === 0 ? shown[i].index : i)] * value(g, i);
+
+  // The strongest signals: each target's two strongest inputs, then the top EDGES_PER_GAP of those per gap.
+  const edges = [];
+  for (let g = 0; g <= L; g++) {
+    const candidates = [];
+    pos[g + 1].forEach((_, j) => {
+      let best = [0, -1], second = [0, -1];
+      for (let i = 0; i < pos[g].length; i++) {
+        const c = contribution(g, j, i);
+        if (Math.abs(c) > Math.abs(best[0])) { second = best; best = [c, i]; } else if (Math.abs(c) > Math.abs(second[0])) second = [c, i];
+      }
+      for (const [c, i] of [best, second]) if (i >= 0) candidates.push([g, i, j, c]);
+    });
+    candidates.sort((a, b) => Math.abs(b[3]) - Math.abs(a[3]));
+    edges.push(...candidates.slice(0, g === L ? 12 * n : EDGES_PER_GAP));
+  }
+  // Tracing: from the chosen node, follow each kept node's 3 strongest inputs back, keeping the 8 most important per column.
+  const traced = traceMode || S.traced ? (S.traced || {col: L + 1, index: Math.min(S.output, n - 1)}) : null;
+  let traceEdges = [], inputShare = null;
+  if (traced && traced.col <= L + 1 && traced.index < pos[traced.col].length) {
+    let kept = new Map([[traced.index, 1]]);
+    for (let g = traced.col - 1; g >= 0; g--) {
+      const next = new Map();
+      for (const [j, strength] of kept) {
+        const all = pos[g].map((_, i) => contribution(g, j, i)), total = all.reduce((s, v) => s + Math.abs(v), 0) || 1;
+        all.forEach((c, i) => next.set(i, (next.get(i) || 0) + strength * Math.abs(c) / total));
+        all.map((c, i) => [Math.abs(c), i]).sort((a, b) => b[0] - a[0]).slice(0, 3).forEach(([, i]) => traceEdges.push([g, i, j, all[i]]));
+      }
+      if (g === 0) inputShare = next;
+      kept = new Map([...next].sort((a, b) => b[1] - a[1]).slice(0, 8));
+    }
+  }
+  // Edges first, nodes on top.
+  const peakEdge = Math.max(...edges.map(e => Math.abs(e[3]))) || 1;
+  ctx.globalAlpha = 1;
+  for (const [g, i, j, c] of [...edges].reverse()) {
+    const f = Math.abs(c) / peakEdge, [x1, y1] = pos[g][i], [x2, y2] = pos[g + 1][j];
+    ctx.globalAlpha = (0.12 + 0.6 * f) * (traced ? 0.3 : 1);
+    line([[x1 + 7, y1], [x2 - 7, y2]], c > 0 ? "pos" : "neg", 0.5 + 1.5 * f);
+  }
+  const peakTrace = Math.max(...traceEdges.map(e => Math.abs(e[3]))) || 1;
+  for (const [g, i, j, c] of traceEdges) {
+    const [x1, y1] = pos[g][i], [x2, y2] = pos[g + 1][j];
+    ctx.globalAlpha = 0.95;
+    line([[x1 + 7, y1], [x2 - 7, y2]], c > 0 ? "pos" : "neg", 1.2 + 2.6 * Math.abs(c) / peakTrace);
+  }
+  ctx.globalAlpha = 1;
+  const onTrace = new Set(traceEdges.flatMap(([g, i, j]) => [`${g}:${i}`, `${g + 1}:${j}`]));
+  if (traced) onTrace.add(`${traced.col}:${traced.index}`);
+  const traceIt = (col, index) => ({click: () => { S.traced = {col, index}; }});
+
+  text("inputs", inputX, top - 10, {size: 12, colour: "muted", align: "center"});
+  shown.forEach((s, i) => {
+    const [x, y] = pos[0][i], v = value(0, i);
+    dot(x, y, 7, shade(v / 2).css, false);
+    if (onTrace.has(`0:${i}`)) { ctx.lineWidth = 2; ctx.strokeStyle = C.ink; ctx.stroke(); }
+    text(s.name, x - 13, y + 4, {size: 11, align: "right"});
+    hit([x - 120, y - 9, 130, 18], {tip: `${s.name}: ${fmt(rawInput(s.index, v))} (scaled for the network: ${v.toFixed(2)})`, ...traceIt(0, i)});
+  });
+  for (let l = 0; l < L; l++) {
+    const count = pos[l + 1].length, pitch = (bottom - top) / count;
+    text(`layer ${l + 1}`, colX(l), top - 10, {size: 12, colour: "muted", align: "center"});
+    for (let k = 0; k < count; k++) {
+      const [x, y] = pos[l + 1][k], v = value(l + 1, k);
+      ctx.fillStyle = shade(v / r.scale[l]).css;
+      ctx.fillRect(x - 6, y - pitch / 2, 12, Math.max(pitch - (pitch > 2 ? 0.6 : 0), 0.8));
+      if (onTrace.has(`${l + 1}:${k}`)) { ctx.strokeStyle = C.ink; ctx.lineWidth = 1.5; ctx.strokeRect(x - 8, y - Math.max(pitch, 3) / 2, 16, Math.max(pitch, 3)); }
+      hit([x - 8, y - pitch / 2, 16, pitch], {tip: `layer ${l + 1}, neuron ${k}: ${v.toFixed(3)} — click to trace`, ...traceIt(l + 1, k)});
+    }
+  }
+  text("answer", outputX, top - 10, {size: 12, colour: "muted", align: "center"});
+  pos[L + 1].forEach(([x, y], c) => {
+    dot(x, y, 11, "model");
+    if (onTrace.has(`${L + 1}:${c}`)) { ctx.beginPath(); ctx.arc(x, y, 14, 0, 2 * Math.PI); ctx.strokeStyle = C.ink; ctx.lineWidth = 2; ctx.stroke(); }
+    text(`${dname(c)} = ${run.out[t][c].toFixed(3)}`, x + 18, y + 1, {size: 13, weight: 600, colour: "ink"});
+    text(`exact ${r.exact[t][c].toFixed(3)}`, x + 18, y + 17, {size: 11, colour: "muted"});
+    hit([x - 14, y - 14, 90, 34], {tip: `the network's ${dname(c)} — click to trace`, ...traceIt(L + 1, c)});
+  });
+
+  // Right panel: the answer with the time cursor, the colour key, and the trace summary.
+  const px = 1050, pw = 198;
+  answerPlot([px, 150, pw, 120], [exactSeries(r.exact.map(s => s[0]), "exact"), networkSeries(run.out.map(s => s[0]))], "");
+  text(`y over time; now t = ${times[t].toFixed(2)}`, px, 114, {size: 13, weight: 600, colour: "ink"});
+  let y = 330;
+  text("neuron colour", px, y, {size: 12, weight: 600, colour: "ink"});
+  for (let i = 0; i < pw; i++) { ctx.fillStyle = shade((i / pw * 2 - 1) * 1.5).css; ctx.fillRect(px + i, y + 8, 1, 10); }
+  text("negative", px, y + 34, {size: 11, colour: "muted"});
+  text("quiet", px + pw / 2, y + 34, {size: 11, colour: "muted", align: "center"});
+  text("positive", px + pw, y + 34, {size: 11, colour: "muted", align: "right"});
+  y = wrap("Lines: the strongest signals right now. Red pushes the next neuron up, blue pushes it down.", px, y + 62, pw, 17, {size: 12});
+  if (traced && inputShare) {
+    const name = traced.col === L + 1 ? `the network's ${dname(traced.index)}` : traced.col === 0 ? shown[traced.index].name : `layer ${traced.col}, neuron ${traced.index}`;
+    y = wrap(`Tracing ${name}: where its paths start`, px, y + 14, pw, 17, {size: 12, weight: 600, colour: "ink"});
+    const total = [...inputShare.values()].reduce((s, v) => s + v, 0) || 1;
+    [...inputShare].sort((a, b) => b[1] - a[1]).slice(0, 6).forEach(([i, v]) => {
+      const share = v / total;
+      text(shown[i].name, px, y + 2, {size: 11});
+      text(pct(share), px + pw, y + 2, {size: 11, colour: "ink", align: "right"});
+      ctx.fillStyle = C.ink2; ctx.fillRect(px, y + 6, Math.max(2, share * pw), 4);
+      y += 26;
+    });
+    text("A rough guide: shares of the traced", px, y + 4, {size: 11, colour: "muted"});
+    text("paths, not an exact split.", px, y + 18, {size: 11, colour: "muted"});
+  } else if (traced) {
+    wrap("This is an input: nothing feeds it. Click a neuron or an answer dot.", px, y + 14, pw, 17, {size: 12});
+  } else {
+    wrap("Click any neuron or answer dot to trace where its value comes from.", px, y + 14, pw, 17, {size: 12, colour: "muted"});
+  }
+}
+
+// ---------- Scene: neurons lighting up ----------
+function drawLights() {
+  header("Neurons lighting up as time runs");
+  const r = results(), run = r.run, shown = shownInputs(S.eq.order), top = 150, left = 220, gap = 18;
+  const width = net.layers[0].out, side = Math.ceil(Math.sqrt(width)), avail = VW - 32 - left;
+  const cell = Math.max(3, Math.floor(Math.min((avail - gap * (L - 1)) / L / side, 220 / side)));
+  text("inputs", 40, top - 12, {size: 12, colour: "muted"});
+  shown.forEach((s, i) => {
+    const v = run.x[S.t * net.F + s.index], y = top + i * 15;
+    ctx.fillStyle = shade(v / 2).css; ctx.fillRect(40, y, 26, 12);
+    text(s.name, 72, y + 10, {size: 11});
+    hit([40, y, 140, 13], {tip: `${s.name}: ${fmt(rawInput(s.index, v))}`});
+  });
+  for (let l = 0; l < L; l++) {
+    const x0 = left + l * (side * cell + gap), count = net.layers[l].out, a = run.act[l];
+    let lit = 0;
+    for (let k = 0; k < count; k++) {
+      const v = a[S.t * count + k] / r.scale[l], x = x0 + (k % side) * cell, y = top + Math.floor(k / side) * cell;
+      if (Math.abs(v) > 0.5) lit++;
+      ctx.fillStyle = shade(v).css; ctx.fillRect(x, y, cell - 1, cell - 1);
+      hit([x, y, cell, cell], {tip: `layer ${l + 1}, neuron ${k}: ${a[S.t * count + k].toFixed(3)}`});
+    }
+    text(`layer ${l + 1}`, x0, top - 12, {size: 12, weight: 600, colour: "ink"});
+    text(`${Math.round(100 * lit / count)}% lit`, x0, top + side * cell + 16, {size: 12, colour: "muted"});
+  }
+  const plotTop = Math.max(top + side * cell + 70, top + shown.length * 15 + 40);
+  answerPlot([left, plotTop, avail, 690 - plotTop - 24],
+             [exactSeries(r.exact.map(s => s[0])), networkSeries(run.out.map(s => s[0]), "network (y)")],
+             `the answer y; the line marks t = ${times[S.t].toFixed(2)}, the moment shown above`);
+}
+
+// ---------- Scene: sweep one setting ----------
+const SWEEP_STEPS = 61;
+function sweepSetting() { const list = settings(S.eq); return list.find(p => p.id === S.sweepParam) || list[0]; }
+// The sweep's error curve belongs to everything except the swept setting; changing anything else starts a new curve.
+function sweepState() {
+  const p = sweepSetting(), probe = clone(S.eq);
+  p.set(probe, 0);
+  const key = p.id + JSON.stringify(probe);
+  if (S.sweep.key !== key) {
+    const [lo, hi] = p.range;
+    S.sweep = {key, values: Array.from({length: SWEEP_STEPS}, (_, i) => lo + (hi - lo) * i / (SWEEP_STEPS - 1)),
+               errors: new Array(SWEEP_STEPS).fill(NaN), index: -1};
+  }
+  return {p, sw: S.sweep, blocked: PUSH.includes(p.id) && !S.eq.amplitude};
+}
+// Fill in one missing point of the error curve (called every frame while the sweep is on screen).
+function sweepFill() {
+  const {p, sw, blocked} = sweepState(), i = sw.errors.findIndex(Number.isNaN);
+  if (blocked || i < 0) return false;
+  const probe = clone(S.eq);
+  p.set(probe, sw.values[i]);
+  sw.errors[i] = relativeError(exactStates(probe, times), net.run(probe).out);
+  return true;
+}
+function sweepStep() {
+  const {p, sw, blocked} = sweepState();
+  if (blocked) return;
+  sw.index = (sw.index + 1) % SWEEP_STEPS;
+  p.set(S.eq, sw.values[sw.index]);  // the swept value is not part of the key, so the curve survives
+  if (sw.index === SWEEP_STEPS - 1) loopDone();
+}
+function drawSweep() {
+  const {p, sw, blocked} = sweepState();
+  header(`Sweeping the ${p.label}`);
+  if (blocked) { message(`Turn the push on (in the settings below) to sweep the ${p.label}.`); return; }
+  const r = results();
+  const peak = answerPlot([70, 150, 640, 290], [exactSeries(r.exact.map(s => s[0])), networkSeries(r.run.out.map(s => s[0]), "network (y)")],
+                          `the answer y with ${p.label} = ${p.get(S.eq).toFixed(2)}`);
+  missPlot([70, 520, 640, 150], r.run.out.map((s, t) => s[0] - r.exact[t][0]), peak);
+  // Error against the swept value, log scale, with the trained range shaded.
+  const done = sw.errors.filter(Number.isFinite), [lo, hi] = p.range;
+  const low = Math.max(1e-5, Math.min(...done, r.error) / 2), high = Math.min(100, Math.max(...done, r.error) * 2);
+  const b = [800, 150, 440, 520];
+  const X = v => b[0] + (v - lo) / (hi - lo) * b[2];
+  ctx.fillStyle = C.grid; ctx.fillRect(X(p.trained[0]), b[1], X(p.trained[1]) - X(p.trained[0]), b[3]);
+  text("trained range", (X(p.trained[0]) + X(p.trained[1])) / 2, b[1] + 16, {size: 12, colour: "muted", align: "center"});
+  const {Y} = axes(b, [lo, hi], [low, high], {title: `how far off the network is, for each ${p.label}`, xLabel: p.label, log: true});
+  const points = sw.values.map((v, i) => [X(v), Y(sw.errors[i])]).filter((_, i) => Number.isFinite(sw.errors[i]));
+  line(points, "model", 2);
+  dot(X(p.get(S.eq)), Y(r.error), 6, "model");
+  text(pct(r.error), Math.min(X(p.get(S.eq)) + 10, b[0] + b[2] - 40), Y(r.error) - 10, {size: 13, weight: 600, colour: "ink"});
+  if (done.length < SWEEP_STEPS) text(`working out the curve… ${done.length} of ${SWEEP_STEPS}`, b[0] + b[2], b[1] + b[3] - 10, {size: 12, colour: "muted", align: "right"});
+  hit(b, {drag: x => { p.set(S.eq, Math.max(lo, Math.min(hi, lo + (x - b[0]) / b[2] * (hi - lo)))); syncControls(); }});
+}
+
+// ---------- Scene: phase portrait ----------
+function drawPhase() {
+  header("The motion, and the shape it leaves inside the network");
+  const r = results();
+  if (S.eq.order < 2) { message("The phase portrait plots y against y′, so it needs an equation of order 2 or more."); return; }
+  const pcs = extra("pca", r => r.run.act.map((a, l) => pca2(a, T, net.layers[l].out)));
+  // Left: y across, y′ up.
+  const ex = r.exact, nw = r.run.out, range = c => { const v = [...ex, ...nw].map(s => s[c]), pad = (Math.max(...v) - Math.min(...v)) * 0.08 || 1; return [Math.min(...v) - pad, Math.max(...v) + pad]; };
+  const a = axes([90, 150, 500, 390], range(0), range(1), {title: "the real motion: y (across) against y′ (up)", xLabel: "y"});
+  line(ex.map(s => [a.X(s[0]), a.Y(s[1])]), "exact", 6);
+  line(nw.map(s => [a.X(s[0]), a.Y(s[1])]), "model", 2);
+  dot(a.X(nw[S.t][0]), a.Y(nw[S.t][1]), 6, "model");
+  legend(590, 138, [{colour: "exact", width: 6, label: "exact"}, {colour: "model", label: "network"}]);
+  // Right: the chosen hidden layer's two main directions, same scale on both axes so the shape is honest.
+  const pc = pcs[S.layer], [p1, p2] = pc.paths, half = Math.max(...p1.map(Math.abs), ...p2.map(Math.abs)) * 1.1 || 1;
+  const b = [700, 150, 500, 390], cx = b[0] + b[2] / 2, cy = b[1] + b[3] / 2, k = Math.min(b[2], b[3]) / 2 / half;
+  text(`inside layer ${S.layer + 1}: ${net.layers[S.layer].out} neuron values squeezed to 2 directions`, b[0], b[1] - 12, {size: 13, weight: 600, colour: "ink"});
+  line([[b[0], cy], [b[0] + b[2], cy]], "grid", 1); line([[cx, b[1]], [cx, b[1] + b[3]]], "grid", 1);
+  line(p1.map((v, t) => [cx + v * k, cy - p2[t] * k]), "ink2", 2);
+  text("start", cx + p1[0] * k + 8, cy - p2[0] * k - 6, {size: 11, colour: "muted"});
+  dot(cx + p1[S.t] * k, cy - p2[S.t] * k, 6, "model");
+  text(`these 2 directions hold ${pct(pc.explained)} of the layer's variation`, b[0], b[1] + b[3] + 20, {size: 12, colour: "muted"});
+  // Bottom: every layer as a thumbnail; click one to show it large.
+  const tw = (VW - 64 - (L - 1) * 12) / L, ty = 600, th = 92;
+  pcs.forEach((pc, l) => {
+    const x0 = 32 + l * (tw + 12), [q1, q2] = pc.paths, m = Math.max(...q1.map(Math.abs), ...q2.map(Math.abs)) * 1.1 || 1, s = Math.min(tw, th) / 2 / m;
+    ctx.strokeStyle = l === S.layer ? C.ink : C.grid; ctx.lineWidth = l === S.layer ? 2 : 1; ctx.strokeRect(x0, ty, tw, th);
+    line(q1.map((v, t) => [x0 + tw / 2 + v * s, ty + th / 2 - q2[t] * s]), "ink2", 1.5);
+    dot(x0 + tw / 2 + q1[S.t] * s, ty + th / 2 - q2[S.t] * s, 3.5, "model", false);
+    text(`layer ${l + 1} · ${pct(pc.explained)}`, x0, ty - 6, {size: 11, colour: l === S.layer ? "ink" : "muted"});
+    hit([x0, ty - 16, tw, th + 16], {tip: `show layer ${l + 1} large`, click: () => { S.layer = l; syncControls(); }});
+  });
+}
+
+// ---------- Scene: neuron roles ----------
+function drawRoles() {
+  header("What each neuron does over time");
+  const r = results(), l = S.layer, W = net.layers[l].out;
+  const all = extra("roles", r => r.run.act.map((a, i) => neuronRoles(a, T, net.layers[i].out, r.scale[i])));
+  const {role, peak, range} = all[l];
+  const order = Array.from({length: W}, (_, k) => k).sort((a, b) => role[a] - role[b] || peak[a] - peak[b]);
+  // The raster: one row per neuron (sorted by role, then by when it peaks), one column per time.
+  const raster = extra(`raster${l}:${theme}`, r => {
+    const image = new ImageData(T, W), a = r.run.act[l];
+    order.forEach((k, row) => { for (let t = 0; t < T; t++) { const rgb = shade(a[t * W + k] / r.scale[l]).rgb, o = (row * T + t) * 4; image.data.set([...rgb, 255], o); } });
+    const off = document.createElement("canvas"); off.width = T; off.height = W; off.getContext("2d").putImageData(image, 0, 0);
+    return off;
+  });
+  const b = [170, 150, 540, 530], rowH = b[3] / W;
+  text(`layer ${l + 1}: every neuron (rows) over time (across), sorted by role`, b[0] - 140, b[1] - 12, {size: 13, weight: 600, colour: "ink"});
+  ctx.imageSmoothingEnabled = false; ctx.drawImage(raster, b[0], b[1], b[2], b[3]); ctx.imageSmoothingEnabled = true;
+  let row = 0;
+  ROLES.forEach((name, i) => {
+    const count = role.filter(x => x === i).length;
+    if (!count) return;
+    const y0 = b[1] + row * rowH, h = count * rowH;
+    ctx.fillStyle = roleColour(i); ctx.fillRect(b[0] - 10, y0, 6, Math.max(h - 1, 1));
+    if (h >= 12) text(`${name} (${count})`, b[0] - 16, y0 + Math.min(h / 2, 14) + 4, {size: 11, align: "right"});
+    row += count;
+  });
+  const X = v => b[0] + (v + 0.5) / T * b[2];
+  line([[X(S.t), b[1]], [X(S.t), b[1] + b[3]]], "ink", 1);
+  text("time →", b[0] + b[2], b[1] + b[3] + 16, {size: 12, colour: "muted", align: "right"});
+  hit(b, {drag: x => { S.t = Math.max(0, Math.min(T - 1, Math.floor((x - b[0]) / b[2] * T))); }});
+  // Right: role mix in every layer, stacked bars with a 2px gap between segments.
+  const bx = 790, bw = 450;
+  text("role mix in every layer", bx, b[1] - 12, {size: 13, weight: 600, colour: "ink"});
+  let lx = bx;
+  ROLES.forEach((name, i) => {
+    ctx.fillStyle = roleColour(i); ctx.fillRect(lx, b[1] + 2, 10, 10);
+    text(name, lx + 14, b[1] + 11, {size: 11}); ctx.font = font({size: 11}); lx += ctx.measureText(name).width + 30;
+  });
+  all.forEach((info, layer) => {
+    const y = b[1] + 26 + layer * 34, count = net.layers[layer].out;
+    text(`layer ${layer + 1}`, bx, y + 17, {size: 12, colour: layer === l ? "ink" : "ink2", weight: layer === l ? 600 : 400});
+    let x = bx + 62;
+    ROLES.forEach((name, i) => {
+      const c = info.role.filter(v => v === i).length, w = c / count * (bw - 62);
+      if (!c) return;
+      ctx.fillStyle = roleColour(i); ctx.fillRect(x, y + 2, Math.max(w - 2, 1), 22);
+      if (w > 26) text(String(c), x + w / 2 - 1, y + 17, {size: 11, colour: i === 0 ? "ink" : i === 4 ? "#0b0b0b" : "#ffffff", align: "center"});
+      hit([x, y + 2, w, 22], {tip: `layer ${layer + 1}: ${c} ${name} neurons — click to show this layer`, click: () => { S.layer = layer; syncControls(); }});
+      x += w;
+    });
+  });
+  // Bottom right: one example per role from this layer (its most active member).
+  const ey = b[1] + 26 + L * 34 + 34, ew = (bw - 20) / 3, eh = Math.min(70, (b[1] + b[3] - ey - 30) / 2 - 24);
+  text(`one example of each role in layer ${l + 1}`, bx, ey - 8, {size: 13, weight: 600, colour: "ink"});
+  ROLES.forEach((name, i) => {
+    const members = order.filter(k => role[k] === i), x0 = bx + (i % 3) * (ew + 10), y0 = ey + 22 + Math.floor(i / 3) * (eh + 40);
+    text(`${name} · ${members.length}`, x0, y0 - 4, {size: 12, colour: "ink"});
+    ctx.strokeStyle = C.grid; ctx.lineWidth = 1; ctx.strokeRect(x0, y0, ew, eh);
+    if (!members.length) { text("none here", x0 + 8, y0 + eh / 2 + 4, {size: 11, colour: "muted"}); return; }
+    const k = members.reduce((best, m) => range[m] > range[best] ? m : best), a = r.run.act[l];
+    const v = Array.from({length: T}, (_, t) => a[t * W + k]), hi = Math.max(...v), lo = Math.min(...v);
+    const span = Math.max(hi - lo, 0.25 * r.scale[l]), mid = (hi + lo) / 2;  // a quiet neuron stays flat instead of being blown up
+    line(v.map((x, t) => [x0 + 4 + (ew - 8) * t / (T - 1), y0 + eh / 2 - (x - mid) / span * (eh - 12)]), roleColour(i), 2);
+    text(`neuron ${k}`, x0 + ew - 4, y0 + eh + 14, {size: 10, colour: "muted", align: "right"});
+  });
+}
+
+// ---------- Scene: input importance ----------
+function drawImportance() {
+  const c = Math.min(S.output, S.eq.order - 1), r = results(), shown = shownInputs(S.eq.order);
+  header(`Which inputs are pushing ${dname(c)} right now`);
+  const G = extra(`gradient${c}`, r => net.gradient(r.run, c));
+  // Gradient × input, in the units of the answer: roughly how much this input moves the answer
+  // away from what an average training equation would give.
+  const A = shown.map(s => Array.from({length: T}, (_, t) => G[t * net.F + s.index] * r.run.x[t * net.F + s.index]));
+  const peak = Math.max(...A.flat().map(Math.abs)) || 1, top = 150, rowH = Math.min(26, 330 / shown.length), zero = 410, half = 150;
+  text(`at t = ${times[S.t].toFixed(2)}`, 40, top - 12, {size: 13, weight: 600, colour: "ink"});
+  line([[zero, top - 4], [zero, top + shown.length * rowH]], "axis", 1);
+  shown.forEach((s, i) => {
+    const y = top + i * rowH, v = A[i][S.t], w = v / peak * half;
+    text(s.name, zero - half - 12, y + rowH / 2 + 4, {size: 12, align: "right"});
+    ctx.fillStyle = v > 0 ? C.pos : C.neg; ctx.fillRect(Math.min(zero, zero + w), y + 4, Math.max(Math.abs(w), 1), rowH - 8);
+    text(Math.abs(v) < 5e-4 ? "≈ 0" : (v > 0 ? "+" : "−") + Math.abs(v).toFixed(3), zero + half + 64, y + rowH / 2 + 4, {size: 11, colour: "muted", align: "right"});
+    hit([40, y, 560, rowH], {tip: `${s.name} pushes ${dname(c)} by ${v.toFixed(4)} at this moment`});
+  });
+  // Right: the same numbers for every moment.
+  const hx = 640, hw = 600;
+  text("the same, over the whole time window", hx, top - 12, {size: 13, weight: 600, colour: "ink"});
+  shown.forEach((_, i) => { for (let t = 0; t < T; t++) { ctx.fillStyle = shade(A[i][t] / peak * 2).css; ctx.fillRect(hx + t * hw / T, top + i * rowH + 2, hw / T + 0.5, rowH - 4); } });
+  const hb = [hx, top, hw, shown.length * rowH];
+  line([[hx + (S.t + 0.5) * hw / T, top], [hx + (S.t + 0.5) * hw / T, top + hb[3]]], "ink", 1.5);
+  hit(hb, {drag: x => { S.t = Math.max(0, Math.min(T - 1, Math.floor((x - hx) / hw * T))); }});
+  const below = top + hb[3] + 60;
+  answerPlot([hx, below, hw, 680 - below - 16], [exactSeries(r.exact.map(s => s[c])), networkSeries(r.run.out.map(s => s[c]), `network (${dname(c)})`)], `the answer ${dname(c)}`);
+  wrap(`How to read this: each bar is the input's value times how sensitive ${dname(c)} is to it (gradient × input). ` +
+       "It estimates how much the answer would move if that input were set to its average over the training equations. " +
+       "It is a first-order guide, not an exact split, and the bars need not add up to the answer.",
+       40, Math.max(top + shown.length * rowH + 50, 540), 560, 18, {size: 12, colour: "muted"});
+}
+
+// ---------- Scene: compare two models ----------
+function drawCompare() {
+  header("Two networks, same equation");
+  if (!other) { message("To compare, build the page with a second model: python -m ode viz --compare ode/models/arc"); return; }
+  const r = results(), B = extra("B", () => other.supports(S.eq) ? other.run(S.eq) : null);
+  const errorB = B ? relativeError(r.exact, B.out) : NaN;
+  const series = [exactSeries(r.exact.map(s => s[0])), networkSeries(r.run.out.map(s => s[0]), net.name)];
+  if (B) series.push({values: B.out.map(s => s[0]), colour: "other", width: 2, dash: [8, 5], label: other.name});
+  answerPlot([70, 150, 680, 260], series, "the answer y");
+  // Error over time, log scale: RMS of the miss across y, y′, ... at each moment.
+  const missAt = out => r.exact.map((row, t) => Math.max(Math.sqrt(row.reduce((s, v, c) => s + (out[t][c] - v) ** 2, 0) / row.length), 1e-7));
+  const lines = [[missAt(r.run.out), "model"], ...(B ? [[missAt(B.out), "other"]] : [])];
+  const all = lines.flatMap(l => l[0]), lo = Math.min(...all) / 1.5, hi = Math.max(...all) * 1.5;
+  const b = [70, 480, 680, 190], X = v => b[0] + v / times[T - 1] * b[2];
+  const {Y} = axes(b, [0, times[T - 1]], [lo, hi], {title: "how far off each one is at each moment (log scale)", xLabel: "time", yTicks: false, log: true});
+  for (const v of logTicks(lo, hi)) { line([[b[0], Y(v)], [b[0] + b[2], Y(v)]], "grid", 1); text(v.toPrecision(1), b[0] - 6, Y(v) + 4, {size: 11, colour: "muted", align: "right"}); }
+  lines.forEach(([values, colour], i) => line(values.map((v, t) => [X(times[t]), Y(v)]), colour, 2, i ? [8, 5] : []));
+  cursor(b, X); timeDrag(b);
+  // Right: the facts, then each model's neurons at this moment.
+  const tx = 800, col1 = 1040, col2 = 1180;
+  text(net.name, col1, 150, {size: 14, weight: 600, colour: "ink", align: "right"});
+  text(other.name, col2, 150, {size: 14, weight: 600, colour: "ink", align: "right"});
+  line([[col1 - 70, 158], [col1, 158]], "model", 3); line([[col2 - 70, 158], [col2, 158]], "other", 3, [8, 5]);
+  const better = (a, b) => a < b ? 600 : 400;
+  [["trained on orders", net.config.orders.join(", "), other.config.orders.join(", ")],
+   ["hidden layers × width", `${net.hidden} × ${net.architecture.width}`, `${other.hidden} × ${other.architecture.width}`],
+   ["weights", net.parameters.toLocaleString(), other.parameters.toLocaleString()],
+   ["validation error (average)", pct(net.validation_error), pct(other.validation_error)],
+   ["off by, on this equation", pct(r.error), B ? pct(errorB) : "not trained on it"]].forEach(([label, a, b2], i) => {
+    const y = 186 + i * 28, last = i === 4;
+    text(label, tx, y, {size: 12});
+    text(a, col1, y, {size: 13, colour: "ink", align: "right", weight: last && B ? better(r.error, errorB) : 400});
+    text(b2, col2, y, {size: 13, colour: "ink", align: "right", weight: last && B ? better(errorB, r.error) : 400});
+    line([[tx, y + 9], [col2, y + 9]], "grid", 1);
+  });
+  text(`neurons at t = ${times[S.t].toFixed(2)}, one square per neuron, one block per layer`, tx, 360, {size: 13, weight: 600, colour: "ink"});
+  [[net, r.run], [other, B]].forEach(([model, run], m) => {
+    const y0 = 390 + m * 150;
+    text(model.name, tx, y0 + 4, {size: 12, colour: "ink2"});
+    if (!run) { text("not trained on this order", tx, y0 + 40, {size: 12, colour: "muted"}); return; }
+    const width = model.layers[0].out, side = Math.ceil(Math.sqrt(width)), lw = (VW - 32 - tx - (model.hidden - 1) * 8) / model.hidden, cell = Math.min(lw / side, 110 / side);
+    for (let l = 0; l < model.hidden; l++) {
+      const a = run.act[l], scale = quantileAbs(a, 0.95) || 1, x0 = tx + l * (lw + 8);
+      for (let k = 0; k < width; k++) { ctx.fillStyle = shade(a[S.t * width + k] / scale).css; ctx.fillRect(x0 + (k % side) * cell, y0 + 14 + Math.floor(k / side) * cell, cell, cell); }
+    }
+  });
+}
+
+// ---------- Scene: worst-case reel ----------
+function hardReasons(c) {
+  const eq = c.equation, out = [], top = net.config.frequency_range[1];
+  if (eq.amplitude && eq.pairs.some(([, w]) => Math.abs(eq.frequency - w) < 0.15 * w))
+    out.push(["Pushed near its natural rhythm", "The push nearly matches how fast it wiggles on its own (resonance), so the swings build up. Few training equations do that."]);
+  if (c.reference_rms * 10 < D.reel.typical_rms)
+    out.push(["Tiny motion", `This answer is ${Math.round(D.reel.typical_rms / c.reference_rms)}× smaller than a typical one, so even a tiny miss is a big percentage.`]);
+  if (Math.min(...eq.pairs.map(p => p[0]), ...eq.real) < 0.05)
+    out.push(["Barely fading", "It keeps ringing for the whole time window, so mistakes never fade away."]);
+  if (Math.max(...eq.pairs.map(p => p[1]), eq.amplitude ? eq.frequency : 0) > 0.9 * top)
+    out.push(["Fast wiggles", "Near the top of the speeds it was trained on: many ups and downs to get right."]);
+  if (!out.length) out.push(["No obvious reason", "Nothing unusual stands out: a genuine weak spot worth studying."]);
+  return out;
+}
+function loadCase() { if (cases.length) { S.eq = clone(cases[S.reel].equation); rebuildControls(); } }
+function drawReel() {
+  if (!cases.length) {
+    header("Worst cases");
+    message("No evaluation file was found next to this model, so there is no reel. Run python -m ode evaluate for the model, then rebuild this page with python -m ode viz.");
+    return;
+  }
+  const c = cases[S.reel], r = results(), edited = JSON.stringify(S.eq) !== JSON.stringify(c.equation);
+  header(`Worst case ${S.reel + 1} of ${cases.length}${edited ? " (settings changed since)" : ""}`);
+  const peak = answerPlot([70, 150, 700, 300], [exactSeries(r.exact.map(s => s[0])), networkSeries(r.run.out.map(s => s[0]), "network (y)")],
+                          "the answer y");
+  missPlot([70, 530, 700, 140], r.run.out.map((s, t) => s[0] - r.exact[t][0]), peak);
+  const x = 850, w = 390;
+  text(c.id, x, 138, {size: 12, colour: "muted"});
+  text(`recorded ${pct(c.error)} off in evaluation; this page measures ${pct(r.error)}`, x, 158, {size: 13, colour: "ink"});
+  text("why this one is hard (likely)", x, 190, {size: 13, weight: 600, colour: "ink"});
+  let y = 216;
+  for (const [title, why] of hardReasons(c)) {
+    text(title, x, y, {size: 14, weight: 600, colour: "ink"});
+    y = wrap(why, x, y + 20, w, 18, {size: 12}) + 8;
+  }
+  y = Math.max(y + 10, 420);
+  y = wrap(`the ${cases.length} worst of ${D.reel.total.toLocaleString()} validation equations (${D.reel.source})`, x, y, w, 18, {size: 13, weight: 600, colour: "ink"}) - 18;
+  const most = cases[0].error;
+  cases.forEach((k, i) => {
+    const ry = y + 14 + i * Math.min(28, (690 - y - 14) / cases.length), bar = Math.max(2, k.error / most * (w - 150));
+    ctx.fillStyle = i === S.reel ? C.model : C.axis; ctx.fillRect(x + 90, ry + 4, bar, 12);
+    text(`#${i + 1}`, x, ry + 14, {size: 12, weight: i === S.reel ? 600 : 400, colour: i === S.reel ? "ink" : "ink2"});
+    text(`order ${k.equation.order}`, x + 28, ry + 14, {size: 11, colour: "muted"});
+    text(pct(k.error), x + 96 + bar, ry + 14, {size: 12, colour: "ink"});
+    hit([x, ry, w, 22], {tip: `${k.id} — click to show`, click: () => { S.reel = i; loadCase(); }});
+  });
+}
+
+// ---------- Frame loop, playing and recording ----------
+let dirty = true, lastStep = 0;
+const redraw = () => { dirty = true; };
+function draw() {
+  ctx.setTransform(PX, 0, 0, PX, 0, 0);
+  ctx.globalAlpha = 1; ctx.fillStyle = C.surface; ctx.fillRect(0, 0, VW, VH);
+  HITS = [];
+  SCENES[S.scene].draw();
+  text(`EigenFlow · ${net.name} network running live in this page`, VW - 12, VH - 8, {size: 10, colour: "muted", align: "right"});
+  syncTime();
+}
+function frame(now) {
+  const mode = SCENES[S.scene].play, delay = {time: 50, sweep: 60, reel: 3500}[mode];
+  if (S.playing && now - lastStep > delay) { lastStep = now; advance(mode); dirty = true; }
+  else if (S.scene === "sweep" && !S.playing && sweepFill()) dirty = true;  // build the error curve while idle
+  if (dirty) { dirty = false; draw(); }
+  requestAnimationFrame(frame);
+}
+function advance(mode) {
+  if (mode === "time") { S.t = (S.t + 1) % T; if (S.t === T - 1) loopDone(); }
+  else if (mode === "sweep") { sweepFill(); sweepStep(); syncControls(); }
+  else if (cases.length) { const wrapped = S.reel === cases.length - 1; S.reel = (S.reel + 1) % cases.length; loadCase(); if (wrapped) loopDone(); }
+}
+// A recording covers one loop: time start to end, one full sweep, or every worst case once.
+function rewind() {
+  const mode = SCENES[S.scene].play;
+  if (mode === "time") S.t = 0;
+  else if (mode === "sweep") S.sweep.index = -1;
+  else { S.reel = cases.length - 1; }  // the first step moves to case 1
+}
+function loopDone() { if (S.recording) setTimeout(stopRecording, 120); }
+function setPlaying(on) { S.playing = on; $("play").textContent = on ? "⏸ Pause" : "▶ Play"; }
+function save(blob, name) {
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob); a.download = name; document.body.append(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+}
+function startRecording() {
+  if (!window.MediaRecorder || !canvas.captureStream) { alert("This browser cannot record the canvas. Chrome, Edge and Firefox can."); return; }
+  const type = ["video/webm;codecs=vp9", "video/webm", "video/mp4"].find(t => MediaRecorder.isTypeSupported(t));
+  const recorder = new MediaRecorder(canvas.captureStream(30), type ? {mimeType: type, videoBitsPerSecond: 12e6} : {}), chunks = [];
+  recorder.ondataavailable = e => { if (e.data.size) chunks.push(e.data); };
+  recorder.onstop = () => {
+    const kind = recorder.mimeType || "video/webm";
+    save(new Blob(chunks, {type: kind}), `eigenflow-${S.scene}.${kind.includes("mp4") ? "mp4" : "webm"}`);
+    S.recording = null; $("record").textContent = "⏺ Record video";
+  };
+  S.recording = recorder; rewind(); redraw(); recorder.start(); setPlaying(true); lastStep = 0;
+  $("record").textContent = "⏹ Stop recording";
+}
+function stopRecording() { if (S.recording && S.recording.state === "recording") S.recording.stop(); setPlaying(false); }
+
+// ---------- Controls ----------
+let SLIDERS = [];
+function fieldset(title) { const f = document.createElement("fieldset"), l = document.createElement("legend"); l.textContent = title; f.append(l); $("controls").append(f); return f; }
+function rebuildControls() {
+  $("controls").textContent = ""; SLIDERS = [];
+  const basics = fieldset("Equation");
+  const orderRow = document.createElement("div"); orderRow.className = "slider";
+  orderRow.innerHTML = `<label for="order">order</label><select id="order"></select><span></span>`;
+  basics.append(orderRow);
+  for (const n of net.config.orders) $("order").add(new Option(String(n), n, false, n === S.eq.order));
+  $("order").onchange = e => { setOrder(+e.target.value); onEquationChange(true); };
+  const pushRow = document.createElement("label"); pushRow.className = "slider";
+  pushRow.innerHTML = `<span>outside push</span><span><input type="checkbox" id="push"> on</span><span></span>`;
+  basics.append(pushRow);
+  $("push").checked = !!S.eq.amplitude;
+  $("push").onchange = e => { setPush(e.target.checked); onEquationChange(true); };
+  const reset = document.createElement("button"); reset.textContent = "Reset to the starting equation";
+  reset.onclick = () => { S.eq = clone(D.start); onEquationChange(true); };
+  basics.append(reset);
+  const groups = {move: fieldset("How it moves"), start: fieldset("Where it starts"), push: fieldset("Outside push")};
+  for (const p of settings(S.eq)) {
+    const row = document.createElement("div"), id = "s-" + p.id, [lo, hi] = p.range;
+    row.className = "slider";
+    row.innerHTML = `<label for="${id}">${p.label}</label><input type="range" id="${id}" min="${lo}" max="${hi}" step="${(hi - lo) / 400}"><output for="${id}"></output>`;
+    const input = row.querySelector("input"), a = (p.trained[0] - lo) / (hi - lo) * 100, b = (p.trained[1] - lo) / (hi - lo) * 100;
+    // The darker band on each track is the range the network was trained on.
+    input.style.background = `linear-gradient(to right, var(--grid) ${a}%, var(--band) ${a}% ${b}%, var(--grid) ${b}%)`;
+    input.title = `trained on ${fmt(p.trained[0])} to ${fmt(p.trained[1])}`;
+    input.oninput = () => { p.set(S.eq, +input.value); onEquationChange(false); };
+    groups[p.group].append(row);
+    SLIDERS.push({p, row, input, output: row.querySelector("output")});
+  }
+  syncControls();
+}
+function syncControls() {
+  for (const {p, row, input, output} of SLIDERS) {
+    const off = PUSH.includes(p.id) && !S.eq.amplitude;
+    input.value = p.get(S.eq); output.value = off ? "off" : p.get(S.eq).toFixed(2); input.disabled = off; row.classList.toggle("off", off);
+  }
+  if ($("push")) $("push").checked = !!S.eq.amplitude;
+  $("layer").value = S.layer; $("output").value = Math.min(S.output, S.eq.order - 1);
+  const names = settings(S.eq);
+  if ([...$("sweepParam").options].map(o => o.value).join() !== names.map(p => p.id).join()) {
+    $("sweepParam").textContent = "";
+    for (const p of names) $("sweepParam").add(new Option(p.label, p.id));
+  }
+  $("sweepParam").value = sweepSetting().id;
+  $("output").textContent = "";
+  for (let c = 0; c < S.eq.order; c++) $("output").add(new Option(dname(c), c, false, c === Math.min(S.output, S.eq.order - 1)));
+  redraw();
+}
+function syncTime() { $("time").value = S.t; $("timeLabel").textContent = `t = ${times[S.t].toFixed(2)}`; }
+function setOrder(n) {
+  const eq = S.eq, defaults = [[0.3, 1.4], [0.5, 2.6]];
+  eq.order = n;
+  eq.pairs = Array.from({length: Math.floor(n / 2)}, (_, p) => eq.pairs[p] || defaults[p] || [0.4, 1 + p]);
+  eq.real = n % 2 ? [eq.real[0] ?? 0.8] : [];
+  eq.init = Array.from({length: n}, (_, k) => eq.init[k] ?? 0);
+}
+let lastPush = {amplitude: 0.5, frequency: 1.0, phase: 0};
+function setPush(on) {
+  if (on) Object.assign(S.eq, lastPush);
+  else { if (S.eq.amplitude) lastPush = {amplitude: S.eq.amplitude, frequency: S.eq.frequency, phase: S.eq.phase}; Object.assign(S.eq, {amplitude: 0, frequency: 0, phase: 0}); }
+}
+function onEquationChange(rebuild) {
+  if (S.traced && S.traced.col === L + 1 && S.traced.index >= S.eq.order) S.traced = null;
+  if (rebuild) rebuildControls(); else syncControls();
+  if ($("numbers").open) fillTable();
+}
+function fillTable() {
+  const r = results(), n = S.eq.order, head = ["time", ...Array.from({length: n}, (_, c) => `exact ${dname(c)}`), ...Array.from({length: n}, (_, c) => `network ${dname(c)}`)];
+  const rows = times.map((time, t) => `<tr><td>${time.toFixed(2)}</td>${r.exact[t].map(v => `<td>${v.toFixed(5)}</td>`).join("")}${r.run.out[t].map(v => `<td>${v.toFixed(5)}</td>`).join("")}</tr>`);
+  $("table").innerHTML = `<p class="note">Network off by ${pct(r.error)} on this equation (trajectory-rms-v1).</p><table><thead><tr>${head.map(h => `<th>${h}</th>`).join("")}</tr></thead><tbody>${rows.join("")}</tbody></table>`;
+}
+function setScene(name) {
+  if (!SCENES[name]) name = "map";
+  S.scene = name;
+  if (name === "trace" && !S.traced) S.traced = {col: L + 1, index: Math.min(S.output, S.eq.order - 1)};
+  if (name === "reel" && cases.length && JSON.stringify(S.eq) !== JSON.stringify(cases[S.reel].equation)) loadCase();
+  for (const b of $("tabs").children) b.setAttribute("aria-selected", b.dataset.scene === name);
+  for (const el of $("sceneBar").children) el.hidden = !el.dataset.for.split(" ").includes(name);
+  $("blurb").textContent = SCENES[name].blurb;
+  $("time").disabled = SCENES[name].play !== "time";
+  try { history.replaceState(null, "", "#scene=" + name); } catch (e) { /* some browsers block this on file:// pages */ }
+  redraw();
+}
+
+// ---------- Mouse: tooltips, clicks and drags on the canvas ----------
+function toLayout(e) { const b = canvas.getBoundingClientRect(); return [(e.clientX - b.left) / b.width * VW, (e.clientY - b.top) / b.height * VH]; }
+function hitAt(x, y) {
+  for (let i = HITS.length - 1; i >= 0; i--) { const [bx, by, bw, bh] = HITS[i].box; if (x >= bx && x <= bx + bw && y >= by && y <= by + bh) return HITS[i]; }
+  return null;
+}
+function tooltip(e, tip) {
+  const el = $("tip");
+  if (!tip) { el.hidden = true; return; }
+  el.textContent = tip; el.hidden = false;
+  el.style.left = Math.min(e.clientX + 14, innerWidth - el.offsetWidth - 8) + "px"; el.style.top = e.clientY + 16 + "px";
+}
+let dragging = null;
+canvas.addEventListener("pointerdown", e => {
+  const [x, y] = toLayout(e), h = hitAt(x, y);
+  if (!h) return;
+  if (h.drag) { dragging = h; canvas.setPointerCapture(e.pointerId); h.drag(x, y); }
+  if (h.click) h.click();
+  redraw();
+});
+canvas.addEventListener("pointermove", e => {
+  const [x, y] = toLayout(e);
+  if (dragging) { dragging.drag(x, y); redraw(); return; }
+  const h = hitAt(x, y);
+  tooltip(e, h && h.tip);
+  canvas.style.cursor = h && (h.click || h.drag) ? "pointer" : "default";
+});
+canvas.addEventListener("pointerup", () => { dragging = null; });
+canvas.addEventListener("pointerleave", () => tooltip(null));
+
+// ---------- Start ----------
+readTheme();
+matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => { readTheme(); redraw(); });
+for (const [name, scene] of Object.entries(SCENES)) {
+  const b = document.createElement("button");
+  b.textContent = scene.tab; b.dataset.scene = name; b.setAttribute("role", "tab"); b.onclick = () => setScene(name);
+  $("tabs").append(b);
+}
+for (let l = 0; l < L; l++) $("layer").add(new Option(`layer ${l + 1}`, l));
+$("time").max = T - 1;
+$("time").oninput = e => { S.t = +e.target.value; redraw(); };
+$("play").onclick = () => setPlaying(!S.playing);
+$("record").onclick = () => S.recording ? stopRecording() : startRecording();
+$("picture").onclick = () => canvas.toBlob(b => save(b, `eigenflow-${S.scene}.png`));
+$("sweepParam").onchange = e => { S.sweepParam = e.target.value; redraw(); };
+$("layer").onchange = e => { S.layer = +e.target.value; redraw(); };
+$("output").onchange = e => { S.output = +e.target.value; if (S.scene === "trace") S.traced = {col: L + 1, index: S.output}; redraw(); };
+$("clearTrace").onclick = () => { S.traced = null; if (S.scene === "trace") setScene("map"); redraw(); };
+$("prevCase").onclick = () => { if (cases.length) { S.reel = (S.reel + cases.length - 1) % cases.length; loadCase(); } };
+$("nextCase").onclick = () => { if (cases.length) { S.reel = (S.reel + 1) % cases.length; loadCase(); } };
+$("numbers").addEventListener("toggle", () => { if ($("numbers").open) fillTable(); });
+
+const cfg = net.config;
+$("sub").textContent = `Model "${net.name}": ${L} hidden layers of ${net.architecture.width} neurons, ${net.parameters.toLocaleString()} weights. ` +
+  `Trained on orders ${cfg.orders.join(", ")}, fade rates ${cfg.decay_range.join("–")}, wiggle speeds ${cfg.frequency_range.join("–")}, times 0–${cfg.t_stop - cfg.t_start}.`;
+$("foot").textContent = `Built ${D.built} by python -m ode viz. Everything runs inside this file; no internet needed. ` +
+  "Recordings save as WebM (ffmpeg -i in.webm out.mp4 converts them).";
+const check = selfCheck(nets), worstModel = Math.max(...check.models.filter(v => v !== null));
+if (check.exact < 1e-8 && worstModel < 1e-4) {
+  $("status").textContent = `✓ The network runs live in this page and matches PyTorch to within ${worstModel.toExponential(0)} of the answer's size; ` +
+    `the exact solver matches to ${Math.max(check.exact, 1e-16).toExponential(0)}.`;
+} else {
+  $("status").className = "bad";
+  $("status").textContent = `⚠ This page's network does not match PyTorch (difference ${worstModel.toExponential(1)}, exact solver ${check.exact.toExponential(1)}). Rebuild it with python -m ode viz.`;
+}
+rebuildControls();
+setScene((location.hash.match(/scene=(\w+)/) || [])[1] || "map");
+draw();
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>
