@@ -34,7 +34,7 @@ python3 -m venv .venv                                  # 1. private Python in .v
 git clone https://github.com/TrentFeldman/EigenFlow.git
 cd EigenFlow
 py -3.14 -m venv .venv
-.venv\Scripts\python -m pip install -r ode\requirements.txt
+.venv\Scripts\python -m pip install -r ode\requirements.txt #install gpu torches before this!
 .venv\Scripts\python -m ode check
 .venv\Scripts\python -m unittest discover -s ode\tests
 ```
