@@ -1,0 +1,2 @@
+foundation_checks_passed
+numerical_solver_validation=not_run

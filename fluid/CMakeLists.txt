@@ -1,0 +1,62 @@
+cmake_minimum_required(VERSION 3.20)
+project(EigenFlowFluid VERSION 0.2.0 LANGUAGES CXX)
+
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
+if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
+    set(CMAKE_BUILD_TYPE Debug CACHE STRING "Debug or Release" FORCE)
+endif()
+find_package(HDF5 REQUIRED COMPONENTS CXX)
+include(CTest)
+
+add_library(fluid_core FluidGrid.cpp FlowPresets.cpp Simulation.cpp RunConfig.cpp Validation.cpp)
+target_include_directories(fluid_core PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
+add_library(fluid_output GridOutput.cpp RunOutput.cpp)
+target_include_directories(fluid_output PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/generated")
+target_link_libraries(fluid_output PUBLIC fluid_core PRIVATE HDF5::HDF5)
+add_executable(fluid_demo main.cpp)
+target_link_libraries(fluid_demo PRIVATE fluid_output)
+add_executable(fluid_compression_fixture tools/compression_fixture.cpp)
+target_link_libraries(fluid_compression_fixture PRIVATE fluid_output HDF5::HDF5)
+
+# Reconfigure after source changes so run metadata identifies the actual build.
+set(source_files CMakeLists.txt cmake/BuildInfo.h.in main.cpp
+    FluidGrid.h FluidGrid.cpp FlowPresets.h FlowPresets.cpp Simulation.h Simulation.cpp
+    RunConfig.h RunConfig.cpp GridOutput.h GridOutput.cpp RunOutput.h RunOutput.cpp)
+list(APPEND source_files Validation.h Validation.cpp)
+set(source_hashes "")
+foreach(source IN LISTS source_files)
+    set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${source}")
+    file(SHA256 "${CMAKE_CURRENT_SOURCE_DIR}/${source}" source_hash)
+    string(APPEND source_hashes "${source}:${source_hash}\n")
+endforeach()
+string(SHA256 FLUID_SOURCE_SHA256 "${source_hashes}")
+configure_file(cmake/BuildInfo.h.in generated/BuildInfo.h @ONLY)
+
+if(BUILD_TESTING)
+    add_executable(fluid_validation_tests tests/test_validation.cpp)
+    target_link_libraries(fluid_validation_tests PRIVATE fluid_core)
+    add_test(NAME numerical_validation_harness COMMAND fluid_validation_tests)
+    add_executable(fluid_tests tests/test_fluid.cpp)
+    target_link_libraries(fluid_tests PRIVATE fluid_output HDF5::HDF5)
+    foreach(suite geometry presets simulation config output runs)
+        add_test(NAME ${suite} COMMAND fluid_tests ${suite})
+    endforeach()
+    add_test(NAME cli COMMAND "${CMAKE_COMMAND}"
+        "-DEXECUTABLE=$<TARGET_FILE:fluid_demo>"
+        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/cli-test"
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/tests/test_cli.cmake")
+endif()
+
+set(warning_targets fluid_core fluid_output fluid_demo fluid_compression_fixture)
+if(BUILD_TESTING)
+    list(APPEND warning_targets fluid_tests fluid_validation_tests)
+endif()
+foreach(target IN LISTS warning_targets)
+    if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+        target_compile_options(${target} PRIVATE -Wall -Wextra -Wpedantic)
+    elseif(MSVC)
+        target_compile_options(${target} PRIVATE /W4)
+    endif()
+endforeach()

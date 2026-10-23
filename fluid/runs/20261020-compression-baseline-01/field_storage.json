@@ -1,0 +1,722 @@
+{
+  "multiscale/shuffle_gzip1_chunk256": {
+    "velocity_x": {
+      "stored_bytes": 6661222,
+      "filter_count": 2
+    },
+    "velocity_y": {
+      "stored_bytes": 6660423,
+      "filter_count": 2
+    },
+    "pressure": {
+      "stored_bytes": 410634,
+      "filter_count": 2
+    },
+    "density": {
+      "stored_bytes": 37040,
+      "filter_count": 2
+    },
+    "kinematic_viscosity": {
+      "stored_bytes": 37184,
+      "filter_count": 2
+    },
+    "force_x": {
+      "stored_bytes": 36960,
+      "filter_count": 2
+    },
+    "force_y": {
+      "stored_bytes": 36960,
+      "filter_count": 2
+    }
+  },
+  "multiscale/shuffle_gzip1_chunk64": {
+    "velocity_x": {
+      "stored_bytes": 6732766,
+      "filter_count": 2
+    },
+    "velocity_y": {
+      "stored_bytes": 6733324,
+      "filter_count": 2
+    },
+    "pressure": {
+      "stored_bytes": 961254,
+      "filter_count": 2
+    },
+    "density": {
+      "stored_bytes": 44032,
+      "filter_count": 2
+    },
+    "kinematic_viscosity": {
+      "stored_bytes": 46080,
+      "filter_count": 2
+    },
+    "force_x": {
+      "stored_bytes": 41728,
+      "filter_count": 2
+    },
+    "force_y": {
+      "stored_bytes": 41728,
+      "filter_count": 2
+    }
+  },
+  "taylor_green/shuffle_gzip4_chunk64": {
+    "velocity_x": {
+      "stored_bytes": 6425945,
+      "filter_count": 2
+    },
+    "velocity_y": {
+      "stored_bytes": 6425940,
+      "filter_count": 2
+    },
+    "pressure": {
+      "stored_bytes": 6413101,
+      "filter_count": 2
+    },
+    "density": {
+      "stored_bytes": 15872,
+      "filter_count": 2
+    },
+    "kinematic_viscosity": {
+      "stored_bytes": 18944,
+      "filter_count": 2
+    },
+    "force_x": {
+      "stored_bytes": 13312,
+      "filter_count": 2
+    },
+    "force_y": {
+      "stored_bytes": 13312,
+      "filter_count": 2
+    }
+  },
+  "taylor_green/chunk64": {
+    "velocity_x": {
+      "stored_bytes": 8388608,
+      "filter_count": 0
+    },
+    "velocity_y": {
+      "stored_bytes": 8388608,
+      "filter_count": 0
+    },
+    "pressure": {
+      "stored_bytes": 8388608,
+      "filter_count": 0
+    },
+    "density": {
+      "stored_bytes": 8388608,
+      "filter_count": 0
+    },
+    "kinematic_viscosity": {
+      "stored_bytes": 8388608,
+      "filter_count": 0
+    },
+    "force_x": {
+      "stored_bytes": 8388608,
+      "filter_count": 0
+    },
+    "force_y": {
+      "stored_bytes": 8388608,
+      "filter_count": 0
+    }
+  },
+  "taylor_green/gzip1_chunk64": {
+    "velocity_x": {
+      "stored_bytes": 7290440,
+      "filter_count": 1
+    },
+    "velocity_y": {
+      "stored_bytes": 7290378,
+      "filter_count": 1
+    },
+    "pressure": {
+      "stored_bytes": 6838603,
+      "filter_count": 1
+    },
+    "density": {
+      "stored_bytes": 52992,
+      "filter_count": 1
+    },
+    "kinematic_viscosity": {
+      "stored_bytes": 54528,
+      "filter_count": 1
+    },
+    "force_x": {
+      "stored_bytes": 41728,
+      "filter_count": 1
+    },
+    "force_y": {
+      "stored_bytes": 41728,
+      "filter_count": 1
+    }
+  },
+  "noise/chunk64": {
+    "velocity_x": {
+      "stored_bytes": 8388608,
+      "filter_count": 0
+    },
+    "velocity_y": {
+      "stored_bytes": 8388608,
+      "filter_count": 0
+    },
+    "pressure": {
+      "stored_bytes": 8388608,
+      "filter_count": 0
+    },
+    "density": {
+      "stored_bytes": 8388608,
+      "filter_count": 0
+    },
+    "kinematic_viscosity": {
+      "stored_bytes": 8388608,
+      "filter_count": 0
+    },
+    "force_x": {
+      "stored_bytes": 8388608,
+      "filter_count": 0
+    },
+    "force_y": {
+      "stored_bytes": 8388608,
+      "filter_count": 0
+    }
+  },
+  "multiscale/chunk64": {
+    "velocity_x": {
+      "stored_bytes": 8388608,
+      "filter_count": 0
+    },
+    "velocity_y": {
+      "stored_bytes": 8388608,
+      "filter_count": 0
+    },
+    "pressure": {
+      "stored_bytes": 8388608,
+      "filter_count": 0
+    },
+    "density": {
+      "stored_bytes": 8388608,
+      "filter_count": 0
+    },
+    "kinematic_viscosity": {
+      "stored_bytes": 8388608,
+      "filter_count": 0
+    },
+    "force_x": {
+      "stored_bytes": 8388608,
+      "filter_count": 0
+    },
+    "force_y": {
+      "stored_bytes": 8388608,
+      "filter_count": 0
+    }
+  },
+  "gradient/shuffle_gzip1_chunk256": {
+    "velocity_x": {
+      "stored_bytes": 43544,
+      "filter_count": 2
+    },
+    "velocity_y": {
+      "stored_bytes": 36960,
+      "filter_count": 2
+    },
+    "pressure": {
+      "stored_bytes": 36960,
+      "filter_count": 2
+    },
+    "density": {
+      "stored_bytes": 37040,
+      "filter_count": 2
+    },
+    "kinematic_viscosity": {
+      "stored_bytes": 37184,
+      "filter_count": 2
+    },
+    "force_x": {
+      "stored_bytes": 36960,
+      "filter_count": 2
+    },
+    "force_y": {
+      "stored_bytes": 36960,
+      "filter_count": 2
+    }
+  },
+  "noise/shuffle_gzip1_chunk256": {
+    "velocity_x": {
+      "stored_bytes": 7255306,
+      "filter_count": 2
+    },
+    "velocity_y": {
+      "stored_bytes": 7256247,
+      "filter_count": 2
+    },
+    "pressure": {
+      "stored_bytes": 7255494,
+      "filter_count": 2
+    },
+    "density": {
+      "stored_bytes": 37040,
+      "filter_count": 2
+    },
+    "kinematic_viscosity": {
+      "stored_bytes": 37184,
+      "filter_count": 2
+    },
+    "force_x": {
+      "stored_bytes": 36960,
+      "filter_count": 2
+    },
+    "force_y": {
+      "stored_bytes": 36960,
+      "filter_count": 2
+    }
+  },
+  "multiscale/contiguous": {
+    "velocity_x": {
+      "stored_bytes": 8388608,
+      "filter_count": 0
+    },
+    "velocity_y": {
+      "stored_bytes": 8388608,
+      "filter_count": 0
+    },
+    "pressure": {
+      "stored_bytes": 8388608,
+      "filter_count": 0
+    },
+    "density": {
+      "stored_bytes": 8388608,
+      "filter_count": 0
+    },
+    "kinematic_viscosity": {
+      "stored_bytes": 8388608,
+      "filter_count": 0
+    },
+    "force_x": {
+      "stored_bytes": 8388608,
+      "filter_count": 0
+    },
+    "force_y": {
+      "stored_bytes": 8388608,
+      "filter_count": 0
+    }
+  },
+  "gradient/gzip1_chunk64": {
+    "velocity_x": {
+      "stored_bytes": 119648,
+      "filter_count": 1
+    },
+    "velocity_y": {
+      "stored_bytes": 41728,
+      "filter_count": 1
+    },
+    "pressure": {
+      "stored_bytes": 41728,
+      "filter_count": 1
+    },
+    "density": {
+      "stored_bytes": 52992,
+      "filter_count": 1
+    },
+    "kinematic_viscosity": {
+      "stored_bytes": 54528,
+      "filter_count": 1
+    },
+    "force_x": {
+      "stored_bytes": 41728,
+      "filter_count": 1
+    },
+    "force_y": {
+      "stored_bytes": 41728,
+      "filter_count": 1
+    }
+  },
+  "gradient/contiguous": {
+    "velocity_x": {
+      "stored_bytes": 8388608,
+      "filter_count": 0
+    },
+    "velocity_y": {
+      "stored_bytes": 8388608,
+      "filter_count": 0
+    },
+    "pressure": {
+      "stored_bytes": 8388608,
+      "filter_count": 0
+    },
+    "density": {
+      "stored_bytes": 8388608,
+      "filter_count": 0
+    },
+    "kinematic_viscosity": {
+      "stored_bytes": 8388608,
+      "filter_count": 0
+    },
+    "force_x": {
+      "stored_bytes": 8388608,
+      "filter_count": 0
+    },
+    "force_y": {
+      "stored_bytes": 8388608,
+      "filter_count": 0
+    }
+  },
+  "gradient/shuffle_gzip4_chunk64": {
+    "velocity_x": {
+      "stored_bytes": 62144,
+      "filter_count": 2
+    },
+    "velocity_y": {
+      "stored_bytes": 13312,
+      "filter_count": 2
+    },
+    "pressure": {
+      "stored_bytes": 13312,
+      "filter_count": 2
+    },
+    "density": {
+      "stored_bytes": 15872,
+      "filter_count": 2
+    },
+    "kinematic_viscosity": {
+      "stored_bytes": 18944,
+      "filter_count": 2
+    },
+    "force_x": {
+      "stored_bytes": 13312,
+      "filter_count": 2
+    },
+    "force_y": {
+      "stored_bytes": 13312,
+      "filter_count": 2
+    }
+  },
+  "taylor_green/shuffle_gzip1_chunk256": {
+    "velocity_x": {
+      "stored_bytes": 6353297,
+      "filter_count": 2
+    },
+    "velocity_y": {
+      "stored_bytes": 6353316,
+      "filter_count": 2
+    },
+    "pressure": {
+      "stored_bytes": 6349973,
+      "filter_count": 2
+    },
+    "density": {
+      "stored_bytes": 37040,
+      "filter_count": 2
+    },
+    "kinematic_viscosity": {
+      "stored_bytes": 37184,
+      "filter_count": 2
+    },
+    "force_x": {
+      "stored_bytes": 36960,
+      "filter_count": 2
+    },
+    "force_y": {
+      "stored_bytes": 36960,
+      "filter_count": 2
+    }
+  },
+  "gradient/shuffle_gzip1_chunk64": {
+    "velocity_x": {
+      "stored_bytes": 79120,
+      "filter_count": 2
+    },
+    "velocity_y": {
+      "stored_bytes": 41728,
+      "filter_count": 2
+    },
+    "pressure": {
+      "stored_bytes": 41728,
+      "filter_count": 2
+    },
+    "density": {
+      "stored_bytes": 44032,
+      "filter_count": 2
+    },
+    "kinematic_viscosity": {
+      "stored_bytes": 46080,
+      "filter_count": 2
+    },
+    "force_x": {
+      "stored_bytes": 41728,
+      "filter_count": 2
+    },
+    "force_y": {
+      "stored_bytes": 41728,
+      "filter_count": 2
+    }
+  },
+  "taylor_green/contiguous": {
+    "velocity_x": {
+      "stored_bytes": 8388608,
+      "filter_count": 0
+    },
+    "velocity_y": {
+      "stored_bytes": 8388608,
+      "filter_count": 0
+    },
+    "pressure": {
+      "stored_bytes": 8388608,
+      "filter_count": 0
+    },
+    "density": {
+      "stored_bytes": 8388608,
+      "filter_count": 0
+    },
+    "kinematic_viscosity": {
+      "stored_bytes": 8388608,
+      "filter_count": 0
+    },
+    "force_x": {
+      "stored_bytes": 8388608,
+      "filter_count": 0
+    },
+    "force_y": {
+      "stored_bytes": 8388608,
+      "filter_count": 0
+    }
+  },
+  "noise/shuffle_gzip1_chunk64": {
+    "velocity_x": {
+      "stored_bytes": 7653576,
+      "filter_count": 2
+    },
+    "velocity_y": {
+      "stored_bytes": 7653265,
+      "filter_count": 2
+    },
+    "pressure": {
+      "stored_bytes": 7653846,
+      "filter_count": 2
+    },
+    "density": {
+      "stored_bytes": 44032,
+      "filter_count": 2
+    },
+    "kinematic_viscosity": {
+      "stored_bytes": 46080,
+      "filter_count": 2
+    },
+    "force_x": {
+      "stored_bytes": 41728,
+      "filter_count": 2
+    },
+    "force_y": {
+      "stored_bytes": 41728,
+      "filter_count": 2
+    }
+  },
+  "multiscale/shuffle_gzip4_chunk64": {
+    "velocity_x": {
+      "stored_bytes": 6662090,
+      "filter_count": 2
+    },
+    "velocity_y": {
+      "stored_bytes": 6669692,
+      "filter_count": 2
+    },
+    "pressure": {
+      "stored_bytes": 603536,
+      "filter_count": 2
+    },
+    "density": {
+      "stored_bytes": 15872,
+      "filter_count": 2
+    },
+    "kinematic_viscosity": {
+      "stored_bytes": 18944,
+      "filter_count": 2
+    },
+    "force_x": {
+      "stored_bytes": 13312,
+      "filter_count": 2
+    },
+    "force_y": {
+      "stored_bytes": 13312,
+      "filter_count": 2
+    }
+  },
+  "noise/contiguous": {
+    "velocity_x": {
+      "stored_bytes": 8388608,
+      "filter_count": 0
+    },
+    "velocity_y": {
+      "stored_bytes": 8388608,
+      "filter_count": 0
+    },
+    "pressure": {
+      "stored_bytes": 8388608,
+      "filter_count": 0
+    },
+    "density": {
+      "stored_bytes": 8388608,
+      "filter_count": 0
+    },
+    "kinematic_viscosity": {
+      "stored_bytes": 8388608,
+      "filter_count": 0
+    },
+    "force_x": {
+      "stored_bytes": 8388608,
+      "filter_count": 0
+    },
+    "force_y": {
+      "stored_bytes": 8388608,
+      "filter_count": 0
+    }
+  },
+  "multiscale/gzip1_chunk64": {
+    "velocity_x": {
+      "stored_bytes": 7885894,
+      "filter_count": 1
+    },
+    "velocity_y": {
+      "stored_bytes": 7876526,
+      "filter_count": 1
+    },
+    "pressure": {
+      "stored_bytes": 722593,
+      "filter_count": 1
+    },
+    "density": {
+      "stored_bytes": 52992,
+      "filter_count": 1
+    },
+    "kinematic_viscosity": {
+      "stored_bytes": 54528,
+      "filter_count": 1
+    },
+    "force_x": {
+      "stored_bytes": 41728,
+      "filter_count": 1
+    },
+    "force_y": {
+      "stored_bytes": 41728,
+      "filter_count": 1
+    }
+  },
+  "noise/shuffle_gzip4_chunk64": {
+    "velocity_x": {
+      "stored_bytes": 7577273,
+      "filter_count": 2
+    },
+    "velocity_y": {
+      "stored_bytes": 7576944,
+      "filter_count": 2
+    },
+    "pressure": {
+      "stored_bytes": 7577095,
+      "filter_count": 2
+    },
+    "density": {
+      "stored_bytes": 15872,
+      "filter_count": 2
+    },
+    "kinematic_viscosity": {
+      "stored_bytes": 18944,
+      "filter_count": 2
+    },
+    "force_x": {
+      "stored_bytes": 13312,
+      "filter_count": 2
+    },
+    "force_y": {
+      "stored_bytes": 13312,
+      "filter_count": 2
+    }
+  },
+  "noise/gzip1_chunk64": {
+    "velocity_x": {
+      "stored_bytes": 8027476,
+      "filter_count": 1
+    },
+    "velocity_y": {
+      "stored_bytes": 8027518,
+      "filter_count": 1
+    },
+    "pressure": {
+      "stored_bytes": 8027504,
+      "filter_count": 1
+    },
+    "density": {
+      "stored_bytes": 52992,
+      "filter_count": 1
+    },
+    "kinematic_viscosity": {
+      "stored_bytes": 54528,
+      "filter_count": 1
+    },
+    "force_x": {
+      "stored_bytes": 41728,
+      "filter_count": 1
+    },
+    "force_y": {
+      "stored_bytes": 41728,
+      "filter_count": 1
+    }
+  },
+  "taylor_green/shuffle_gzip1_chunk64": {
+    "velocity_x": {
+      "stored_bytes": 6484842,
+      "filter_count": 2
+    },
+    "velocity_y": {
+      "stored_bytes": 6484774,
+      "filter_count": 2
+    },
+    "pressure": {
+      "stored_bytes": 6473903,
+      "filter_count": 2
+    },
+    "density": {
+      "stored_bytes": 44032,
+      "filter_count": 2
+    },
+    "kinematic_viscosity": {
+      "stored_bytes": 46080,
+      "filter_count": 2
+    },
+    "force_x": {
+      "stored_bytes": 41728,
+      "filter_count": 2
+    },
+    "force_y": {
+      "stored_bytes": 41728,
+      "filter_count": 2
+    }
+  },
+  "gradient/chunk64": {
+    "velocity_x": {
+      "stored_bytes": 8388608,
+      "filter_count": 0
+    },
+    "velocity_y": {
+      "stored_bytes": 8388608,
+      "filter_count": 0
+    },
+    "pressure": {
+      "stored_bytes": 8388608,
+      "filter_count": 0
+    },
+    "density": {
+      "stored_bytes": 8388608,
+      "filter_count": 0
+    },
+    "kinematic_viscosity": {
+      "stored_bytes": 8388608,
+      "filter_count": 0
+    },
+    "force_x": {
+      "stored_bytes": 8388608,
+      "filter_count": 0
+    },
+    "force_y": {
+      "stored_bytes": 8388608,
+      "filter_count": 0
+    }
+  }
+}
