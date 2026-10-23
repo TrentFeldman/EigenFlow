@@ -139,6 +139,8 @@ from far below to far above the trained range, with the error at each value),
 cases** (the worst validation equations from the model's evaluation file, with
 likely reasons). **Record video** plays the scene once and saves a WebM
 (`ffmpeg -i in.webm out.mp4` converts it); **Save picture** saves a PNG.
+The **colour-blind palette** checkbox (blue and orange instead of blue and red, for
+protanopia and deuteranopia) is remembered by the browser for that file.
 
 Options: `--model` (default `ode/models/current`), `--input` (equation JSON to
 start on), `--worst N` (reel length, 0 for none), `--output`. With `--compare`

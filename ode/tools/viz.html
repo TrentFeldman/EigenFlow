@@ -21,6 +21,14 @@
 :root[data-theme="dark"]{color-scheme:dark;--page:#0d0d0d;--surface:#1a1a19;--ink:#f0efec;--ink2:#c3c2b7;--muted:#898781;--grid:#2c2c2a;
   --axis:#383835;--border:rgba(255,255,255,.12);--exact:#3987e5;--model:#d95926;--other:#199e70;--neg:#3987e5;--pos:#e66767;
   --mid:#383835;--band:#1c5cab;--role1:#3987e5;--role2:#d95926;--role3:#199e70;--role4:#c98500;--role5:#d55181}
+/* Colour-blind palette (protanopia/deuteranopia): blue-orange instead of blue-red, Okabe-Ito hues. Checked with the
+   dataviz palette validator: every adjacent pair separates under protan, deutan and tritan simulation in both themes. */
+:root[data-palette="cvd"]{--exact:#0072b2;--model:#d55e00;--other:#009e73;--neg:#0072b2;--pos:#c98500;
+  --role1:#0072b2;--role2:#e69f00;--role3:#009e73;--role4:#d55e00;--role5:#cc79a7}
+@media (prefers-color-scheme:dark){:root[data-palette="cvd"]:not([data-theme="light"]){--exact:#3a8fd6;--model:#e2661c;
+  --other:#12a37a;--neg:#3a8fd6;--pos:#e69f00;--role1:#3a8fd6;--role2:#b88000;--role3:#12a37a;--role4:#e2661c;--role5:#c06c9e}}
+:root[data-palette="cvd"][data-theme="dark"]{--exact:#3a8fd6;--model:#e2661c;--other:#12a37a;--neg:#3a8fd6;--pos:#e69f00;
+  --role1:#3a8fd6;--role2:#b88000;--role3:#12a37a;--role4:#e2661c;--role5:#c06c9e}
 *{box-sizing:border-box}
 body{margin:0;background:var(--page);color:var(--ink);font:15px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif}
 main{max-width:1320px;margin:0 auto;padding:16px}
@@ -62,6 +70,7 @@ th,td{padding:2px 10px;text-align:right;border-bottom:1px solid var(--grid)}
 <h1>Inside the EigenFlow ODE network</h1>
 <p class="sub" id="sub"></p>
 <p id="status" role="status">Loading the network…</p>
+<label class="note"><input type="checkbox" id="cvd"> Colour-blind palette (blue and orange instead of blue and red; for protanopia and deuteranopia)</label>
 <nav id="tabs" role="tablist" aria-label="Scenes"></nav>
 <p id="blurb"></p>
 <canvas id="view" width="1920" height="1080" role="img" aria-label="Picture of the current scene; the table under 'Numbers behind the picture' has the same values"></canvas>
@@ -378,7 +387,7 @@ const fmt = v => Math.abs(v) >= 100 ? v.toFixed(0) : Math.abs(v) >= 0.01 || v ==
 
 const SCENES = {
   map: {tab: "Network map", play: "time", draw: () => drawMap(false),
-    blurb: "Inputs on the left, the hidden layers in the middle, the answer on the right. Each dot is a neuron (red = positive, blue = negative, grey = quiet) and the lines are the strongest signals passing between them right now. Press Play to run through time; click any neuron to trace it."},
+    blurb: "Inputs on the left, the hidden layers in the middle, the answer on the right. Each dot is a neuron ({pos} = positive, blue = negative, grey = quiet) and the lines are the strongest signals passing between them right now. Press Play to run through time; click any neuron to trace it."},
   trace: {tab: "Trace", play: "time", draw: () => drawMap(true),
     blurb: "Following one value backwards: the thick lines lead from the chosen output (or any neuron you click) to the neurons that fed it most at this moment, and the list shows which inputs those paths start from."},
   lights: {tab: "Lighting up", play: "time", draw: drawLights,
@@ -390,7 +399,7 @@ const SCENES = {
   roles: {tab: "Neuron roles", play: "time", draw: drawRoles,
     blurb: "Every neuron in a layer, sorted by how it behaves over the whole time window: silent, steady, rising, falling, one bump, or wiggling."},
   importance: {tab: "Input importance", play: "time", draw: drawImportance,
-    blurb: "Which inputs are pushing the answer up (red) or down (blue) at each moment. Press Play to watch the balance shift over time."},
+    blurb: "Which inputs are pushing the answer up ({pos}) or down (blue) at each moment. Press Play to watch the balance shift over time."},
   compare: {tab: "Compare models", play: "time", draw: drawCompare,
     blurb: "Two networks on the same equation: their answers, how far off each one is over time, and their neurons side by side."},
   reel: {tab: "Worst cases", play: "reel", draw: drawReel,
@@ -467,7 +476,7 @@ function readTheme() {
   const css = getComputedStyle(document.documentElement);
   for (const name of ["surface", "ink", "ink2", "muted", "grid", "axis", "exact", "model", "other", "neg", "pos", "mid", "good", "bad", "role1", "role2", "role3", "role4", "role5"])
     C[name] = css.getPropertyValue("--" + name).trim();
-  // Diverging colours for neuron values: blue (negative) through the neutral grey to red (positive).
+  // Diverging colours for neuron values: blue (negative) through the neutral grey to red, or orange in the colour-blind palette (positive).
   const [neg, mid, pos] = [C.neg, C.mid, C.pos].map(hex);
   LUT = Array.from({length: 257}, (_, i) => {
     const f = (i - 128) / 128, pole = f < 0 ? neg : pos, rgb = mid.map((m, j) => Math.round(m + (pole[j] - m) * Math.abs(f)));
@@ -475,6 +484,7 @@ function readTheme() {
   });
   theme++;
 }
+const posName = () => document.documentElement.dataset.palette === "cvd" ? "orange" : "red";  // what "positive" looks like
 const roleColour = r => r === 0 ? C.axis : C["role" + r];
 // v is in units of the layer's typical big value; tanh keeps colours from saturating too early.
 const shade = v => LUT[Math.round((Math.tanh(1.5 * v) + 1) * 128)] || LUT[128];
@@ -696,7 +706,7 @@ function drawMap(traceMode) {
   text("negative", px, y + 34, {size: 11, colour: "muted"});
   text("quiet", px + pw / 2, y + 34, {size: 11, colour: "muted", align: "center"});
   text("positive", px + pw, y + 34, {size: 11, colour: "muted", align: "right"});
-  y = wrap("Lines: the strongest signals right now. Red pushes the next neuron up, blue pushes it down.", px, y + 62, pw, 17, {size: 12});
+  y = wrap(`Lines: the strongest signals right now. ${posName()[0].toUpperCase() + posName().slice(1)} pushes the next neuron up, blue pushes it down.`, px, y + 62, pw, 17, {size: 12});
   if (traced && inputShare) {
     const name = traced.col === L + 1 ? `the network's ${dname(traced.index)}` : traced.col === 0 ? shown[traced.index].name : `layer ${traced.col}, neuron ${traced.index}`;
     y = wrap(`Tracing ${name}: where its paths start`, px, y + 14, pw, 17, {size: 12, weight: 600, colour: "ink"});
@@ -1166,7 +1176,7 @@ function setScene(name) {
   if (name === "reel" && cases.length && JSON.stringify(S.eq) !== JSON.stringify(cases[S.reel].equation)) loadCase();
   for (const b of $("tabs").children) b.setAttribute("aria-selected", b.dataset.scene === name);
   for (const el of $("sceneBar").children) el.hidden = !el.dataset.for.split(" ").includes(name);
-  $("blurb").textContent = SCENES[name].blurb;
+  $("blurb").textContent = SCENES[name].blurb.replace("{pos}", posName());
   $("time").disabled = SCENES[name].play !== "time";
   try { history.replaceState(null, "", "#scene=" + name); } catch (e) { /* some browsers block this on file:// pages */ }
   redraw();
@@ -1203,6 +1213,13 @@ canvas.addEventListener("pointerup", () => { dragging = null; });
 canvas.addEventListener("pointerleave", () => tooltip(null));
 
 // ---------- Start ----------
+try { if (localStorage.getItem("eigenflow-palette") === "cvd") document.documentElement.dataset.palette = "cvd"; } catch (e) { /* no storage: default palette */ }
+$("cvd").checked = document.documentElement.dataset.palette === "cvd";
+$("cvd").onchange = e => {
+  if (e.target.checked) document.documentElement.dataset.palette = "cvd"; else delete document.documentElement.dataset.palette;
+  try { localStorage.setItem("eigenflow-palette", e.target.checked ? "cvd" : "default"); } catch (error) { /* not remembered */ }
+  readTheme(); setScene(S.scene);
+};
 readTheme();
 matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => { readTheme(); redraw(); });
 for (const [name, scene] of Object.entries(SCENES)) {
