@@ -9,6 +9,8 @@ exports the initial state at time zero; it does not advance the physics.
 
 Requires CMake 3.20+, a C++17 compiler, and the HDF5 C++ development library.
 For example, the HDF5 package is `libhdf5-dev` on Debian/Ubuntu or `hdf5` on Arch.
+The optional `fluid_pod` toolkit also needs LAPACK (`liblapack-dev` / `lapack`);
+without it, CMake skips that tool and builds everything else.
 From this folder:
 
 ```bash
@@ -101,6 +103,8 @@ keep/reject/investigate decision. Ordinary initialization previews default to
 | `tests/test_fluid.cpp`, `tests/test_cli.cmake`, `tests/test_validation.cpp` | Software regression, CLI replay and analytical validation-tool checks |
 | `tools/benchmark_compression.py`, `tools/compression_fixture.cpp` | Isolated compression measurement; production writer remains uncompressed |
 | `cmake/BuildInfo.h.in` | Build metadata template populated by CMake |
+| `pod/` | `fluid_pod`: AMReX plotfiles → HDF5 snapshots → POD, reconstruction and `.npy` export ([guide](pod/README.md)) |
+| `tests/test_pod.cpp` | Synthetic-plotfile regression suites for `fluid_pod` |
 
 The core library has no HDF5 dependency. `fluid_output` links the HDF5 C++ library.
 Output functions now live outside `FluidGrid`; the old member calls `grid.save()`,
@@ -221,6 +225,24 @@ Inspect with `h5dump -H <run-folder>/grid.h5` or
 Explicit-path exports overwrite; nonfinite fields/times are rejected before
 opening the file. SVG also rejects overflowing speeds. I/O errors throw and
 may leave partial output. The unique folders protect previous CLI runs.
+
+## AMReX reference data and POD
+
+`fluid_pod` reads 2D AMReX plotfiles from the external multimaterial solver.
+It composites the AMR levels onto a uniform grid, stores each run as one HDF5
+file with a ParaView `.vtkhdf` sidecar, and computes proper orthogonal
+decompositions:
+
+```bash
+./build/release/fluid_pod info ~/dat/run_000
+./build/release/fluid_pod convert ~/dat/run_000 -o run_000.h5
+./build/release/fluid_pod pod run_000.h5 -s nddataPLT -v x_velocity,y_velocity -e 0.999
+```
+
+It is separate from the solver prototype: it neither reads nor writes the
+format-2 `grid.h5`. The [guide](pod/README.md) covers every option, the file
+layouts, the POD conventions and the limitations;
+[verification](docs/pod-toolkit-verification.md) records what was checked.
 
 ## Human review pending
 
