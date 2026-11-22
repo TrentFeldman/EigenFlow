@@ -1,0 +1,4 @@
+[submodule "sim"]
+	path = sim
+	url = git@github.com:TrentFeldman/amrex_implicit_interfaces.git
+	branch = modernization
