@@ -1,0 +1,18 @@
+1. use "ngrow_vector"
+2. single precision
+3. GPU
+4. profile the advection step
+5. introduce particles only on the interface.  Attribute "iten" in 
+   [1..num_interfaces]. subdivide=4
+6. delete particles in which |LS_{m}(xp)|>alpha dx  m=m1 or m2
+   (use linear interpolation? data bounded weno?)
+7. if too many particles, then delete those with the largest values for
+   |LS_{m}(xp)|.
+8. use MOF/CMOF reconstruction either when:
+   (i) near triple point
+   (ii) interface changing phase??
+   (iii) prescribed solids
+   (iv) too few particles in the cell
+   otherwise, slope and intercept minimize |phi_recon(xp)| and the volume
+   fractions and centroids are updated.
+9. directionally split advection for the particles.

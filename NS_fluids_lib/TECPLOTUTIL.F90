@@ -1,0 +1,1526 @@
+#undef  BL_LANG_CC
+#ifndef BL_LANG_FORT
+#define BL_LANG_FORT
+#endif
+
+#define STANDALONE 0
+
+#include "AMReX_REAL.H"
+#include "AMReX_CONSTANTS.H"
+#include "AMReX_SPACE.H"
+#include "AMReX_BC_TYPES.H"
+#include "AMReX_ArrayLim.H"
+
+#include "EXTRAP_COMP.H"
+#include "TOWER_MF_CODES.H"
+
+#include "TECPLOTUTIL_F.H"
+
+#if (AMREX_SPACEDIM==3)
+#define SDIM 3
+#elif (AMREX_SPACEDIM==2)
+#define SDIM 2
+#else
+print *,"dimension bust"
+stop
+#endif
+
+      module tecplotutil_cpp_module
+      use amrex_fort_module, only : amrex_real
+      contains
+
+      subroutine fort_tecplotfab( &
+       time, &
+       fabdata,DIMS(fabdata), &
+       growlo,growhi, &
+       fablo,fabhi, &
+       bfact, &
+       xlo,dx, &
+       dir,ncomp,interior_only,nsteps) &
+      bind(c,name='fort_tecplotfab')
+
+      use probcommon_module
+      use global_utility_module
+
+      IMPLICIT NONE
+
+      integer, INTENT(in) :: dir,ncomp,interior_only,nsteps,bfact
+      integer, INTENT(in) :: growlo(SDIM),growhi(SDIM) 
+      integer, INTENT(in) :: fablo(SDIM),fabhi(SDIM) 
+      integer plotlo(SDIM),plothi(SDIM) 
+      integer lo(SDIM),hi(SDIM) 
+      integer, INTENT(in) :: DIMDEC(fabdata)
+      real(amrex_real), INTENT(in) :: fabdata(DIMV(fabdata),ncomp)
+      real(amrex_real) xlo(SDIM)
+      real(amrex_real) xsten(-1:1,SDIM)
+      integer nhalf
+      real(amrex_real) dx(SDIM)
+      real(amrex_real) time
+      integer klo,khi
+    
+
+      integer ih
+
+      character(len=plotfile_digits+11) :: newfilename !fabdata ...
+      character*2 matstr
+      character(len=plotfile_digits) :: stepstr
+
+      integer i,j,k,im,dir2
+      integer nwrite
+
+! Guibo
+
+      character*80 Title,Varname,Zonename
+      real(tecplot_real_short) :: ZONEMARKER,EOHMARKER
+      integer*4 :: iz_gb,ivar_gb
+      integer*4, dimension(:,:), allocatable :: lo_gb,hi_gb
+      integer strandid
+
+      ! define zone structure
+      type zone_t
+         real(tecplot_real), pointer :: var(:,:,:,:)
+      end type zone_t
+      type(zone_t), dimension(:), allocatable :: zone_gb
+
+! Guibo
+
+      nhalf=1
+
+      if (bfact.lt.1) then
+       print *,"bfact invalid400"
+       stop
+      endif
+
+      if (ncomp.lt.1) then
+       print *,"ncomp invalid 30"
+       stop
+      endif
+      if (nsteps.lt.0) then
+       print *,"nsteps invalid in tecplotfab nsteps=",nsteps
+       stop
+      endif
+      if (time.ge.zero) then
+       ! do nothing
+      else
+       print *,"time invalid"
+       stop
+      endif
+      write(stepstr,109) nsteps
+109   format(I plotfile_digits )
+
+      do i=1,plotfile_digits
+       if (stepstr(i:i).eq.' ') then
+        stepstr(i:i)='0'
+       endif
+      enddo
+
+      write(newfilename,119) 'fabdata',stepstr,'.plt'
+119   format(A7,A plotfile_digits ,A4)
+
+      if (interior_only.eq.0) then
+       do dir2=1,SDIM
+        plotlo(dir2)=growlo(dir2)
+        plothi(dir2)=growhi(dir2)
+       enddo
+      else if (interior_only.eq.1) then
+       do dir2=1,SDIM
+        plotlo(dir2)=fablo(dir2)
+        plothi(dir2)=fabhi(dir2)
+       enddo
+      else
+       print *,"interior_only invalid"
+       stop
+      endif
+
+      nwrite=SDIM+ncomp
+
+      print *,"fabdata: ",newfilename
+
+      !--------------------------------------------------
+      ! Determine nzones_gb and allocate zone_gb, lo_gb, hi_gb
+
+      allocate(zone_gb(1))
+      allocate(lo_gb(1,SDIM))
+      allocate(hi_gb(1,SDIM))
+
+      ! Determine lo_gb, hi_gb
+      ! Allocate zone_gb%var later
+      iz_gb=1
+      do dir2=1,SDIM
+       lo_gb(iz_gb,dir2)=plotlo(dir2)
+       hi_gb(iz_gb,dir2)=plothi(dir2)
+      enddo
+
+      !-----------------------------------------------------------
+      ZONEMARKER = 299.0
+      EOHMARKER  = 357.0 
+       !fabdata ...
+      open(unit=11,file=newfilename,form="unformatted",access="stream")
+
+      ! +++++++ HEADER SECTION ++++++
+
+      ! i.  Magic number, Version number
+      write(11) "#!TDV112"
+ 
+      ! ii. Integer value of 1.
+      write(11) 1
+
+      ! iii. Title and variable names.
+      ! File type 0 = FULL,1 = GRID,2 = SOLUTION
+      write(11) 0
+      ! The TITLE
+      Title = "CLSVOF data"
+      call dumpstring(Title)
+      ! Number of variables 
+      write(11) nwrite
+
+      ! Variable names.
+      Varname='X'
+      call dumpstring(Varname)
+      Varname='Y'
+      call dumpstring(Varname)
+
+      if (SDIM.eq.3) then
+       Varname='Z'
+       call dumpstring(Varname)
+      else if (SDIM.eq.2) then
+       ! do nothing
+      else
+       print *,"dimension bust"
+       stop
+      endif
+
+      do im=1,ncomp
+       write(matstr,'(I2)') im
+       do i=1,2
+        if (matstr(i:i).eq.' ') then
+         matstr(i:i)='0'
+        endif
+       enddo
+
+       ih=1
+       Varname='F'
+       ih=ih+1
+       Varname(ih:ih)='D'
+       ih=ih+1
+       do i=1,2
+        Varname(ih:ih)=matstr(i:i)
+        ih=ih+1
+       enddo
+       call dumpstring(Varname)
+      enddo ! im
+
+
+      ! Zones
+      iz_gb=1
+       ! Zone marker. Value = 299.0
+      write(11) ZONEMARKER
+       ! Zone name
+      Zonename = "ZONE"
+      call dumpstring(Zonename)
+
+      strandid=12
+
+      write(11) -1   ! Parent Zone
+      write(11) strandid-1    ! StrandID (this does not work)
+      write(11) round_time(time) ! Solution time
+      write(11) -1   ! Not used. Set to -1
+      write(11) 0    ! Zone Type
+      write(11) 0    ! Specify Var Location. 0 = Don't specify, 
+                     ! all data is located at the nodes.
+      write(11) 0    ! Are raw local 1-to-1 face neighbors supplied?
+      write(11) 0    ! Number of miscellaneous user-defined  
+                      !face neighbor connections
+
+        ! ----- IMax,JMax,KMax
+      write(11) hi_gb(iz_gb,1)-lo_gb(iz_gb,1)+1
+      write(11) hi_gb(iz_gb,2)-lo_gb(iz_gb,2)+1
+      if (SDIM.eq.3) then
+       write(11) hi_gb(iz_gb,SDIM)-lo_gb(iz_gb,SDIM)+1
+      else if (SDIM.eq.2) then
+       write(11) 1
+      else
+       print *,"dimension bust"
+       stop
+      endif
+ 
+      write(11) 0
+
+      write(11) EOHMARKER
+ 
+      ! +++++++ DATA SECTION ++++++
+
+      iz_gb=1
+
+      do dir2=1,SDIM
+       lo(dir2)=lo_gb(iz_gb,dir2)
+       hi(dir2)=hi_gb(iz_gb,dir2)
+      enddo
+
+      if (SDIM.eq.3) then
+       klo=lo(SDIM)
+       khi=hi(SDIM)
+      else if (SDIM.eq.2) then
+       klo=0
+       khi=0
+      else
+       print *,"dimension bust"
+       stop
+      endif
+
+      allocate(zone_gb(iz_gb)% &
+        var(nwrite,lo(1):hi(1),lo(2):hi(2),klo:khi))
+
+       ! order is IMPORTANT.
+      do k=klo,khi
+      do j=lo(2),hi(2)
+      do i=lo(1),hi(1)
+
+       if (dir.eq.-1) then
+        call gridsten(xsten,xlo,i,j,k,fablo,bfact,dx,nhalf)
+       else if ((dir.ge.0).and.(dir.lt.SDIM)) then
+        call gridstenMAC(xsten,xlo,i,j,k,fablo,bfact,dx,nhalf,dir)
+       else
+        print *,"dir invalid tecplotfab 2"
+        stop
+       endif
+
+       zone_gb(iz_gb)%var(1,i,j,k)=xsten(0,1)
+       zone_gb(iz_gb)%var(2,i,j,k)=xsten(0,2)
+       if (SDIM.eq.3) then
+        zone_gb(iz_gb)%var(SDIM,i,j,k)=xsten(0,SDIM)
+       else if (SDIM.eq.2) then
+        ! do nothing
+       else
+        print *,"dimension bust"
+        stop
+       endif
+
+       do im=1,ncomp
+        zone_gb(iz_gb)%var(SDIM+im,i,j,k)=fabdata(D_DECL(i,j,k),im)
+       enddo
+      enddo
+      enddo
+      enddo
+
+
+       ! Zone marker  Value = 299.0
+      write(11) ZONEMARKER
+       ! Data format
+      do i=1,nwrite
+        write(11) 2
+      enddo
+      write(11) 0  ! Has passive variables: 0 = no, 1 = yes.
+      write(11) 0  ! Has variable sharing 0 = no, 1 = yes.
+      write(11) -1 ! Share connectivity list (-1 = no sharing). 
+  
+      do ivar_gb=1,nwrite
+       write(11) minval(zone_gb(1)%var(ivar_gb,:,:,:))
+       write(11) maxval(zone_gb(1)%var(ivar_gb,:,:,:))
+      enddo
+
+       ! order is IMPORTANT
+      do ivar_gb=1,nwrite
+       do k=klo,khi
+       do j=lo_gb(iz_gb,2),hi_gb(iz_gb,2)
+       do i=lo_gb(iz_gb,1),hi_gb(iz_gb,1)
+        write(11) zone_gb(iz_gb)%var(ivar_gb,i,j,k)
+       enddo
+       enddo
+       enddo
+      enddo
+
+      deallocate(zone_gb(iz_gb)%var)
+
+      deallocate(zone_gb)
+      deallocate(lo_gb)
+      deallocate(hi_gb)
+
+      close(11)
+      return
+      end subroutine fort_tecplotfab
+
+
+      subroutine fort_cellgrid_sanity( &
+       tid, &
+       tower_mf_id, &
+       data_dir, & ! data_dir=-1,0..sdim,3,4,5
+       bfact, &
+       ncomp, &
+       datafab,DIMS(datafab), &
+       problo, &
+       probhi, &
+       dx, &
+       lo,hi, &
+       level, &
+       finest_level, &
+       gridno, &
+       rz_flag) &
+      bind(c,name='fort_cellgrid_sanity')
+
+      use probcommon_module
+      use global_utility_module
+
+      IMPLICIT NONE
+
+      integer, INTENT(in) :: tid
+      integer, INTENT(in) :: tower_mf_id
+      integer, INTENT(in) :: data_dir
+      integer, INTENT(in) :: bfact
+      integer, INTENT(in) :: ncomp
+
+      integer, INTENT(in) :: rz_flag
+      integer, INTENT(in) :: lo(SDIM), hi(SDIM)
+      integer, INTENT(in) :: DIMDEC(datafab)
+      integer, INTENT(in) :: level
+      integer, INTENT(in) :: finest_level
+      integer, INTENT(in) :: gridno
+      real(amrex_real), INTENT(in), target :: datafab(DIMV(datafab), &
+        ncomp)
+      real(amrex_real), pointer :: datafab_ptr(D_DECL(:,:,:),:)
+      real(amrex_real) xposnd(SDIM)
+      real(amrex_real) xposndT(SDIM)
+      real(amrex_real) datand(ncomp)
+      real(amrex_real) writend(2*ncomp+2*SDIM)
+      integer scomp,iw
+
+      real(amrex_real), INTENT(in) :: problo(SDIM)
+      real(amrex_real), INTENT(in) :: probhi(SDIM)
+      real(amrex_real), INTENT(in) :: dx(SDIM)
+
+      character*3 levstr
+      character*5 gridstr
+      character*32 filename32 !./temptecplot/tempnddata ...
+
+      integer i,j,k
+      integer isub,jsub,ksub
+      integer isub_nrm
+      integer dir
+      integer i1,j1,k1
+      integer k1lo,k1hi
+      integer ksubhi
+      integer isubhi_local
+      integer jsubhi_local
+      integer ksubhi_local
+      integer igridlo(3),igridhi(3)
+      integer icell(3)
+      integer iproblo(3)
+      integer nhalf
+      real(amrex_real) xstenND(-3:3,SDIM)
+      real(amrex_real) dxleft,dxright
+      integer local_nd
+      integer box_type(SDIM)
+      integer plot_sdim_macro
+
+      nhalf=3
+
+      plot_sdim_macro=SDIM
+
+      if (tid.ge.0) then
+       ! do nothing
+      else
+       print *,"tid invalid"
+       stop
+      endif
+      if ((level.lt.0).or.(level.gt.finest_level)) then
+       print *,"level invalid 39"
+       stop
+      endif
+
+      if (bfact.lt.1) then
+       print *,"bfact too small"
+       stop
+      endif
+
+      if (tower_mf_id.ge.0) then
+       !do nothing
+      else if (tower_mf_id-GET_NEW_DATA_OFFSET.ge.0) then
+       !do nothing
+      else
+       print *,"tower_mf_id out of range"
+       stop
+      endif
+
+      datafab_ptr=>datafab
+
+      if (data_dir.eq.-1) then 
+       call checkbound_array(lo,hi,datafab_ptr,0,-1)
+      else if ((data_dir.ge.0).and.(data_dir.le.5)) then
+       call checkbound_array(lo,hi,datafab_ptr,0,data_dir)
+      else
+       print *,"data_dir invalid"
+       stop
+      endif
+
+      if (rz_flag.eq.COORDSYS_CARTESIAN) then
+       ! do nothing
+      else if (rz_flag.eq.COORDSYS_RZ) then
+       if (SDIM.ne.2) then
+        print *,"dimension bust"
+        stop
+       endif
+      else
+       print *,"rz_flag invalid in cellgrid ",rz_flag
+       stop
+      endif
+
+      write(levstr,'(I3)') level
+      write(gridstr,'(I5)') gridno
+      
+      do i=1,3
+        if (levstr(i:i).eq.' ') then
+         levstr(i:i)='0'
+        endif
+      enddo
+      do i=1,5
+        if (gridstr(i:i).eq.' ') then
+         gridstr(i:i)='0'
+        endif
+      enddo
+#if (STANDALONE==0)
+      write(filename32,'(A14,A10,A3,A5)') &
+              './temptecplot/','tempnddata',levstr,gridstr
+#elif (STANDALONE==1)
+      write(filename32,'(A14,A10,A3,A5)') &
+              './temptecplot_','tempnddata',levstr,gridstr
+#else
+      print *,"STANDALONE invalid"
+      stop
+#endif
+
+      print *,"filename32 ",filename32
+      open(unit=11,file=filename32)
+
+      do dir=1,SDIM
+       write(11,*) lo(dir),hi(dir)
+      enddo
+
+      igridlo(3)=0
+      igridhi(3)=0
+      iproblo(3)=0
+
+      if (SDIM.eq.3) then
+       k1lo=0
+       k1hi=1
+       ksubhi=2
+      else if (SDIM.eq.2) then
+       k1lo=0
+       k1hi=0
+       ksubhi=0
+      else
+       print *,"dimension bust"
+       stop
+      endif
+
+      do dir=1,SDIM
+       igridlo(dir)=lo(dir)
+       igridhi(dir)=hi(dir)+1
+       iproblo(dir)=0
+      enddo
+
+       ! the order k,j,i is IMPORTANT.
+      do k=igridlo(3),igridhi(3) 
+        if (k.eq.igridhi(3)) then
+         ksubhi_local=0
+        else
+         ksubhi_local=ksubhi
+        endif
+        do ksub=0,ksubhi_local 
+         do j=igridlo(2),igridhi(2) 
+          if (j.eq.igridhi(2)) then
+           jsubhi_local=0
+          else
+           jsubhi_local=2
+          endif
+          do jsub=0,jsubhi_local
+           do i=igridlo(1),igridhi(1) 
+            if (i.eq.igridhi(1)) then
+             isubhi_local=0
+            else
+             isubhi_local=2
+            endif
+            do isub=0,isubhi_local
+
+             ! iproblo=0
+             call gridstenND(xstenND,problo,i,j,k,iproblo,bfact,dx,nhalf)
+             call grid_type_to_box_type(data_dir,box_type)
+
+             do dir=1,SDIM
+              dxleft=xstenND(0,dir)-xstenND(-1,dir)
+              dxright=xstenND(1,dir)-xstenND(0,dir)
+
+              if (bfact.eq.1) then
+               if (abs(dxleft-dxright).le.EPS2*dx(dir)) then
+                ! do nothing 
+               else
+                print *,"xstenND invalid 555: ",dxleft,dxright
+                stop
+               endif
+              else if (bfact.gt.1) then
+               if ((dxleft.gt.zero).and.(dxright.gt.zero)) then
+                ! do nothing
+               else
+                print *,"xstenND invalid 562: ",dxleft,dxright
+                stop
+               endif
+              else
+               print *,"bfact invalid152"
+               stop
+              endif
+               ! isub,jsub,ksub=0..2
+              if (dir.eq.1) then
+               isub_nrm=isub ! 0..2
+              else if (dir.eq.2) then
+               isub_nrm=jsub
+              else if ((dir.eq.3).and.(SDIM.eq.3)) then
+               isub_nrm=ksub
+              else
+               print *,"dir invalid"
+               stop
+              endif
+
+              local_nd=box_type(dir)
+
+              dxright=xstenND(2,dir)-xstenND(0,dir)
+              if (dxright.gt.zero) then
+               if (isub_nrm.eq.0) then
+                xposnd(dir)=xstenND(0,dir)
+               else if (isub_nrm.eq.1) then
+                if (local_nd.eq.0) then
+                 xposnd(dir)=xstenND(0,dir)+dxright/100.0
+                else if (local_nd.eq.1) then
+                 xposnd(dir)=xstenND(0,dir)+(half-one/100.0)*dxright
+                else
+                 print *,"local_nd invalid"
+                 stop
+                endif
+               else if (isub_nrm.eq.2) then
+                if (local_nd.eq.0) then
+                 xposnd(dir)=xstenND(2,dir)-dxright/100.0
+                else if (local_nd.eq.1) then
+                 xposnd(dir)=xstenND(2,dir)-(half-one/100.0)*dxright
+                else
+                 print *,"local_nd invalid"
+                 stop
+                endif
+               else
+                print *,"isub_nrm invalid"
+                stop
+               endif
+              else
+               print *,"dxright invalid"
+               stop
+              endif
+             enddo ! dir = 1..sdim
+
+             do dir=1,SDIM
+              xposndT(dir)=xposnd(dir)
+             enddo
+             if (visual_RT_transform.eq.1) then ! defined in PROBCOMMON.F90
+              call RT_transform(xposnd,xposndT)
+             endif
+
+             do dir=1,ncomp
+              datand(dir)=zero
+             enddo
+
+             icell(1)=i
+             icell(2)=j
+             icell(3)=k
+
+             do dir=1,SDIM
+
+               ! isub,jsub,ksub=0..2
+              if (dir.eq.1) then
+               isub_nrm=isub ! 0..2
+              else if (dir.eq.2) then
+               isub_nrm=jsub
+              else if ((dir.eq.3).and.(SDIM.eq.3)) then
+               isub_nrm=ksub
+              else
+               print *,"dir invalid"
+               stop
+              endif
+
+              if ((icell(dir).ge.lo(dir)).and. &
+                  (icell(dir).le.hi(dir))) then
+
+               if (box_type(dir).eq.1) then
+                if ((isub_nrm.eq.0).or.(isub_nrm.eq.1)) then
+                 ! do nothing
+                else if (isub_nrm.eq.2) then
+                 icell(dir)=icell(dir)+1
+                else
+                 print *,"isub_nrm invalid"
+                 stop
+                endif
+               else if (box_type(dir).eq.0) then
+                ! do nothing
+               else
+                print *,"box_type invalid"
+                stop
+               endif
+
+              else if (icell(dir).eq.hi(dir)+1) then
+
+               if (box_type(dir).eq.1) then
+                ! do nothing
+               else if (box_type(dir).eq.0) then
+                icell(dir)=hi(dir)
+               else
+                print *,"box_type invalid"
+                stop
+               endif
+
+              else
+               print *,"icell out of range"
+               stop
+              endif
+             enddo ! dir=1..sdim
+
+             i1=icell(1)
+             j1=icell(2)
+             k1=icell(3)
+
+             do dir=1,ncomp
+              datand(dir)=datafab(D_DECL(i1,j1,k1),dir)
+             enddo
+
+             scomp=0
+             do iw=1,SDIM
+              writend(scomp+iw)=xposndT(iw)
+             enddo
+
+             scomp=scomp+SDIM
+
+             do iw=1,ncomp
+              writend(scomp+iw)=datand(iw)
+             enddo
+
+             scomp=scomp+ncomp 
+
+             if (tower_mf_id.eq.MULTIFAB_TOWER_PLT_MF) then
+              if (ncomp.eq.PLOTCOMP_NCOMP) then
+               ! do nothing
+              else
+               print *,"ncomp.ne.PLOTCOMP_NCOMP fort_cellgrid_sanity"
+               stop
+              endif
+             endif
+
+             do iw=1,scomp
+              if (iw.lt.scomp) then
+!              write(11,'(D25.16)',ADVANCE="NO") writend(iw)
+               write(11,'(E25.16)',ADVANCE="NO") writend(iw)
+              else if (iw.eq.scomp) then
+!              write(11,'(D25.16)') writend(iw)
+               write(11,'(E25.16)') writend(iw)
+              else
+               print *,"iw invalid"
+               stop
+              endif
+             enddo ! iw=1..scomp
+            enddo ! isub=0..2
+           enddo  ! i=igridlo(1),igridhi(1)
+          enddo ! jsub=0..2
+         enddo  ! j=igridlo(2),igridhi(2)
+        enddo ! ksub=0..ksubhi
+      enddo  ! k=igridlo(3),igridhi(3)  (sanity output loop to "AMR" grid)
+
+      close(11)
+
+      return
+      end subroutine fort_cellgrid_sanity
+
+
+      subroutine fort_combinezones_sanity( &
+       root_char_array, &
+       n_root, &
+       data_dir, &
+       total_number_grids, &
+       grids_per_level_array, &
+       levels_array, &
+       bfact_array, &
+       gridno_array, &
+       gridlo_array, &
+       gridhi_array, &
+       finest_level, &
+       SDC_outer_sweeps, &
+       slab_step, &
+       tower_mf_id, &
+       nsteps, &
+       num_levels, &
+       time, &
+       visual_revolve, &
+       ncomp) &
+      bind(c,name='fort_combinezones_sanity')
+
+      use probcommon_module
+      use global_utility_module
+
+      IMPLICIT NONE
+
+      integer, INTENT(in) :: n_root
+      character, dimension(n_root), INTENT(in) :: root_char_array
+      integer, INTENT(in) :: data_dir
+      integer, INTENT(in) :: ncomp
+      integer, INTENT(in) :: total_number_grids
+      integer, INTENT(in) :: num_levels
+      integer, INTENT(in) :: grids_per_level_array(num_levels)
+      integer, INTENT(in) :: levels_array(total_number_grids)
+      integer, INTENT(in) :: bfact_array(total_number_grids)
+      integer, INTENT(in) :: gridno_array(total_number_grids)
+      integer, INTENT(in) :: gridlo_array(total_number_grids*SDIM)
+      integer, INTENT(in) :: gridhi_array(total_number_grids*SDIM)
+      integer, INTENT(in) :: finest_level
+      integer, INTENT(in) :: SDC_outer_sweeps
+      integer, INTENT(in) :: slab_step
+      integer, INTENT(in) :: tower_mf_id
+      integer, INTENT(in) :: nsteps
+      real(amrex_real), INTENT(in) :: time
+      integer, INTENT(in) :: visual_revolve
+
+      integer strandid
+      integer nwrite
+
+
+      character*3 levstr
+      character*5 gridstr
+      character(len=32) filename32 ! ./temptecplot_tempnddata
+      character*80 rmcommand
+
+      character(len=plotfile_digits) stepstr
+      character*3 outerstr
+      character*3 slabstr
+      character*3 idstr
+
+      character(len=n_root) :: root_char_str
+      character(len=n_root+30+plotfile_digits) :: newfilename40
+      character(len=30+plotfile_digits) :: fname_extend
+      character(len=4) :: step_chars
+      character(len=2) :: dir_chars
+      character(len=5) :: outer_chars
+      character(len=4) :: slab_chars
+      character(len=2) :: id_chars
+      character(len=4) :: plt_chars
+
+      integer i,j,k,dir
+      integer ilev,igrid
+      integer lo(SDIM),hi(SDIM)
+      integer hi_index_shift(3)
+
+! Guibo
+
+      character*80 Title,Zonename
+      real(tecplot_real_short) :: ZONEMARKER,EOHMARKER
+      integer*4 :: nzones_gb,iz_gb,ivar_gb
+      integer*4, dimension(:,:), allocatable :: lo_gb,hi_gb
+      integer bfact,testlev,testgridno
+      integer testlo(SDIM),testhi(SDIM)
+
+      ! define zone structure
+      type zone_t
+         real(tecplot_real), pointer :: var(:,:,:,:)
+      end type zone_t
+      type(zone_t), dimension(:), allocatable :: zone_gb
+
+      integer plot_sdim
+      integer plot_sdim_macro
+      integer klo_plot,khi_plot
+      integer add_sub_cells
+
+! Guibo
+      integer sysret
+
+
+      plot_sdim=SDIM
+      plot_sdim_macro=SDIM
+
+      if (tower_mf_id.ge.0) then
+       !do nothing
+      else if (tower_mf_id-GET_NEW_DATA_OFFSET.ge.0) then
+       !do nothing
+      else
+       print *,"tower_mf_id out of range (fort_combinezones_sanity) ", &
+        tower_mf_id
+       stop
+      endif
+
+
+      if (levelrz.eq.COORDSYS_CARTESIAN) then
+       if (visual_revolve.ne.0) then
+        print *,"visual_revolve= ",visual_revolve
+        print *,"visual_revolve invalid combine zones"
+        stop
+       endif
+      else if (levelrz.eq.COORDSYS_RZ) then
+       if (SDIM.ne.2) then
+        print *,"dimension bust"
+        stop
+       endif
+       if (visual_revolve.eq.0) then
+        ! do nothing
+       else if ((visual_revolve.ge.1).and.(visual_revolve.le.1024)) then
+        ! do nothing
+       else
+        print *,"visual_revolve= ",visual_revolve
+        print *,"visual_revolve out of range"
+        stop
+       endif
+      else 
+       print *,"levelrz invalid combine zones ",levelrz
+       stop
+      endif
+
+      nwrite=plot_sdim+ncomp
+      if (tower_mf_id.eq.MULTIFAB_TOWER_PLT_MF) then
+       if (ncomp.eq.PLOTCOMP_NCOMP) then
+        ! do nothing
+       else
+        print *,"ncomp.ne.PLOTCOMP_NCOMP fort_combinezones_sanity"
+        stop
+       endif
+      endif
+
+      if (num_levels.ne.finest_level+1) then
+       print *,"num_levels invalid"
+       stop
+      endif
+
+      if ((visual_revolve.ge.1).and.(visual_revolve.le.1024)) then
+
+       if (levelrz.ne.COORDSYS_RZ) then
+        print *,"levelrz invalid combine zones 2"
+        stop
+       endif
+       if (SDIM.ne.2) then
+        print *,"parameter bust"
+        stop
+       endif
+
+       plot_sdim=3
+
+        ! declared in: GLOBALUTIL.F90
+       call zones_revolve_sanity( &
+        root_char_array, &
+        n_root, &
+        data_dir, &
+        plot_sdim, &
+        total_number_grids, &
+        grids_per_level_array, &
+        levels_array, &
+        bfact_array, &
+        gridno_array, &
+        gridlo_array, &
+        gridhi_array, &
+        finest_level, &
+        SDC_outer_sweeps, &
+        slab_step, &
+        tower_mf_id, &
+        nsteps, &
+        num_levels, &
+        time, &
+        visual_revolve, &
+        ncomp)
+      else if (visual_revolve.eq.0) then
+
+       if (levelrz.eq.COORDSYS_CARTESIAN) then
+        ! do nothing
+       else if (levelrz.eq.COORDSYS_RZ) then
+        if (SDIM.ne.2) then
+         print *,"dimension bust"
+         stop
+        endif
+       else
+        print *,"levelrz invalid combine zones 3 ",levelrz
+        stop
+       endif
+
+       write(stepstr,943) nsteps
+943    FORMAT(I plotfile_digits)
+
+       do i=1,plotfile_digits
+        if (stepstr(i:i).eq.' ') then
+         stepstr(i:i)='0'
+        endif
+       enddo
+
+       write(outerstr,'(I3)') SDC_outer_sweeps
+       write(slabstr,'(I3)') slab_step
+
+       if (tower_mf_id.ge.0) then
+        write(idstr,'(I3)') tower_mf_id
+       else if (tower_mf_id-GET_NEW_DATA_OFFSET.ge.0) then
+        write(idstr,'(I3)') tower_mf_id-GET_NEW_DATA_OFFSET
+       else
+        print *,"tower_mf_id invalid"
+        stop
+       endif
+
+       do i=1,3
+        if (outerstr(i:i).eq.' ') then
+         outerstr(i:i)='0'
+        endif
+        if (slabstr(i:i).eq.' ') then
+         slabstr(i:i)='0'
+        endif
+        if (idstr(i:i).eq.' ') then
+         idstr(i:i)='0'
+        endif
+       enddo
+
+       do i=1,n_root
+        root_char_str(i:i)=root_char_array(i)
+       enddo
+
+       if (data_dir.eq.-1) then
+        dir_chars='CC'
+       else if (data_dir.eq.0) then
+        dir_chars='XC'
+       else if (data_dir.eq.1) then
+        dir_chars='YC'
+       else if ((data_dir.eq.SDIM-1).and.(SDIM.eq.3)) then
+        dir_chars='ZC'
+       else if (data_dir.eq.3) then
+        dir_chars='XY'
+       else if ((data_dir.eq.4).and.(SDIM.eq.3)) then
+        dir_chars='XZ'
+       else if ((data_dir.eq.5).and.(SDIM.eq.3)) then
+        dir_chars='YZ'
+       else
+        print *,"data_dir invalid"
+        stop
+       endif
+       step_chars='step'
+       outer_chars='outer'
+       slab_chars='slab'
+       id_chars='id'
+       plt_chars='.plt'
+
+       newfilename40(1:n_root)=root_char_str
+       write(fname_extend,1003) &
+               dir_chars,id_chars,idstr, &
+               step_chars,stepstr,outer_chars,outerstr, &
+               slab_chars,slabstr,plt_chars
+1003   format(A2,A2,A3,A4,A plotfile_digits ,A5,A3,A4,A3,A4)
+
+       newfilename40(n_root+1:n_root+30+plotfile_digits)=fname_extend
+
+       print *,"newfilename40 ",newfilename40
+
+
+       !--------------------------------------------------
+       ! Determine nzones_gb and allocate zone_gb, lo_gb, hi_gb
+       nzones_gb=0
+       do ilev=0,finest_level
+       do igrid=0,grids_per_level_array(ilev+1)-1
+        nzones_gb = nzones_gb+1
+       enddo
+       enddo
+
+       if (nzones_gb.ne.total_number_grids) then
+        print *,"nzones_gb.ne.total_number_grids: aborting"
+        stop
+       endif
+
+       print *,"allocating grid structure for tecplot binary"
+       print *,"finest_level= ",finest_level
+       print *,"number of grids on finest level ", &
+        grids_per_level_array(finest_level+1) 
+       print *,"total number of grid blocks: ",nzones_gb
+       print *,"num_materials ",num_materials
+       print *,"num_state_material ",num_state_material
+
+       allocate(zone_gb(nzones_gb))
+       allocate(lo_gb(nzones_gb,plot_sdim))
+       allocate(hi_gb(nzones_gb,plot_sdim))
+
+        ! Determine lo_gb, hi_gb
+       iz_gb=0
+       do ilev=0,finest_level
+       do igrid=0,grids_per_level_array(ilev+1)-1
+        write(levstr,'(I3)') ilev
+        write(gridstr,'(I5)') igrid
+        do i=1,3
+         if (levstr(i:i).eq.' ') then
+          levstr(i:i)='0'
+         endif
+        enddo
+        do i=1,5
+         if (gridstr(i:i).eq.' ') then
+          gridstr(i:i)='0'
+         endif
+        enddo
+
+#if (STANDALONE==0)
+        write(filename32,'(A14,A10,A3,A5)') &
+              './temptecplot/','tempnddata',levstr,gridstr
+#elif (STANDALONE==1)
+        write(filename32,'(A14,A10,A3,A5)') &
+              './temptecplot_','tempnddata',levstr,gridstr
+#else
+        print *,"STANDALONE invalid"
+        stop
+#endif
+
+        print *,"filename32 ",filename32
+        open(unit=4,file=filename32)
+
+        do dir=1,plot_sdim
+         read(4,*) lo(dir),hi(dir)
+         lo_gb(iz_gb+1,dir)=lo(dir)
+         hi_gb(iz_gb+1,dir)=hi(dir)
+        enddo ! dir
+
+        bfact=bfact_array(iz_gb+1)
+        testlev=levels_array(iz_gb+1)
+        testgridno=gridno_array(iz_gb+1)
+
+        if (bfact.lt.1) then
+         print *,"bfact invalid156"
+         stop
+        endif
+        if (testlev.ne.ilev) then
+         print *,"testlev invalid"
+         stop
+        endif
+        if (testgridno.ne.igrid) then
+         print *,"testgridno invalid"
+         stop
+        endif
+
+        do dir=1,plot_sdim
+         testlo(dir)=gridlo_array(plot_sdim*iz_gb+dir)
+         testhi(dir)=gridhi_array(plot_sdim*iz_gb+dir)
+         if (testlo(dir).ne.lo(dir)) then
+          print *,"testlo invalid"
+          stop
+         endif
+         if (testhi(dir).ne.hi(dir)) then
+          print *,"testhi invalid"
+          stop
+         endif
+         if ((lo(dir)/bfact)*bfact.ne.lo(dir)) then
+          print *,"lo not divisible by bfact"
+          stop
+         endif
+         if (((hi(dir)+1)/bfact)*bfact.ne.hi(dir)+1) then
+          print *,"hi+1 not divisible by bfact"
+          stop
+         endif
+        enddo ! dir
+
+        close(4)
+
+        iz_gb=iz_gb+1
+       enddo ! igrid
+       enddo ! ilev
+
+       if (iz_gb.ne.total_number_grids) then
+        print *,"iz_gb or total_number_grids invalid"
+        stop
+       endif
+
+       !-----------------------------------------------------------
+       ZONEMARKER = 299.0
+       EOHMARKER  = 357.0
+       open(unit=11,file=newfilename40,form="unformatted",access="stream")
+
+        ! +++++++ HEADER SECTION ++++++
+
+        ! i.  Magic number, Version number
+       write(11) "#!TDV112"
+ 
+        ! ii. Integer value of 1.
+       write(11) 1
+
+        ! iii. Title and variable names.
+        ! File type 0 = FULL,1 = GRID,2 = SOLUTION
+       write(11) 0
+        ! The TITLE
+       Title = "CLSVOF data"
+       call dumpstring(Title)
+       ! Number of variables 
+       write(11) nwrite
+
+       ! Variable names: combinezones_sanity
+       ! "dumpstring_headers" declared in GLOBALUTIL.F90
+       ! "dumpstring_headers_sanity" declared in GLOBALUTIL.F90
+       if (tower_mf_id.eq.MULTIFAB_TOWER_PLT_MF) then
+        add_sub_cells=plot_sdim
+        call dumpstring_headers(plot_sdim,add_sub_cells)
+       else
+        call dumpstring_headers_sanity(plot_sdim,ncomp)
+       endif
+
+        ! Zones
+       do iz_gb=1,nzones_gb
+        ! Zone marker. Value = 299.0
+        write(11) ZONEMARKER
+        ! Zone name
+        Zonename = "ZONE"
+        call dumpstring(Zonename)
+
+        strandid=13
+ 
+        write(11) -1   ! Parent Zone
+        write(11) strandid-1    ! StrandID (this does not work)
+        write(11) round_time(time) ! Solution time
+        write(11) -1   ! Not used. Set to -1
+        write(11) 0    ! Zone Type
+        write(11) 0    ! Specify Var Location. 0 = Don't specify, 
+                       ! all data is located at the nodes.
+        write(11) 0    ! Are raw local 1-to-1 face neighbors supplied?
+        write(11) 0    ! Number of miscellaneous user-defined  
+                       !face neighbor connections
+
+        hi_index_shift(1)=3*(hi_gb(iz_gb,1)-lo_gb(iz_gb,1)+1)+1
+        hi_index_shift(2)=3*(hi_gb(iz_gb,2)-lo_gb(iz_gb,2)+1)+1
+        if (plot_sdim.eq.3) then
+         hi_index_shift(3)=3*(hi_gb(iz_gb,plot_sdim)-lo_gb(iz_gb,plot_sdim)+1)+1
+        else if (plot_sdim.eq.2) then
+         hi_index_shift(3)=1
+        else
+         print *,"plot_sdim invalid in combinezones_sanity"
+         stop
+        endif
+
+         ! ----- IMax,JMax,KMax
+        write(11) hi_index_shift(1)
+        write(11) hi_index_shift(2)
+        write(11) hi_index_shift(3)
+ 
+        write(11) 0
+       enddo  ! iz_gb
+
+       write(11) EOHMARKER
+ 
+       print *,"finished writing header section, now data section"
+       print *,"nzones_gb= ",nzones_gb
+       print *,"nwrite= ",nwrite
+
+        ! +++++++ DATA SECTION ++++++
+
+       ilev=0
+       igrid=0
+
+       do iz_gb=1,nzones_gb
+
+        if (ilev.gt.finest_level) then
+         print *,"ilev invalid"
+         print *,"ilev=",ilev
+         print *,"finest_level=",finest_level
+         stop
+        endif
+      
+        do while (grids_per_level_array(ilev+1).eq.0)
+         ilev=ilev+1
+
+         if (igrid.ne.0) then
+          print *,"igrid should be 0"
+          print *,"igrid=",igrid
+          stop
+         endif
+         if (ilev.gt.finest_level) then
+          print *,"ilev invalid in grids_per_level loop"
+          print *,"ilev=",ilev
+          print *,"finest_level=",finest_level
+          stop
+         endif
+        enddo ! while grids_per_level_array(ilev+1)==0
+ 
+        if (igrid.gt.grids_per_level_array(ilev+1)-1) then
+         print *,"igrid invalid"
+         print *,"igrid= ",igrid
+         print *,"ilev= ",ilev
+         print *,"finest_level=",finest_level
+         print *,"grids_per_level_array= ", &
+          grids_per_level_array(ilev+1)
+         print *,"iz_gb = ",iz_gb
+         print *,"nzones_gb= ",nzones_gb
+         print *,"num_levels= ",num_levels
+         print *,"nwrite= ",nwrite
+         stop
+        endif
+
+        if (igrid.ne.gridno_array(iz_gb)) then
+         print *,"igrid invalid ",igrid
+         print *,"iz_gb=",iz_gb
+         print *,"gridno_array(iz_gb) ",gridno_array(iz_gb)
+         stop
+        endif
+        if (ilev.ne.levels_array(iz_gb)) then
+         print *,"ilev invalid ",ilev
+         print *,"iz_gb=",iz_gb
+         print *,"levels_array(iz_gb) ",levels_array(iz_gb)
+         stop
+        endif
+
+        do dir=1,plot_sdim
+         lo(dir)=lo_gb(iz_gb,dir)
+         hi(dir)=hi_gb(iz_gb,dir)
+        enddo
+      
+        if (plot_sdim.eq.3) then
+         klo_plot=lo(plot_sdim)
+         khi_plot=hi(plot_sdim)+1
+        else if (plot_sdim.eq.2) then
+         klo_plot=0
+         khi_plot=0
+        else
+         print *,"plot_sdim invalid"
+         stop
+        endif
+
+        hi_index_shift(1)=3*(hi(1)-lo(1)+1)
+        hi_index_shift(2)=3*(hi(2)-lo(2)+1)
+        hi_index_shift(3)=3*(khi_plot-klo_plot)
+ 
+        allocate(zone_gb(iz_gb)% &
+         var(nwrite, &
+            0:hi_index_shift(1), &
+            0:hi_index_shift(2), &
+            0:hi_index_shift(3)))
+         
+        write(levstr,'(I3)') ilev
+        write(gridstr,'(I5)') igrid
+        do i=1,3
+         if (levstr(i:i).eq.' ') then
+          levstr(i:i)='0'
+         endif
+        enddo
+        do i=1,5
+         if (gridstr(i:i).eq.' ') then
+          gridstr(i:i)='0'
+         endif
+        enddo
+
+#if (STANDALONE==0)
+        write(filename32,'(A14,A10,A3,A5)') &
+              './temptecplot/','tempnddata',levstr,gridstr
+#elif (STANDALONE==1)
+        write(filename32,'(A14,A10,A3,A5)') &
+              './temptecplot_','tempnddata',levstr,gridstr
+#else
+        print *,"STANDALONE invalid"
+        stop
+#endif
+
+        open(unit=4,file=filename32)
+        print *,"filename32 ",filename32
+
+        do dir=1,SDIM
+         read(4,*) lo(dir),hi(dir)
+
+         if (lo(dir).ne.lo_gb(iz_gb,dir)) then
+          print *,"lo and lo_gb different"
+          print *,"iz_gb,dir,lo,lo_gb ",iz_gb,dir,lo(dir), &
+           lo_gb(iz_gb,dir)
+          stop
+         endif
+         if (hi(dir).ne.hi_gb(iz_gb,dir)) then
+          print *,"hi and hi_gb different"
+          print *,"iz_gb,dir,hi,hi_gb ",iz_gb,dir,hi(dir), &
+           hi_gb(iz_gb,dir)
+          stop
+         endif
+
+        enddo  ! dir
+
+         ! order is IMPORTANT.
+        do k=0,hi_index_shift(3)
+        do j=0,hi_index_shift(2)
+        do i=0,hi_index_shift(1)
+         read(4,*) (zone_gb(iz_gb)%var(ivar_gb,i,j,k),ivar_gb=1,nwrite)
+        enddo
+        enddo
+        enddo
+
+        close(4)
+
+        ! Zone marker  Value = 299.0
+        write(11) ZONEMARKER
+        ! Data format
+        do i=1,nwrite
+         write(11) 2
+        enddo
+        write(11) 0  ! Has passive variables: 0 = no, 1 = yes.
+        write(11) 0  ! Has variable sharing 0 = no, 1 = yes.
+        write(11) -1 ! Share connectivity list (-1 = no sharing). 
+   
+        do ivar_gb=1,nwrite
+         write(11) minval(zone_gb(iz_gb)%var(ivar_gb,:,:,:))
+         write(11) maxval(zone_gb(iz_gb)%var(ivar_gb,:,:,:))
+        enddo
+
+        ! order is IMPORTANT
+        do ivar_gb=1,nwrite
+         hi_index_shift(1)=3*(hi_gb(iz_gb,1)-lo_gb(iz_gb,1)+1)
+         hi_index_shift(2)=3*(hi_gb(iz_gb,2)-lo_gb(iz_gb,2)+1)
+         hi_index_shift(3)=3*(khi_plot-klo_plot)
+         do k=0,hi_index_shift(3)
+         do j=0,hi_index_shift(2)
+         do i=0,hi_index_shift(1)
+          write(11) zone_gb(iz_gb)%var(ivar_gb,i,j,k)
+         enddo
+         enddo
+         enddo
+        enddo
+
+        deallocate(zone_gb(iz_gb)%var)
+
+        igrid=igrid+1
+        if (igrid.gt.grids_per_level_array(ilev+1)-1) then
+         ilev=ilev+1
+         igrid=0
+        endif
+
+       enddo  ! iz_gb
+
+       deallocate(zone_gb)
+       deallocate(lo_gb)
+       deallocate(hi_gb)
+
+       close(11)
+     
+       rmcommand='rm ./temptecplot_tempnddata*'
+       sysret=0
+
+#if (STANDALONE==0)
+       ! do nothing
+#elif (STANDALONE==1)
+       print *,"issuing command ",rmcommand
+       call execute_command_line(rmcommand,exitstat=sysret)
+
+       if (sysret.ne.0) then
+        print *,"execute_command_line has sysret=",sysret
+        stop
+       endif
+#else
+       print *,"STANDALONE invalid"
+       stop
+#endif
+
+      else
+       print *,"visual_revolve invalid"
+       stop
+      endif
+
+      return
+      end subroutine fort_combinezones_sanity
+
+      subroutine fort_tecplotfab_sanity( &
+       root_char_array, &
+       n_root, &
+       data_dir, &
+       bfact, &
+       fablo, &
+       fabhi, &
+       datafab,DIMS(datafab), &
+       problo, &
+       probhi, &
+       dx, &
+       SDC_outer_sweeps, &
+       slab_step, &
+       tower_mf_id, &
+       nsteps, &
+       time, &
+       visual_revolve, &
+       level, &
+       finest_level, &
+       ncomp) &
+      bind(c,name='fort_tecplotfab_sanity')
+
+      use probcommon_module
+      use global_utility_module
+
+      IMPLICIT NONE
+
+      integer, INTENT(in) :: n_root
+      character, dimension(n_root), INTENT(in) :: root_char_array
+      integer, INTENT(in) :: data_dir
+      integer, INTENT(in) :: ncomp
+      integer, INTENT(in) :: level
+      integer, INTENT(in) :: finest_level
+      integer, INTENT(in) :: SDC_outer_sweeps
+      integer, INTENT(in) :: slab_step
+      integer, INTENT(in) :: tower_mf_id
+      integer, INTENT(in) :: nsteps
+      real(amrex_real), INTENT(in) :: time
+      integer, INTENT(in) :: bfact
+      integer, INTENT(in) :: visual_revolve
+      integer, INTENT(in) :: fablo(SDIM),fabhi(SDIM) 
+      integer, INTENT(in) :: DIMDEC(datafab)
+      real(amrex_real), INTENT(in) :: datafab(DIMV(datafab),ncomp)
+      real(amrex_real), INTENT(in) :: problo(SDIM)
+      real(amrex_real), INTENT(in) :: probhi(SDIM)
+      real(amrex_real), INTENT(in) :: dx(SDIM)
+      integer :: tid_local
+      integer :: gridno_local
+      integer :: dir_local
+      integer :: total_number_grids
+      integer :: num_levels
+      integer :: grids_per_level_array(1)
+      integer :: levels_array(1)
+      integer :: bfact_array(1)
+      integer :: gridno_array(1)
+      integer :: gridlo_array(SDIM)
+      integer :: gridhi_array(SDIM)
+
+      tid_local=0
+      gridno_local=0
+
+      call fort_cellgrid_sanity( &
+       tid_local, &
+       tower_mf_id, &
+       data_dir, &
+       bfact, &
+       ncomp, &
+       datafab,DIMS(datafab), &
+       problo, &
+       probhi, &
+       dx, &
+       fablo,fabhi, &
+       level, &
+       finest_level, &
+       gridno_local, &
+       levelrz)
+
+      total_number_grids=1
+      num_levels=1
+      grids_per_level_array(1)=1
+      levels_array(1)=0
+      bfact_array(1)=bfact
+      gridno_array(1)=0
+      do dir_local=1,SDIM
+       gridlo_array(dir_local)=fablo(dir_local)
+       gridhi_array(dir_local)=fabhi(dir_local)
+      enddo
+
+      call fort_combinezones_sanity( &
+       root_char_array, &
+       n_root, &
+       data_dir, &
+       total_number_grids, &
+       grids_per_level_array, &
+       levels_array, &
+       bfact_array, &
+       gridno_array, &
+       gridlo_array, &
+       gridhi_array, &
+       finest_level, &
+       SDC_outer_sweeps, &
+       slab_step, &
+       tower_mf_id, &
+       nsteps, &
+       num_levels, &
+       time, &
+       visual_revolve, &
+       ncomp)
+
+      return
+      end subroutine fort_tecplotfab_sanity
+
+      end module tecplotutil_cpp_module
+
+#undef STANDALONE

@@ -1,0 +1,865 @@
+c  solves Ax=b, status=1 if ok, A is an ndim x ndim matrix 
+c  in fortran, array dimensions go from 1..n; thus
+c  valid regions of AA are 1..ndim x 1..ndim
+c  NOTE: AA and bb are OVERWRITTEN after call to matrix_solve.
+
+        subroutine matrix_solve(AA,xx,bb,ndim,status)
+        integer ndim
+        real*8 AA(ndim,ndim),xx(ndim),bb(ndim)
+        real*8 alpha,holdvalue
+        integer i,j,k,holdj,status
+
+        status=1
+        do i=1,ndim-1
+         holdj=i
+         holdvalue=AA(i,i)
+         do j=i+1,ndim 
+          if (abs(AA(j,i)).gt.abs(holdvalue)) then
+           holdj=j
+           holdvalue=abs(AA(j,i))
+          endif
+         enddo
+         if (holdj.ne.i) then
+          do j=i,ndim
+           holdvalue=AA(i,j)
+           AA(i,j)=AA(holdj,j)
+           AA(holdj,j)=holdvalue
+          enddo
+         endif
+         holdvalue=bb(i)
+         bb(i)=bb(holdj)
+         bb(holdj)=holdvalue
+         if (abs(AA(i,i)).lt.1.0E-13) then
+          status=0
+         else
+          do j=i+1,ndim
+           alpha=AA(j,i)/AA(i,i)
+           do k=i,ndim
+            AA(j,k)=AA(j,k)-alpha*AA(i,k)
+           enddo
+           bb(j)=bb(j)-alpha*bb(i)
+          enddo
+         endif
+        enddo
+
+        do i=ndim,1,-1
+         if (status.ne.0) then
+          holdvalue=bb(i)
+          do j=i+1,ndim
+           holdvalue=holdvalue-AA(i,j)*xx(j)
+          enddo
+          if (abs(AA(i,i)).lt.1.0E-13) then
+           status=0
+          else
+           xx(i)=holdvalue/AA(i,i)
+          endif
+         endif
+        enddo
+
+        return
+        end
+
+      subroutine tridiag_solve(l,u,d,n,f,soln)
+      IMPLICIT NONE
+
+      integer n,i
+      real*8 l(n),u(n),d(n),f(n),soln(n)
+      real*8 ll(n),uu(n),dd(n),z(n)
+
+      dd(1)=d(1)
+      uu(1)=u(1)/dd(1)
+      z(1)=f(1)/dd(1)
+      do i=2,n-1
+       ll(i)=l(i)
+       dd(i)=d(i)-ll(i)*uu(i-1)
+       uu(i)=u(i)/dd(i)
+       z(i)=(f(i)-ll(i)*z(i-1))/dd(i)
+      enddo
+      ll(n)=l(n)
+      dd(n)=d(n)-ll(n)*uu(n-1)
+      z(n)=(f(n)-ll(n)*z(n-1))/dd(n)
+      soln(n)=z(n)
+      do i=n-1,1,-1
+       soln(i)=z(i)-uu(i)*soln(i+1)
+      enddo
+
+      return
+      end
+
+      real*8 function erfmine(x)
+      IMPLICIT NONE
+
+      real*8 x,pi,dx,t,xhead,xtail
+      real*8 sumhead,sumtail
+      integer i,nhead,ntail
+
+      pi=4.d0*atan(1.d0)
+      if (x.le.3.0) then
+       xhead=x
+       nhead=1200
+       xtail=x
+       ntail=0
+      else 
+       xhead=3.0
+       nhead=1000
+       xtail=x
+       ntail=200
+      endif
+
+      dx=xhead/nhead
+      sumhead=0.0
+      do i=0,nhead-1
+       t=(i+0.5)*dx
+       sumhead=sumhead+exp(-t*t)*dx
+      enddo
+      sumtail=0.0
+      if ((ntail.gt.0).and.(xtail-xhead.gt.0.0)) then
+       dx=(xtail-xhead)/ntail
+       do i=0,ntail-1
+        t=xhead+(i+0.5)*dx
+        sumtail=sumtail+exp(-t*t)*dx
+       enddo
+      endif
+      erfmine=(sumtail+sumhead)*2.0/sqrt(pi)
+
+      return
+      end
+     
+c 1d stefan problem
+c Welch and Wilson, JCP 2000
+c lambda exp(lambda^2)erf(lambda)=
+c   cp (theta_wall - theta_sat)/(h_{lg}Pi^.5)
+      real*8 function transf(x,cp)
+      IMPLICIT NONE
+
+      real*8 erfmine
+      real*8 x,pi,cp
+
+      pi=4.d0*atan(1.d0)
+      transf=x*exp(x*x)*erfmine(x)-cp/sqrt(pi)
+
+      return
+      end
+ 
+      program main
+      IMPLICIT NONE
+      real*8 deltat
+      real*8 cp
+      real*8 cpambient
+      real*8 denambient
+      real*8 kambient
+      real*8 kgap
+      real*8 cpliquid
+      real*8 flux_left
+      real*8 flux_right
+      real*8 liquid_temp
+      real*8 liquid_temp_substrate
+      real*8 max_alpha
+      real*8 alpha_liquid
+      real*8 alpha_vapor_or_ice
+      real*8 alpha_ambient
+      real*8 radblob
+      real*8 radcyl
+      real*8 tnucleate
+      real*8 tnucleate_start
+      real*8 tnucleate_end
+      real*8 voldrop
+      real*8 xgap
+      real*8 xlo_drop
+      real*8 xhi_drop
+      integer N_liquid
+      integer N_liquid_substrate
+      real*8 hlg
+      real*8 hlg_original
+      real*8 mass_fraction_instant_freeze
+      real*8 k_vapor_or_ice,den_vapor_or_ice,alpha
+      real*8 kliquid,denliquid,psat,tsat
+      real*8 transf
+      real*8 erfmine
+      real*8 a,b,fa,fb,c,fc
+      real*8 fact,xlo,xhi,xstop,tstop,dx,dx2,xi,theta,dt
+      real*8 CC,beta,xint,current_slope
+      real*8 time
+      integer iter_time
+      real*8 freezing_time_target
+      real*8 super_cool_time
+      integer iter_tnucleate,max_iter_tnucleate
+      real*8 normdiff,ax
+      integer i,testcase,N,N2
+      integer itime,ispace
+      real*8 l(5000),u(5000),d(5000),f(5000),soln(5000)
+      real*8 old_theta(5000)
+      real*8 temp_old(-1:5001)
+      real*8 temp_new(-1:5001)
+      real*8 kfield(-1:5001)
+      real*8 cpfield(-1:5001)
+      real*8 denfield(-1:5001)
+      character*12 namestr
+      integer is_freezing
+      real*8 xint_output,time_output
+      integer RZFLAG,simple_parm
+      real*8 rplus,rminus,rcen
+      real*8 xcfd_offset
+      real*8 xcalibrate
+      real*8 tcalibrate
+      real*8 pi
+
+      pi=4.d0*atan(1.d0)
+      xcfd_offset=0.0d0
+      xcalibrate=0.0d0
+      tcalibrate=0.0d0
+      freezing_time_target=0.0d0
+
+c theta_t=(1/r)(kr theta_r)_r
+c r'=r-int_0^t V(s) ds=r-X(t)
+c theta(r'(r,t),t)_t=theta_r' r'_t + theta_t
+c theta_t=V(t)theta_r'+(1/(r'+X(t)))(k (r'+X(t))theta_r')_r'
+      RZFLAG=1
+      simple_parm=1 
+c k=thermal conductivity
+c testcase=0 1D stefan (analytical solution known, k_{source}=0 )
+c Welch and Wilson, JCP 2000
+c testcase=1 sucking (1d numerical method, k_{dest}=0 )
+c sucking problem has option of cylindrical coordinate systems.
+c testcase=2 1D stefan and include Recalescence
+      testcase=2
+c is_freezing=1 => tstop=700
+c is_freezing=2 => tstop=0.002 
+c is_freezing=3 => tstop=1.75 ? (SEE H. Hu and Z. Jin)
+c is_freezing=4 => tstop=determined when drop all ice. (comparison
+c with this paper:
+c Applied Thermal Engineering
+c ARTICLE TITLE:Instantaneous interface freezing induced 
+c   abnormal icing dynamics during droplet impact icing
+c ARTICLE AUTHOR:Puhang Jin, Yuqiao Chen, Jiale Sun, Zhiming Tan, Wc
+      is_freezing=4
+
+c 1d stefan problem
+c testcase.eq.2 are the recalesce cases
+      if ((testcase.eq.0).or.
+     &    (testcase.eq.2)) then
+c When running this test, we set kliquid=0
+       cp=4.1855E+7
+       cpliquid=4.1855E+7
+       if (is_freezing.gt.0) then
+        hlg=-3.34E+9
+        if (is_freezing.eq.3) then
+         hlg=-65.0E+9
+        endif
+        if (is_freezing.eq.4) then
+         cp=2.03E+7
+         hlg=-3.34E+9
+        endif
+       else
+        hlg=2.26E+10
+       endif
+       denliquid=1.0
+       hlg_original=hlg
+
+c 1W=10^7 erg/s
+c 1W/(m K)=10^5 cgs
+       kliquid=58.0E+3
+       kambient=2.4E+3
+       denambient=0.001225
+       cpambient=1.0E+7
+ 
+       if (is_freezing.gt.0) then
+c this is really the "ice" thermal conductivity
+        k_vapor_or_ice=218.0E+3
+        if (is_freezing.eq.4) then
+c this is really the "ice" thermal conductivity
+         k_vapor_or_ice=220.0E+3
+        endif
+       else if (is_freezing.eq.0) then
+        k_vapor_or_ice=2.4E+3
+       else
+        print *,"expecting is_freezing>=0"
+        stop
+       endif
+       if (is_freezing.eq.3) then
+        kliquid=54.6E+3
+c this is really the "ice" thermal conductivity
+        k_vapor_or_ice=220.0E+3
+       endif
+       if (is_freezing.eq.4) then
+c this is really the "ice" thermal conductivity
+        k_vapor_or_ice=220.0E+3
+        kliquid=58.0E+3
+       endif
+
+       kgap=k_vapor_or_ice
+
+       if (is_freezing.gt.0) then
+        den_vapor_or_ice=0.934
+        tsat=273.0
+        deltat=-10.0
+        tnucleate=tsat
+        if (is_freezing.eq.3) then
+         den_vapor_or_ice=0.917d0
+         tsat=273.0
+c See H. Hu and Z. Jin
+c Tfreeze=32.4
+c        deltat=-2.0
+c Tfreeze=21.5
+c        deltat=-3.0
+c Tfreeze=16.2
+c        deltat=-4.0
+c Tfreeze=13.0
+         deltat=-5.0
+c ice
+         cp=2.03E+7
+         xcalibrate=1.5625e-3
+         xcfd_offset=3.125e-3
+         tnucleate=tsat
+        endif
+
+        if (is_freezing.eq.4) then
+         den_vapor_or_ice=0.917d0
+         tsat=273.0
+         deltat=-28.8
+c        deltat=-36.3
+c        deltat=-43.0
+c 80 ms
+         freezing_time_target=0.080d0
+         tnucleate=tsat-25.0
+c        tnucleate=tsat-33.0
+c        tnucleate=tsat-39.0
+c        tnucleate=tsat-1.0d0
+c ice
+         cp=2.03E+7
+         tcalibrate=0.0d0
+c thickness of ice seed.  The
+c parameter that is associated with "thermal contact gap" between droplet
+c and heater is k_vapor_or_ice.
+c        xcalibrate=0.04d0
+c        xcfd_offset=0.19d0-xcalibrate
+         xcfd_offset=0.0d0
+        endif
+
+       else if (is_freezing.eq.0) then
+        psat=101.0
+        if (psat.eq.101.0) then
+         den_vapor_or_ice=denliquid/1605.2
+        else if (psat.eq.571.0) then
+         den_vapor_or_ice=denliquid/301.4
+        else if (psat.eq.14044.0) then
+         den_vapor_or_ice=denliquid/7.08
+        else
+         print *,"psat invalid"
+         stop
+        endif
+        tsat=373.0
+        deltat=25.0
+       else
+        print *,"expecting is_freezing>=0"
+        stop
+       endif
+
+       if (freezing_time_target.eq.0.0d0) then
+        max_iter_tnucleate=1
+       else
+        max_iter_tnucleate=100
+       endif
+       tnucleate_start=tsat
+       tnucleate_end=tsat-abs(deltat)
+      
+       max_iter_tnucleate=1
+       tnucleate_start=260.0d0 
+       tnucleate_end=260.0d0 
+
+       do iter_tnucleate=0,max_iter_tnucleate-1
+
+        if (freezing_time_target.gt.0.0d0) then
+         tnucleate=tnucleate_start+
+     &    (tnucleate_end-tnucleate_start)*
+     &     iter_tnucleate/max_iter_tnucleate
+         print *,"iter_tnucleate,tnucleate ",iter_tnucleate,tnucleate
+        endif
+
+        xgap=0.0d0
+
+! position of heater
+        xlo=0.0d0
+! position of top of domain
+! Neumann boundary condition
+        xhi=0.625
+
+        N=512
+        dx=(xhi-xlo)/N
+
+        xgap=2.0d0*xhi/64.0
+
+        xlo_drop=xcalibrate
+!droplet diameter is D0=0.25 cm see page 3
+        radblob=0.125d0
+        radcyl=4.0d0*radblob
+!       radcyl=3.96d0*radblob
+!       radcyl=3.92d0*radblob
+        voldrop=4.0d0*pi*(radblob**3)/3.0d0
+c pi r^2 h=voldrop
+        xhi_drop=xlo_drop+voldrop/(pi*radcyl*radcyl)
+        print *,"xhi_drop ",xhi_drop
+        print *,"xgap ",xgap
+        print *,"dx ",dx
+        time=0.0
+        alpha_ambient=kambient/(denambient*cpambient)
+        alpha_vapor_or_ice=k_vapor_or_ice/(den_vapor_or_ice*cp)
+        alpha_liquid=kliquid/(denliquid*cpliquid)
+        max_alpha=alpha_vapor_or_ice
+        if (alpha_liquid.gt.max_alpha) then
+         max_alpha=alpha_liquid
+        endif
+        if (alpha_ambient.gt.max_alpha) then
+         max_alpha=alpha_ambient
+        endif
+        dt=0.0025*dx*dx/max_alpha
+        do ispace=-1,N
+         rcen=xlo+(ispace+0.5d0)*dx
+         if (rcen.le.xlo_drop) then
+          temp_new(ispace)=tsat+deltat
+          kfield(ispace)=k_vapor_or_ice
+          denfield(ispace)=den_vapor_or_ice
+          cpfield(ispace)=cp
+         else if (rcen.le.xlo_drop+xgap) then
+          temp_new(ispace)=tsat
+          kfield(ispace)=kgap
+          denfield(ispace)=den_vapor_or_ice
+          cpfield(ispace)=cp
+         else if (rcen.le.xhi_drop+xgap) then
+          temp_new(ispace)=tsat
+          kfield(ispace)=kliquid
+          denfield(ispace)=denliquid
+          cpfield(ispace)=cpliquid
+         else 
+          temp_new(ispace)=tsat
+          kfield(ispace)=kambient
+          denfield(ispace)=denambient
+          cpfield(ispace)=cpambient
+         endif
+        enddo
+        temp_new(-1)=tsat+deltat
+        temp_new(N)=temp_new(N-1)
+c       temp_new(N)=tsat
+        do ispace=-1,N
+         temp_old(ispace)=temp_new(ispace)
+        enddo 
+        liquid_temp=0.0d0
+        N_liquid=0
+        do ispace=0,N-1
+         rcen=xlo+(ispace+0.5d0)*dx
+         if ((rcen.ge.xlo_drop+xgap).and.(rcen.le.xhi_drop+xgap)) then
+          liquid_temp=liquid_temp+temp_new(ispace)
+          N_liquid=N_liquid+1
+         endif
+        enddo
+        if (N_liquid.ge.1) then
+         !do nothing
+        else
+         print *,"N_liquid invalid ",N_liquid
+         stop
+        endif
+        liquid_temp=liquid_temp/N_liquid
+
+        if (testcase.eq.2) then 
+         mass_fraction_instant_freeze=abs(cpliquid*(tsat-tnucleate)/hlg)
+         print *,"mass_fraction_instant_freeze=",
+     &     mass_fraction_instant_freeze
+         print *,"hlg_original= ",hlg_original
+         hlg=hlg_original*(1.0d0-mass_fraction_instant_freeze)
+         print *,"updated hlg= ",hlg
+        else if (testcase.eq.0) then
+         liquid_temp=tnucleate-1.0d0
+        else
+         print *,"expecting testcase=0 or 2"
+         stop
+        endif
+ 
+        time=0.0d0 
+        iter_time=0
+        do while (liquid_temp.gt.tnucleate)
+         do ispace=0,N-1
+          flux_right=(temp_old(ispace+1)-temp_old(ispace))*2.0d0*
+     &      (1.0d0/dx)*
+     &      (kfield(ispace+1)*kfield(ispace))/
+     &      (kfield(ispace+1)+kfield(ispace))
+          flux_left=(temp_old(ispace)-temp_old(ispace-1))*2.0d0*
+     &      (1.0d0/dx)*
+     &      (kfield(ispace-1)*kfield(ispace))/
+     &      (kfield(ispace)+kfield(ispace-1))
+          temp_new(ispace)=temp_old(ispace)+dt*
+     &      (flux_right-flux_left)/
+     &      (dx*denfield(ispace)*cpfield(ispace))
+         enddo
+         temp_new(-1)=tsat+deltat
+         temp_new(N)=temp_new(N-1)
+c        temp_new(N)=tsat
+         do ispace=-1,N
+          temp_old(ispace)=temp_new(ispace)
+         enddo 
+         liquid_temp=0.0d0
+         liquid_temp_substrate=0.0d0
+         N_liquid=0
+         N_liquid_substrate=0
+         do ispace=0,N-1
+          rcen=xlo+(ispace+0.5d0)*dx
+          if ((rcen.ge.xlo_drop+xgap).and.(rcen.le.xhi_drop+xgap)) then
+           liquid_temp=liquid_temp+temp_new(ispace)
+           N_liquid=N_liquid+1
+          endif
+          if ((rcen.ge.xlo_drop+xgap).and.
+     &        (rcen.le.0.1d0*xhi_drop+xgap)) then
+           liquid_temp_substrate=liquid_temp_substrate+temp_new(ispace)
+           N_liquid_substrate=N_liquid_substrate+1
+          endif
+         enddo
+         if (N_liquid.ge.1) then
+          !do nothing
+         else
+          print *,"N_liquid invalid ",N_liquid
+          stop
+         endif
+         liquid_temp=liquid_temp/N_liquid
+         if (N_liquid_substrate.ge.1) then
+          !do nothing
+         else
+          print *,"N_liquid_substrate invalid ",N_liquid_substrate
+          stop
+         endif
+         liquid_temp_substrate=liquid_temp_substrate/N_liquid_substrate
+         time=time+dt
+         iter_time=iter_time+1
+         if ((iter_time/100)*100.eq.iter_time) then
+          print *,"time,liquid_temp ",time,liquid_temp
+          print *,"time,liquid_temp_substrate ", 
+     &      time,liquid_temp_substrate
+         endif
+
+        enddo
+c do while (liquid_temp.gt.tnucleate)
+        print *,"time,liquid_temp ",time,liquid_temp
+        print *,"time,liquid_temp_substrate ", 
+     &    time,liquid_temp_substrate
+
+        super_cool_time=time
+
+        fact=cp*deltat/hlg
+        alpha=k_vapor_or_ice/(den_vapor_or_ice*cp)
+  
+        a=0.0
+        b=2.0
+c 1d stefan
+c transf=x e^{x^{2}}*erf(x)-cp/sqrt(pi)
+c lambda exp(lambda^2)erf(lambda)=
+c   cp (theta_wall - theta_sat)/(h_{lg}Pi^.5)
+        fb=transf(b,fact)
+        do while (fb.le.0.0) 
+         b=2.0*b
+         fb=transf(b,fact)
+        enddo 
+        fa=transf(a,fact)
+        fb=transf(b,fact)
+        print *,"a,b,fa,fb ",a,b,fa,fb
+        if (fa*fb.gt.0.0) then
+         print *,"a,b invalid"
+        endif
+        do i=1,100
+         c=(a+b)/2.0  
+         fc=transf(c,fact)
+         if (fa*fc.gt.0.0) then
+          a=c
+          fa=fc
+         else
+          b=c
+          fb=fc
+         endif
+         print *,"c,fc ",c,fc
+        enddo
+
+        print *,"pos=2 lambda sqrt(alpha t)"
+        print *,"lambda= ",c
+        print *,"2 lambda= ",2.0*c
+        print *,"alpha= ",alpha 
+
+        tcalibrate=(xcalibrate/(2.0*c))**2/alpha
+        print *,"xcalibrate ",xcalibrate
+        print *,"tcalibrate ",tcalibrate
+
+        if (is_freezing.eq.3) then
+         xlo=xcalibrate
+c See H. Hu and Z. Jin
+         tstop=33.0d0  
+         xhi=2.0d0*c*sqrt(alpha*(tcalibrate+tstop))
+         xstop=xhi
+        else if (is_freezing.eq.4) then
+         xlo=xcalibrate
+         tstop=1.0d0
+         xhi=2.0d0*c*sqrt(alpha*(tcalibrate+tstop))
+         xstop=xhi
+         xstop=xhi_drop
+         tstop=(xstop/(2.0d0*c))**2/alpha
+        else
+         xlo=0.0
+         xhi=2.0
+         xstop=1.0
+         tstop=(xstop/(2.0*c))**2/alpha
+        endif
+        print *,"xlo+xcfd_offset,xhi+xcfd_offset ",  
+     &     xlo+xcfd_offset,xhi+xcfd_offset
+        print *,"xstop+xcfd_offset,tstop ",xstop+xcfd_offset,tstop
+        namestr='temp_profile'
+        open(unit=11,file=namestr)
+        N=200
+        dx=(xhi-xlo)/N
+        do i=0,N-1
+         xi=xlo+(i+0.5)*dx
+         if (xi.ge.xstop) then
+          theta=tsat
+         else
+          theta=tsat+deltat-
+     &    (deltat/erfmine(c))* 
+     &     erfmine(xi/(2.0*sqrt(alpha*tstop)))
+         endif
+         write(11,*) xi+xcfd_offset,theta
+        enddo
+        
+        close(11)
+        print *,"temperature file is temp_profile"
+
+        print *,"tsat ",tsat
+        print *,"tnucleate ",tnucleate
+        print *,"xcfd_offset ",xcfd_offset
+        print *,"xcalibrate ",xcalibrate
+        print *,"tcalibrate ",tcalibrate
+        print *,"xlo_drop=",xlo_drop
+        print *,"xhi_drop=",xhi_drop
+        print *,"xgap=",xgap
+        print *,"kgap=",kgap
+        print *,"tstop=",tstop
+        print *,"xstop=",xstop
+        time=0.0
+        open(unit=12,file='interface')
+        xint=0.0
+        xint=2.0*c*sqrt(alpha*(time+tcalibrate))
+        write(12,*) time,xint+xcfd_offset
+        itime=0
+        do while ((time.lt.tstop).or. 
+     &            (xint.lt.xstop))
+         dt=tstop/256.0
+         time=time+dt
+         xint=2.0*c*sqrt(alpha*(time+tcalibrate))
+         write(12,*) time,xint+xcfd_offset
+        enddo
+        close(12)  
+        print *,"interface file is: interface"
+
+        print *,"iter_tnucleate,tnucleate,tsat,deltat ",
+     &    iter_tnucleate,tnucleate,tsat,deltat
+        print *,"tsat+deltat= ",tsat+deltat
+        print *,"super_cool_time ",super_cool_time
+        print *,"freezing_time ",tstop
+        print *,"iter, total_freezing_time ",
+     &   iter_tnucleate,super_cool_time+tstop
+        print *,"freezing_time_target ",freezing_time_target
+
+        if (freezing_time_target.gt.0.0d0) then
+         if (super_cool_time+tstop.gt.freezing_time_target) then
+          stop
+         endif
+        endif
+
+       enddo
+c do iter_tnucleate=0,max_iter_tnucleate-1
+
+c sucking problem
+      else if (testcase.eq.1) then
+
+c When running this test, we ignore k_vapor_or_ice (the destination material)
+c 1 WATT=10^7 cm^2 g/s^3= 1 J/s  1 J=1 N M
+c 1 Joule=1 N M = kg m/s^2  m =kg m^2/s^2
+       cp=4.1855E+7
+c 2260 J/g=2260x10^7 erg/g=2.26x10^10 erg/g
+       if (is_freezing.gt.0) then
+        hlg=-3.34E+9
+       else
+        hlg=2.26E+10
+       endif
+       denliquid=1.0
+c 0.58 W/(M K)
+       kliquid=58.0E+3
+c 0.024 W/(M K)
+       if (is_freezing.gt.0) then
+        k_vapor_or_ice=218.0E+3
+       else
+        k_vapor_or_ice=2.4E+3
+       endif
+       if (is_freezing.gt.0) then
+        den_vapor_or_ice=0.934
+        tsat=273.0
+        deltat=-20.0
+       else
+        psat=101.0
+        if (psat.eq.101.0) then
+         den_vapor_or_ice=denliquid/1605.2
+        else if (psat.eq.571.0) then
+         den_vapor_or_ice=denliquid/301.4
+        else if (psat.eq.14044.0) then
+         den_vapor_or_ice=denliquid/7.08
+        else
+         print *,"psat invalid"
+         stop
+        endif
+        tsat=373.0
+        deltat=5.0
+       endif
+
+       if (is_freezing.eq.1) then
+        tstop=700.00
+       else if (is_freezing.eq.2) then
+        tstop=0.002
+       else
+        tstop=1.0
+       endif
+       xhi=4.0
+       if (is_freezing.eq.2) then
+        xhi=0.01
+       endif
+       xint=0.0
+       xlo=0.0
+
+       if (simple_parm.eq.1) then
+        cp=1.0
+        denliquid=1.0
+        den_vapor_or_ice=1.0
+        kliquid=1.0
+        k_vapor_or_ice=1.0
+        hlg=-8.0
+        tsat=273.0
+        deltat=-1.0 
+        tstop=0.1
+       endif
+ 
+       alpha=kliquid/(denliquid*cp)
+       CC=kliquid/(den_vapor_or_ice*hlg)
+       beta=den_vapor_or_ice/denliquid
+
+       print *,"alpha,CC,beta ",alpha,CC,beta
+
+       N=2000
+       dx=(xhi-xlo)/N
+
+       time=0.0
+       open(unit=11,file='interface')
+       write(11,*) time,xint
+
+       do ispace=1,N-1
+        old_theta(ispace)=tsat+deltat
+        soln(ispace)=old_theta(ispace)
+       enddo
+       itime=0
+       do while (time.lt.tstop)
+        current_slope=(soln(1)-tsat)*CC/dx
+        if (abs(current_slope).lt.1.0e-10) then
+         dt=0.25*dx
+        else
+         dt=0.25*dx/abs(current_slope)
+        endif
+        if (time+dt.gt.tstop) then
+         dt=tstop-time+1.0E-10
+        endif
+        do ispace=1,N-1 
+
+         if (RZFLAG.eq.0) then
+          rplus=1.0
+          rminus=1.0
+          rcen=1.0
+         else if (RZFLAG.eq.1) then
+          rcen=xlo+ispace*dx+xint
+          rplus=rcen+0.5*dx
+          rminus=rcen-0.5*dx
+         else
+          print *,"RZFLAG invalid"
+          stop
+         endif 
+         l(ispace)=rminus*alpha/(dx**2)
+         u(ispace)=rplus*alpha/(dx**2)+rcen*beta*current_slope/dx
+         d(ispace)=-l(ispace)-u(ispace)-rcen/dt
+         f(ispace)=-old_theta(ispace)*rcen/dt
+         if (ispace.eq.1) then
+          f(ispace)=f(ispace)-l(ispace)*tsat
+         endif
+         if (ispace.eq.N-1) then
+          f(ispace)=f(ispace)-u(ispace)*(tsat+deltat)
+         endif
+        enddo
+        call tridiag_solve(l,u,d,N-1,f,soln)
+        do ispace=1,N-1 
+         old_theta(ispace)=soln(ispace)
+        enddo
+        normdiff=0.0
+        do ispace=1,N-1
+          ax=0.0
+          if (ispace.gt.1) then
+           ax=ax+l(ispace)*soln(ispace-1)
+          endif
+          if (ispace.lt.N-1) then
+           ax=ax+u(ispace)*soln(ispace+1)
+          endif
+          ax=ax+d(ispace)*soln(ispace)
+          normdiff=normdiff+(ax-f(ispace))**2
+        enddo
+        normdiff=sqrt(normdiff)
+        if (1.eq.0) then
+         print *,"itime,normdiff ",itime,normdiff
+        endif
+        current_slope=(soln(1)-tsat)*CC/dx
+        print *,"time,velocity ",time+dt,current_slope
+        xint=xint+dt*current_slope 
+        xint_output=xint
+        time_output=time+dt
+        if ((is_freezing.eq.1).and.(testcase.eq.1).and. 
+     &      (simple_parm.eq.0)) then
+         xint_output=xint_output+0.5
+        endif
+        if ((is_freezing.eq.1).and.(testcase.eq.1).and. 
+     &      (simple_parm.eq.1)) then
+         time_output=time_output
+        endif
+        write(11,*) time_output,xint_output
+
+        time=time+dt
+       enddo
+       close(11)
+
+       print *,"x(t) file is: interface"
+
+       namestr='temp_profile'
+       open(unit=11,file=namestr)
+       N2=200 
+       dx2=(xint-xlo)/N2
+       do i=0,N2-1
+        xi=xlo+(i+0.5)*dx2
+        theta=tsat
+        write(11,*) xi,theta
+       enddo
+       do ispace=0,N
+        xi=xint+ispace*dx
+        if (ispace.eq.0) then
+         theta=tsat
+        else if (ispace.eq.N) then
+         theta=tsat+deltat
+        else
+         theta=soln(ispace)
+        endif
+        write(11,*) xi,theta
+       enddo 
+
+       close(11)
+       print *,"theta(x) file is: temp_profile"
+
+      else
+       print *,"testcase invalid"
+       stop
+      endif
+
+      end
+

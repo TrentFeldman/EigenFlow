@@ -1,0 +1,19 @@
+#!/bin/bash
+for file in *.tec
+do
+#preplot ${file}
+#~/tec360/bin/preplot ${file}
+#~/tecplot360ex/bin/preplot ${file}
+#/usr/local/tecplot/360ex_2017r2/bin/preplot ${file}
+#/usr/local/tecplot/360ex_2018r2/bin/preplot ${file}
+#/usr/local/tecplot/360ex_2020r2/bin/preplot ${file}
+#/usr/local/tecplot/360ex_2023r2/bin/preplot ${file}
+#/Applications/Tecplot\ 360\ EX\ 2021\ R1/bin/preplot ${file}
+#/Applications/Tecplot\ 360\ EX\ 2021\ R2/bin/preplot ${file}
+/Applications/Tecplot\ 360\ EX\ 2023\ R2/bin/preplot ${file}
+# TECPLOT ON A MAC:
+#/Applications/Tecplot ..../Tecplot ...app/Contents/MacOS/Tecplot ....
+# VisIt:
+#/Users/sussman/Desktop/VisIt.app/Contents/MacOS/VisIt
+#~/visit2_13_3.linux-x86_64/bin/visit
+done

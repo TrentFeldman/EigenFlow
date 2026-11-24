@@ -1,0 +1,194 @@
+max_step  =  99999    # maximum timestep
+#max_step  =  2    # maximum timestep
+#rescale: R=0.2 cm 
+# tau=rho CP R^2/K=(1)4.1855e+7(0.2)^2/58000
+# tau=28.9
+# U=R/tau=.2/28.9=0.007
+# PR=CP mu/K=4.1855e+7 0.02/58000=14.4
+# ST=(TSAT-TCOLD)CP/L=20(4.1855e+7)/3.34e+9=.25
+# BO=rho g R^2/sigma=1(980)(.2^2)/72.8=0.54
+# WE=rho U^2 R/sigma=.007^2 (.2)/72.8=1.4e-7
+# U=R/(rho CP R^2/K)=K/(rho CP R)
+# WE=(1/sigma) rho R K^2 /(rho CP R)^2 = K^2/(sigma rho R CP^2)
+
+stop_time = 1.0
+
+# ------------------  INPUTS TO CLASS AMR ---------------------
+# set up for bubble
+geometry.coord_sys      = 1        # 0 => cart, 1 => RZ
+geometry.prob_lo   =  0.0 0.0
+#geometry.prob_hi   = 0.00015 0.00015 # meters
+geometry.prob_hi   = 0.015 0.015 # cm
+
+ns.minimum_relative_error=1.0e-22
+ns.initial_project_cycles=3 # initial jacobi cycles
+ns.initial_cg_cycles=3
+ns.project_solver_type=0 # 0MGPCG 1PCG 2 MINV=I
+ns.projection_pressure_scale=1.0
+ns.num_materials=4 # 1: liquid 2: air 3: ice  4: substrate
+ns.mof_ordering=5 5 1 1
+
+# solidheat_flag=0=>diffuse in solid 
+# solidheat_flag=1=>dirichlet  (must have heatvisc(im_solid)>0)
+# solidheat_flag=2=>neumann
+ns.solidheat_flag=0
+
+ns.num_species_var=0
+ns.post_init_pressure_solve=1 
+ns.MOFITERMAX=30
+
+# multigrid class
+mg.verbose = 0
+cg.verbose = 0
+# set above to 2 for maximum verbosity
+mg.nu_f = 40
+mg.nu_0 = 1   # 1 - v-cycle 2 - w-cycle
+cg.maxiter = 400
+mg.bot_atol = 1.0e-12
+mg.rtol_b = -0.01
+Lp.v = 0
+
+amr.plotfile_on_restart=0
+#ns.visual_revolve=32
+
+# domain size is 0.0003 x 0.0003 x 0.00015 (meters)
+# minimum radius is 15
+amr.n_cell    = 128 128
+amr.max_level =  2
+# 0- 1 level 1- 2 levels  2- 3 levels
+amr.regrid_int      = 1       # how often to regrid
+amr.n_error_buf     = 4 4 4 4 4   # number of buffer cells in error est
+amr.grid_eff        = 0.8   # what constitutes an efficient grid
+# above was .55 (smaller=> less boxes)
+amr.blocking_factor = 8 8 4  # block factor in grid generation
+amr.check_int       = 50     # number of timesteps between checkpoints
+amr.check_file      = chk     # root name of checkpoint file
+amr.plot_int        = 25
+amr.plot_file       = plt 
+amr.grid_log        = grdlog  # name of grid logging file
+amr.max_grid_size   = 32
+#amr.restart         = chk15600
+#amr.trace   =1
+
+# ------------------  INPUTS TO PHYSICS CLASS -------------------
+ns.dt_cutoff      = 1.0e-11  # level 0 timestep below which we halt
+
+mac.mac_abs_tol    = 1.0e-10
+
+ns.cfl            = 0.5      # cfl number for hyperbolic system
+ns.init_shrink    = 1.0      # scale back initial timestep
+ns.change_max     = 1.01 
+ns.visc_coef      = 1.0
+mac.visc_abs_tol   = 1.0e-10
+ns.gravity        = 0.0     
+# sigma_{SV}-sigma_{SL}=sigma_{LV}cos(theta_{L})
+# assume theta_L=45 degrees (wetting preferred for additive manufact)
+# and sigma_SL=sigma_LV then
+# sigma_SV=sigma_LV(1+1/sqrt(2))
+# material 1=liquid 2=gas  3=ice 4=substrate
+# Mo (not Ni)
+# N/m
+# Liquid-Vapor,
+# Liquid-ice,
+# Liquid-Solid, 
+# Vapor-ice, 
+# Vapor-solid, 
+# ice-solid
+#ns.tension = 2.1 2.1 2.1 3.58 3.58 2.1 # 12 - liquid/vapor
+ns.tension = 2100.0 2100.0 2100.0 3580.0 3580.0 2100.0 # cgs
+# 1 J = 1e+7 erg
+# 1 kg = 1000g
+#ns.stiffCP=570.0 114.0 339.0 339.0 # J/(kg K)
+ns.stiffCP=570.0e+4 114.0e+4 339.0e+4 339.0e+4 #  erg/(g K)
+#ns.latent_heat = -3.34e+9 0.0 # 12,21 liquid-> ice, ice -> liquid FREEZING
+# <0 if condensation or solidification
+# >0 if boiling or melting
+# latent_heat[2*max_num_tension]
+# So that the simulation finishes, use ST=5.0 instead of ST=0.25
+# J/kg
+# Still to be tested: nodevel in CONVERTMATERIAL now has 2 * nten components.
+#ns.latent_heat = 0.0 -3.753e+5 0.0 0.0 0.0 0.0 0.0 3.753e+5 0.0 0.0 0.0 0.0
+#ns.latent_heat = 0.0 -3.753e+5 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 #J/kg
+ns.latent_heat = 0.0 -3.753e+9 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 #erg/g
+# 1->2 liquid-> gas
+# 1->3 liquid->ice 
+# 2->3 gas->ice 
+# Kelvin
+ns.saturation_temp = 0.0  2895.0  0.0 0.0 0.0 0.0 0.0 2895.0 0.0 0.0 0.0 0.0
+ns.nucleation_temp = 0.0  0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0
+# 
+#ns.fixed_dt	  = 0.01     # hardwire dt
+ns.sum_interval   = 10       # timesteps between computing mass 
+
+ns.axis_dir=1   #  drop falling onto ice (probtype=55)
+ns.vorterr=0.0 0.0 0.0 0.0
+ns.rgasinlet=1.57
+ns.vinletgas=0.0
+ns.twall=263  # not used
+# initial falling (downward) speed of liquid drop
+#ns.advbot=-125.0 # m/s
+ns.advbot=-12500.0 # cm/s
+ns.adv_vel=0.0 # keep 0.0
+ns.adv_dir=1 # adv_dir=1 x direction  adv_dir=2 y direction   
+ns.pressure_error_cutoff=0.0 0.0 0.0 0.0
+ns.material_type=0 0 0 999
+# 1 Watt=10^7 ERG/S
+# 1 W/(M K)=10^5 ERG/(S CM K)
+# 1 ERG= 1 (gram cm^2/s^2)
+# air: k=0.024 W/(M K)
+# water: k=0.58 W/(M K)
+# cp hardwired to be 4.1855E+7 (all incompressible materials)
+#ns.heatviscconst=58000.0 0.0 218000.0 # liquid/air/ice 
+# W/(m K)
+# 1 W = 10^7 ERG/S (cm g/s)
+#ns.heatviscconst=46.0 0.068 84.0 84.0 # liquid/air/ice  W/(m k)
+ns.heatviscconst=46.0e+5 0.068e+5 84.0e+5 84.0e+5 # liquid/air/ice ERG/(S cm K)
+# diffusivity liquid/ice this problem does not inlucde air
+#ns.viscconst=0.02 0.0001 100.0
+# solid viscosity should be "small" so that gas-solid coefficient
+# not large.
+# kg/(m s)=10 g/(cm s)
+#ns.viscconst=0.005 4.15e-5 1.0 1.0 # kg/(m s)
+ns.viscconst=0.05 4.15e-4 10.0 10.0 # g/(cm s)
+#ns.denconst=9350.0 0.353 10200.0 10200.0 # kg/m^3
+ns.denconst=9.350 0.000353 10.2000 10.2000 # g/cm^3
+ns.FSI_flag=0 0 3 1 # 0 - fluid 1 - solid in PROB.F90 2-lag solid 3-ice
+#dimensionless: (supercooled droplets)
+ns.tempconst=2995.0 2995.0 2895.0 473.0 # initial temperature of liquid/gas/ice
+ns.xblob=0.0  
+ns.yblob=0.0
+#ns.zblob=0.000015 # substrate thickness. Meters
+ns.zblob=0.0015 # substrate thickness. cm
+#ns.radblob=0.000015 # radius of initial ice layer. Meters
+ns.radblob=0.0015 # radius of initial ice layer. CentiMeters
+ns.denfact=1.0
+ns.velfact=0.0
+ns.probtype=402
+
+#ns.mem_debug = 1
+#ns.v = 1
+#ns.d = 1
+
+# ----------------  PROBLEM DEPENDENT INPUTS
+# boundary conditions 
+# 0=dirichlet at inflow
+# 1=dirichlet at inflow and outflow
+# 2=dirichlet at inflow and walls, extrap at outflow.
+# 3=dirichlet at inflow, outflow, and walls.
+ns.prescribe_temperature_outflow=2
+ns.lo_bc          = 3 5
+ns.hi_bc          = 3 2
+
+# >>>>>>>>>>>>>  BC FLAGS <<<<<<<<<<<<<<<<
+# 0 = Interior           3 = Symmetry
+# 1 = Inflow             4 = SlipWall
+# 2 = Outflow            5 = NoSlipWall
+
+# turn any of these on to generate run-time timing stats
+
+
+# select single or double precision of FAB output data
+#        default is whatever precision code is compiled with.
+#fab.precision = FLOAT     # output in FLOAT or DOUBLE
+fab.precision = DOUBLE    # output in FLOAT or DOUBLE
+

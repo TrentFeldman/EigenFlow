@@ -1,0 +1,33 @@
+#
+# $Id: Make.package,v 1.2 1999/04/01 21:43:11 car Exp $
+#
+
+CEXE_sources += ABecLaplacian.cpp 
+
+#cEXE_sources += cudasimulate.c 
+
+CEXE_headers += ABecLaplacian.H 
+
+FEXE_headers += ABec_F.H CG_F.H LO_F.H MG_F.H 
+
+FEXE_sources += \
+#			ABec_3D.F 
+#			CG_3D.F \
+#                       LO_3D.F \
+#                       MG_3D.F 
+
+F90EXE_sources +=  \
+			ABec_3D.F90 \
+			CG_3D.F90 \
+			LO_3D.F90 \
+			MG_3D.F90
+				
+F90EXE_headers +=  \
+			ABec_F.H \
+			CG_F.H \
+			LO_F.H \
+			MG_F.H
+
+VPATH_LOCATIONS += $(MOF_HOME)/mglib
+INCLUDE_LOCATIONS += $(MOF_HOME)/mglib
+

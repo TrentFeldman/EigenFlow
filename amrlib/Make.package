@@ -1,0 +1,27 @@
+
+CEXE_sources += AMReX_AmrCore.cpp AmrLevel.cpp \
+                AMReX_AmrMesh.cpp \
+                AMReX_Cluster.cpp \
+                Interpolater.cpp StateData.cpp \
+                StateDescriptor.cpp AMReX_TagBox.cpp FillPatchUtil.cpp
+
+CEXE_headers += AMReX_ArrayLim_AUGMENTED.H \
+                PhysBCFunctSUSSMAN.H \
+                AMReX_AmrCore.H AmrLevel.H \
+                AMReX_AmrMesh.H \
+                AMReX_Cluster.H  \
+                LevelBld.H Interpolater.H StateData.H \
+                N_EXTRA_REAL.H \
+                StateDescriptor.H AMReX_TagBox.H FillPatchUtil.H 
+
+ifeq ($(USE_PARTICLES), TRUE)
+  CEXE_headers += AMReX_AmrParGDB.H AMReX_AmrParticles.H
+endif
+
+FEXE_headers += INTERP_F.H
+
+F90EXE_sources += INTERP_3D.F90 
+
+VPATH_LOCATIONS += $(MOF_HOME)/amrlib
+INCLUDE_LOCATIONS += $(MOF_HOME)/amrlib
+
