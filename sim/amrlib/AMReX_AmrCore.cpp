@@ -34,6 +34,7 @@
 #include <AmrLevel.H>
 #include <AMReX_AmrCore.H>
 #include <StateData.H>
+#include <local_thread_class.H>
 
 #include <INTERP_F.H>
 
@@ -1963,6 +1964,10 @@ AmrCore::coarseTimeStep (Real stop_time,int LSA_current_step_in,
      // dt_AMR might be modified within "timeStep"
     timeStep(cumtime,stop_time);
 
+     // ns.check_loop_counts=2: verify every MFIter loop of this step
+     // (one Allreduce) before any plotfile/checkpoint of it is written.
+    thread_class::flush_loop_check();
+
     cumtime += dt_AMR;
 
     if (verbose > 0)
@@ -2081,11 +2086,14 @@ AmrCore::coarseTimeStep (Real stop_time,int LSA_current_step_in,
 
       if (num_per_old != num_per_new)
 #else
-      Long lorig=(Long) cumtime/plot_per;
-      Real rorig=cumtime/plot_per;
-      Real rR=(Real) lorig;
-      rR=rorig-rR;
-      if (rR < (dt_AMR*0.001))
+      // Frame when this step reached the next multiple of plot_per (within
+      // 1e-4*dt, the same slack computeNewDt's clip uses).  The old line
+      // "(Long) cumtime/plot_per" cast cumtime to an integer BEFORE
+      // dividing, so for 0<t<1 no plot_per frame was ever written.
+      Real plot_tol=0.0001*dt_AMR;
+      Long k_new=(Long) std::floor((cumtime+plot_tol)/plot_per);
+      Long k_old=(Long) std::floor((cumtime-dt_AMR+plot_tol)/plot_per);
+      if (k_new>k_old)
 #endif
 	{
 	  plot_test = 1;

@@ -1568,9 +1568,7 @@ StateDataPhysBCFunct::FillBoundary (
    } // has_phys_bc?
   } // mfi
 } // omp
-  thread_class::sync_tile_d_numPts();
-  ParallelDescriptor::ReduceRealSum(thread_class::tile_d_numPts[0]);
-  thread_class::reconcile_d_numPts(LOOP_FILLBOUNDARY,"FillBoundary");
+  thread_class::finish_loop(LOOP_FILLBOUNDARY,"FillBoundary");
 
 } // StateDataPhysBCFunct::FillBoundary
 
@@ -1806,9 +1804,7 @@ StateDataPhysBCFunctGHOST::FillBoundary (
    } // has_phys_bc?
   } // mfi
 } // omp
-  thread_class::sync_tile_d_numPts();
-  ParallelDescriptor::ReduceRealSum(thread_class::tile_d_numPts[0]);
-  thread_class::reconcile_d_numPts(LOOP_FILLBOUNDARY_GHOST,"FillBoundary");
+  thread_class::finish_loop(LOOP_FILLBOUNDARY_GHOST,"FillBoundary");
 
 } // StateDataPhysBCFunctGHOST::FillBoundary
 

@@ -96,13 +96,15 @@ void FillPatchSingleLevel (
   // Barrier statements are inserted here just in case the
   // asynchronous feature of the ParallelCopy command might lead
   // to problems in future operations.
- ParallelDescriptor::Barrier();
+ if (thread_class::fillpatch_barriers==1)
+  ParallelDescriptor::Barrier();
 
   // src,src_comp,dest_comp,num_comp,src_nghost,dst_nghost,period
  mf_target.ParallelCopy(smf, scomp, dcomp, ncomp, IntVect{0}, 
     mf_target.nGrowVect(), geom.periodicity());
 
- ParallelDescriptor::Barrier();
+ if (thread_class::fillpatch_barriers==1)
+  ParallelDescriptor::Barrier();
 
  if (debug_fillpatch==1) {
   for (int pid=0;pid<amrex::ParallelDescriptor::NProcs();pid++) {
@@ -366,15 +368,15 @@ void FillPatchTwoLevels (
                grid_type);
    } // mfi
 } // omp
-   thread_class::sync_tile_d_numPts();
-   ParallelDescriptor::ReduceRealSum(thread_class::tile_d_numPts[0]);
-   thread_class::reconcile_d_numPts(LOOP_MAPPER_INTERP,"FillPatchTwoLevels");
+   thread_class::finish_loop(LOOP_MAPPER_INTERP,"FillPatchTwoLevels");
 
-   ParallelDescriptor::Barrier();
+   if (thread_class::fillpatch_barriers==1)
+    ParallelDescriptor::Barrier();
     // src,src_comp,dest_comp,num_comp,src_nghost,dst_nghost,period
    mf_target.ParallelCopy(mf_fine_patch, 0, dcomp, ncomp, IntVect{0}, 
       ngrow_vec,fgeom.periodicity());
-   ParallelDescriptor::Barrier();
+   if (thread_class::fillpatch_barriers==1)
+    ParallelDescriptor::Barrier();
 
   } else {
    amrex::Error("empty_flag invalid");
@@ -755,15 +757,15 @@ void FillPatchTower (
         grid_type);
      } // mfi
 } // omp
-     thread_class::sync_tile_d_numPts();
-     ParallelDescriptor::ReduceRealSum(thread_class::tile_d_numPts[0]);
-     thread_class::reconcile_d_numPts(LOOP_MAPPER_INTERP,"FillPatchTower");
+     thread_class::finish_loop(LOOP_MAPPER_INTERP,"FillPatchTower");
 
-     ParallelDescriptor::Barrier();
+     if (thread_class::fillpatch_barriers==1)
+      ParallelDescriptor::Barrier();
      // src,src_comp,dest_comp,num_comp,src_nghost,dst_nghost,period
      mf_target.ParallelCopy(mf_fine_patch, 0, dcomp, ncomp, IntVect{0}, 
        ngrow_vec,tower_geom[top_level]->periodicity());
-     ParallelDescriptor::Barrier();
+     if (thread_class::fillpatch_barriers==1)
+      ParallelDescriptor::Barrier();
 
     } else if (ba_crse_patch_ok==0) {
 

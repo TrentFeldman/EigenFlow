@@ -170,6 +170,7 @@ Vector<int> NavierStokes::force_blob_symmetry;
 Real NavierStokes::init_shrink  = 1.0;
 Real NavierStokes::change_max   = 1.01;
 Real NavierStokes::change_max_init = 1.01;
+int  NavierStokes::dt_regrow_after_clip = 1;  // speed/optimized default
 
 Vector<Real> NavierStokes::NS_coflow_Z; 
 Vector<Real> NavierStokes::NS_coflow_R_of_Z; 
@@ -3112,6 +3113,10 @@ NavierStokes::read_params ()
       amrex::Error("init_shrink invalid");
     } else
      amrex::Error("ns.change_max_init invalid");
+
+    pp.queryAdd("dt_regrow_after_clip",dt_regrow_after_clip);
+    if ((dt_regrow_after_clip!=0)&&(dt_regrow_after_clip!=1))
+     amrex::Error("ns.dt_regrow_after_clip must be 0 or 1");
 
 
     pp.queryAdd("fixed_dt",fixed_dt);
@@ -13447,9 +13452,7 @@ void NavierStokes::make_marangoni_and_disjoining_pressure_force() {
 void NavierStokes::ns_reconcile_d_num(int caller_loop_id,
 		const std::string& caller_string) {
 
- thread_class::sync_tile_d_numPts();
- ParallelDescriptor::ReduceRealSum(thread_class::tile_d_numPts[0]);
- thread_class::reconcile_d_numPts(caller_loop_id,caller_string);
+ thread_class::finish_loop(caller_loop_id,caller_string);
 
 } // end subroutine ns_reconcile_d_num
 
@@ -26174,6 +26177,11 @@ void NavierStokes::post_regrid (int lbase,
 
 } // end subroutine post_regrid
 
+// Remembered between calls of NavierStokes::computeNewDt (level 0 only).
+// -1.0 means "nothing remembered yet" (start of run, or just restarted).
+static Real NS_dt_last_unclipped=-1.0; // last dt BEFORE plot/check/stop clip
+static Real NS_dt_last_clipped=-1.0;   // last dt AFTER the clip (sent to advance)
+
 void NavierStokes::computeNewDt (int finest_level,
   Real& dt,Real stop_time) {
 
@@ -26251,8 +26259,23 @@ void NavierStokes::computeNewDt (int finest_level,
     std::cout << "newdt1= " << newdt << '\n';
    }
    if ((local_fixed_dt==0.0)&&(fixed_dt_velocity==0.0)) {
-    if  (newdt>local_change_max*dt)
-     newdt=local_change_max*dt;
+    // dt (input) = the dt the last step really used (advance() returns it).
+    // If that step was shortened only to land on a frame/checkpoint/stop
+    // time, grow from the un-shortened value instead.  The exact "=="
+    // fails when advance() halved dt after a failed step, so failed steps
+    // keep the old behaviour.
+    Real dt_ref=dt;
+    if ((dt_regrow_after_clip==1)&&
+        (dt==NS_dt_last_clipped)&&
+        (NS_dt_last_unclipped>dt)) {
+     dt_ref=NS_dt_last_unclipped;
+     if (ParallelDescriptor::IOProcessor()) {
+      std::cout << "computeNewDt: regrow from un-clipped dt= " <<
+        dt_ref << " (clipped dt was " << dt << ")\n";
+     }
+    }
+    if  (newdt>local_change_max*dt_ref)
+     newdt=local_change_max*dt_ref;
    } else if ((local_fixed_dt>0.0)||(fixed_dt_velocity>0.0)) {
     // do nothing
    } else {
@@ -26265,6 +26288,7 @@ void NavierStokes::computeNewDt (int finest_level,
    }
 
    Real dt_0=newdt;
+   const Real dt_unclipped=dt_0; // before the stop/check/plot clips below
 
    const Real eps      = 0.0001*dt_0;
    const Real eps2     = 0.000001*dt_0;
@@ -26292,6 +26316,9 @@ void NavierStokes::computeNewDt (int finest_level,
    if (1==0) {
     std::cout << "dt_0= " << dt_0 << '\n';
    }
+
+   NS_dt_last_unclipped=dt_unclipped;
+   NS_dt_last_clipped=dt_0;
 
    dt=dt_0;
   } else if ((level>0)&&(level<=max_level)) {

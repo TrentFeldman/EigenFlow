@@ -2094,9 +2094,7 @@ AmrLevel::FillCoarsePatchGHOST (
 
   }  // mfi
 } // omp
-  thread_class::sync_tile_d_numPts();
-  ParallelDescriptor::ReduceRealSum(thread_class::tile_d_numPts[0]);
-  thread_class::reconcile_d_numPts(LOOP_MAPPER_INTERP_GHOST,
+  thread_class::finish_loop(LOOP_MAPPER_INTERP_GHOST,
       "FillCoarsePatchGHOST");
 
   tower_data[level]->FillBoundary(DComp,ncomp_range,geom.periodicity());
@@ -2955,9 +2953,7 @@ AmrLevel::FillCoarsePatch (MultiFab& mf_to_be_filled,
 
   }  // mfi
 } // omp
-  thread_class::sync_tile_d_numPts();
-  ParallelDescriptor::ReduceRealSum(thread_class::tile_d_numPts[0]);
-  thread_class::reconcile_d_numPts(LOOP_FILLCOARSEPATCH,"FillCoarsePatch");
+  thread_class::finish_loop(LOOP_FILLCOARSEPATCH,"FillCoarsePatch");
 
   tower_data[level]->FillBoundary(DComp,ncomp_range,geom.periodicity());
 

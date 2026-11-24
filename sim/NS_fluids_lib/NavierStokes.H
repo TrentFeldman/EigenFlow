@@ -1750,6 +1750,11 @@ protected:
 
     static Real change_max;    // maximum change in dt over a timestep
     static Real change_max_init; // maximum change in dt over a timestep
+    // ns.dt_regrow_after_clip=1: after dt was shortened to land exactly on
+    // a plot_per/check_per/stop_time boundary, the next dt regrows from the
+    // un-shortened value instead of the shortened one. Default 1 on the
+    // speed/optimized branch; 0 = the original behaviour.
+    static int  dt_regrow_after_clip;
 
     static Real fixed_dt;      // set > 0 to specify dt
     static Real fixed_dt_init; // set > 0 to specify dt
