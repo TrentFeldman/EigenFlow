@@ -5,7 +5,7 @@ These are personal notes; git ignores this file and it isn't part of Sussman's r
 > **The golden rule: we never edit Sussman's code.** We only build it, feed it an inputs file, and change settings on the command line. If something seems to need a code change, ask Sussman.
 
 **Status (Nov 2026):**
-- **Account works.** User `tmf24b`, sponsored by Sussman.
+- **Account works.** User `USERNAME`, sponsored by Sussman.
 - **The code builds on RCC.** Sussman commits from RCC's own login nodes.
 - **These job scripts haven't been run on RCC yet.** The restart logic and command-line settings were checked on the laptop.
 
@@ -34,11 +34,11 @@ These are personal notes; git ignores this file and it isn't part of Sussman's r
 1. **Be on the FSU network.** Off campus, connect to the FSU VPN first; SSH won't work otherwise.
 2. **Log in** (password login; there's no SSH key set up):
    ```bash
-   ssh tmf24b@hpc-login.rcc.fsu.edu
+   ssh USERNAME@hpc-login.rcc.fsu.edu
    ```
 3. **Storage.**
-   - **Home** (`/gpfs/home/tmf24b`) has a 150 GB quota. Check usage with `gpfs_quota scratch`. The code plus a few runs fit; a big training set doesn't.
-   - **Scratch** (`/gpfs/research/scratch/tmf24b`) is unlimited but gets wiped periodically and is never backed up. The account doesn't have it yet; request it with an RCC support ticket. It's only needed for big 3D sweeps.
+   - **Home** (`/gpfs/home/USERNAME`) has a 150 GB quota. Check usage with `gpfs_quota scratch`. The code plus a few runs fit; a big training set doesn't.
+   - **Scratch** (`/gpfs/research/scratch/USERNAME`) is unlimited but gets wiped periodically and is never backed up. The account doesn't have it yet; request it with an RCC support ticket. It's only needed for big 3D sweeps.
    - The account is only in the `genacc` group: **general queues only, no group storage.**
 
 ## Step 1: download and build the code (once, and again only when you deliberately update)
@@ -247,7 +247,7 @@ sbatch -A genacc_q -t 2-00:00:00 -n 32 run_rt.sh
 Use the transfer host `export.rcc.fsu.edu`, not the login node. Run this from the laptop:
 
 ```bash
-rsync -rtv --info=progress2 tmf24b@export.rcc.fsu.edu:rt2d_hires/ /mnt/cold/rt2d_hires/
+rsync -rtv --info=progress2 USERNAME@export.rcc.fsu.edu:rt2d_hires/ /mnt/cold/rt2d_hires/
 ```
 
 - **`-rt`, not `-a`.** exFAT/NTFS drives can't store Unix permissions, and `-a` errors on them. On ext4 or btrfs, `-a` is fine.
