@@ -1,0 +1,29 @@
+AMREX_HOME ?= ../amrex-master
+TOP := .
+
+EBASE := CNS
+
+BL_NO_FORT = TRUE
+
+include $(AMREX_HOME)/Tools/GNUMake/Make.defs
+
+FFLAGS   += $(GENERIC_GNU_FLAGS) 
+F90FLAGS += $(GENERIC_GNU_FLAGS)
+
+# CNS uses a coarse grained OMP approach
+DEFINES += -DAMREX_CRSEGRNDOMP
+
+include $(TOP)/Source/Make.package
+INCLUDE_LOCATIONS += $(TOP)/Source
+VPATH_LOCATIONS   += $(TOP)/Source
+
+include $(AMREX_HOME)/Src/Base/Make.package
+ifeq ($(USE_PARTICLES),TRUE)
+include $(AMREX_HOME)/Src/Particle/Make.package
+endif
+include $(AMREX_HOME)/Src/Boundary/Make.package
+include $(AMREX_HOME)/Src/AmrCore/Make.package
+include $(AMREX_HOME)/Src/Amr/Make.package
+
+include $(AMREX_HOME)/Tools/GNUMake/Make.rules
+

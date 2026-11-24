@@ -1,0 +1,201 @@
+# material 2 radius: 0.15 located at (1/2,1/2)  1x1 domain
+# material 1 top half, material 3 bottom half
+# Smith, Solis, Chopp "A projection method for motion of 
+# triple junctions by levels sets, Interfaces Free Bound, 
+# 4 (2002), pp. 263–276
+# gam1=(sig12-sig23+sig13)/2
+# gam2=(sig12+sig23-sig13)/2
+# gam3=(-sig12+sig23+sig13)/2
+# gam1+gam2=sig12
+# gam2+gam3=sig23
+# gam1+gam3=sig13
+# We2=60 We1=We3=36
+# sig12=(1/36+1/60)=1/22.5
+# sig23=(1/60+1/36)=1/22.5
+# sig13=(1/36+1/36)=1/18
+# Re=60 constant viscosity dimensionless density is 1.
+# expected distance between triple junctions:
+# sin theta1/sig23=sin theta2/sig13=sin theta3/sig12
+# theta1=theta3
+# sin theta2=sin theta1 (sig13/sig23)
+# theta1=2.2467  theta2=1.7898  A=pi*.15^2  theta2=2pi-2theta1
+# d=0.4596 using "ternary.f" (just use 3 digits d=0.460)
+# October 3, 2018:
+# max_level=1  recon: .462  LS: .455
+# max_level=2  recon: .460  LS: .456
+# max_level=3  recon: .460  LS: .458  dx_finest=0.00195
+#
+# L=radblob=.15   x^phys=L x^sim
+# T=\sqrt{\rho L^{3}/\sigma}
+# Ohnesorge number (Oh) = \mu/\sqrt{\rho \sigma L}
+# liquid lens: L=0.15, sigma=0.0444, rho=1, mu=1/60, T=0.276, Oh=0.204
+# U=L/T=.15/.276=0.543
+# gas lens: L=0.15, sigma=72.8, rho=1, mu=1/100, T=0.0068, Oh=0.00303
+# U=L/T=.15/.0068=22.06
+# floating lens: L=0.8, sigma=72.8, rho=1.0, mu=1/100, T=0.0839, Oh=0.0013
+# U=L/T=.8/.0013=615.4
+max_step  =  99999    # maximum timestep
+#max_step  =  1    # maximum timestep
+stop_time=160.0  # liquid lens ?
+#stop_time=160.0  # gas lens ?
+#stop_time=160.0  # floating lens ?
+
+# ------------------  INPUTS TO CLASS AMR ---------------------
+# set up for bubble
+geometry.coord_sys      = 0        # 0 => cart, 1 => RZ
+geometry.prob_lo   =  0.0 0.0
+geometry.prob_hi   =  6.667 6.667
+geometry.is_periodic = 1 0 0 
+mac.visc_abs_tol=1.0e-10
+
+# 0MGPCG 1PCG 2 MINV=I
+ns.project_solver_type=0
+
+# multigrid class
+#mg.verbose = 1
+#cg.verbose = 1
+# set above to 2 for maximum verbosity
+mg.nu_f = 40
+mg.nu_0 = 1   # 1 - v-cycle 2 - w-cycle
+cg.maxiter = 200
+mg.bot_atol = 1.0e-12
+mg.rtol_b = -0.01
+#Lp.v = 1
+
+ns.MOFITERMAX=30
+ns.continuous_mof=1
+ns.vof_height_function=1
+ns.FD_curv_interp=1
+
+ns.num_materials=3
+ns.num_species_var=0
+ns.mof_ordering=2 1 2
+
+ns.projection_pressure_scale=1.0
+
+ns.minimum_relative_error=1.0e-18
+ns.initial_project_cycles=3  # number of initial jacobi iterations
+ns.initial_cg_cycles=10  # number of MGPCG steps to do in order to get
+                         # decent sized residual.
+amr.n_cell    = 64 64  
+amr.max_level = 1   # max_level=2 for the IJNMF paper.
+# 0- 1 level 1- 2 levels  2- 3 levels
+amr.regrid_int      = 1       # how often to regrid
+amr.n_error_buf     = 8 8 8 8 8   # number of buffer cells in error est
+amr.grid_eff        = 0.75   # what constitutes an efficient grid
+# above was .55 (smaller=> less boxes)
+amr.blocking_factor = 8       # block factor in grid generation
+amr.check_int       = 500     # number of timesteps between checkpoints
+amr.check_file      = chk     # root name of checkpoint file
+ns.output_drop_distribution=1
+amr.plotfile_on_restart=1
+amr.plot_int        = 200
+amr.plot_file       = plt 
+amr.grid_log        = grdlog  # name of grid logging file
+amr.max_grid_size   = 64
+#amr.restart         = chk00100
+#amr.trace   =1
+
+# ------------------  INPUTS TO PHYSICS CLASS -------------------
+ns.dt_cutoff      = 0.000005  # level 0 timestep below which we halt
+
+mac.mac_abs_tol    = 1.0e-10
+
+
+ns.cfl            = 0.85      # cfl number for hyperbolic system
+ns.init_shrink    = 1.0      # scale back initial timestep
+ns.change_max=1.01    
+ns.visc_coef      = 0.204    # 1/60 physical liquid lens, Oh=0.204
+#ns.visc_coef      = 0.05  # water viscosity gas lens Oh=0.05
+#ns.visc_coef      = 0.00303  # water viscosity gas lens Oh=0.00303
+#ns.visc_coef      = 0.0013  # water viscosity floating lens Oh=0.0013
+ns.gravity        = 0.0
+ns.min_velocity_for_dt=1.0
+# 12, 13, 23
+# material 2 will be bubble
+# material 1 top half material 2 bottom half
+# sigma_{i,j}cos(theta_{i,k})=sigma_{j,k}-sigma_{i,k}
+# We_1=We_3=36 We_2=60
+# sigma_12=gamma_1+gamma_2
+# sigma_13=gamma_1+gamma_3
+# sigma_23=gamma_2+gamma_3
+# if 1cm^2 domain, then water surface tension is 72.8.
+ns.tension        = 1.0 1.25 1.0  #liquid lens and gas lens
+# air-oil  air-water  oil-water
+#ns.tension = 0.055 0.0728 0.04 # floating lens
+#ns.tension = 0.7555 1.0 0.5495 # floating lens (scaled by 0.0728)
+#ns.fixed_dt	  = 0.0025     # hardwire dt
+ns.sum_interval   = 1        # timesteps between computing mass 
+
+ns.axis_dir=0
+ns.vorterr=0.0 0.0 0.0
+ns.rgasinlet=1.57
+ns.vinletgas=0.0
+ns.twall=0.1
+ns.advbot=0.0
+ns.adv_vel=0.0
+ns.adv_dir=1 # adv_dir=1 (x direction)
+ns.heatviscconst=0.0 0.0 0.0 0.0
+# u_t + div(uu)=-grad p/rho - sigma kappa grad H/rho + div (2mu D)/rho
+# U=L/T  T=L/U  u^phys = U u^comp  T^phys=(L/U)t^comp
+# U^2/L  =  (sigma/rho)1/L^2   +  (mu/rho)U/L^2
+# 1  =  (sigma/rho) 1/(L U^2)  +  (mu/rho) 1/(L U)
+# (mu/(rho L U))  / (sigma/rho L U^2)= mu U /sigma = Capillary number
+#ns.uncoupled_viscosity=0  # gas lens
+#ns.uncoupled_viscosity=0  # floating lens
+ns.uncoupled_viscosity=1  # liquid lens
+#ns.viscconst=1.78e-2 91.5 1.0 # floating lens air, oil, water
+#ns.viscconst=1.0 0.01 1.0 # gas lens
+ns.viscconst=1.0 1.0 1.0 # liquid lens
+#ns.denconst=0.001 0.577 1.0 # floating lens air, oil, water
+#ns.denconst=1.0 0.001 1.0 # gas lens
+ns.denconst=1.0 1.0 1.0 # liquid lens
+#12 13 23
+#air-oil air-water oil-water
+ns.tempconst=293.0 293.0 293.0 
+ns.material_type=0 0 0 
+ns.pressure_error_cutoff=0.0 0.0 0.0 
+# add 1/1024=0.0009765625 in order to remove symmetry effects.
+#ns.xblob=0.5
+ns.xblob=3.33984375
+#ns.xblob=0.5009765625
+#ns.yblob=0.5
+ns.yblob=3.33984375
+#ns.yblob=0.5009765625
+ns.zblob=0.0  
+#ns.zblob2=0.5  
+#ns.zblob2=0.5009765625
+ns.zblob2=3.33984375
+ns.centroid_noise_factor=1.0 1.0 1.0
+#ns.radblob=0.15
+ns.radblob=1.0
+ns.denfact=1.0
+ns.velfact=0.0
+ns.probtype=202  # liquid lens
+
+proj.bogus_value = 5.0e+5
+proj.Pcode = 0
+#proj.Pcode = 2
+
+#ns.mem_debug = 1
+ns.v = 1
+#ns.d = 1
+
+# ----------------  PROBLEM DEPENDENT INPUTS
+ns.lo_bc          = 0 5
+ns.hi_bc          = 0 5
+
+# >>>>>>>>>>>>>  BC FLAGS <<<<<<<<<<<<<<<<
+# 0 = Interior           3 = Symmetry
+# 1 = Inflow             4 = SlipWall
+# 2 = Outflow            5 = NoSlipWall
+
+# turn any of these on to generate run-time timing stats
+
+fab.do_initval=1
+
+# select single or double precision of FAB output data
+#        default is whatever precision code is compiled with.
+#fab.precision = FLOAT     # output in FLOAT or DOUBLE
+fab.precision = DOUBLE    # output in FLOAT or DOUBLE
+

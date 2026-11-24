@@ -1,0 +1,760 @@
+#include <local_thread_class.H>
+#include <AMReX_CArena.H>
+#include <AMReX_REAL.H>
+#include <AMReX_Utility.H>
+#include <AMReX_IntVect.H>
+#include <AMReX_Box.H>
+#include <AMReX_ParmParse.H>
+#include <AMReX_ParallelDescriptor.H>
+
+#include <AMReX_AmrCore.H>
+
+extern "C" void cpp_reduce_real_sum(int n,double sync_data[]);
+extern "C" void main_cpp_keyboard();
+
+using namespace amrex;
+
+namespace amrex{
+
+extern void fortran_parameters();
+extern void fortran_deallocate_parameters();
+extern void fortran_process_LSA(Real* inner_product_matrix,
+  Real* X_dangerous,int matrix_size,int vector_size);
+
+}
+
+void main_cpp_keyboard() {
+
+  std::cout << 
+   "press any number then enter (called from SOLIDFLUID_F90_KEYBOARD) \n";
+  int n_input;
+  std::cin >> n_input;
+
+} //end subroutine main_cpp_keyboard
+
+void cpp_reduce_real_sum(int n,double sync_data[]) {
+
+ int debug_reduce=0;
+
+ if (debug_reduce==1) {
+  std::fflush(NULL);
+  amrex::ParallelDescriptor::Barrier();
+
+  for (int pid=0;pid<amrex::ParallelDescriptor::NProcs();pid++) {
+   amrex::ParallelDescriptor::Barrier();
+   if (amrex::ParallelDescriptor::MyProc()==pid) {
+    std::fflush(NULL);
+    for (int i=0;i<n;i++) {
+     std::cout << "BEFORE proc= " << pid << " i= " << i << " data= " <<
+      sync_data[i] << '\n';
+    }
+    std::fflush(NULL);
+   }
+  }  // pid=0..NProcs-1
+ }
+
+
+ amrex::ParallelDescriptor::Barrier();
+ amrex::ParallelDescriptor::ReduceRealSum(sync_data,n);
+ amrex::ParallelDescriptor::Barrier();
+
+ if (debug_reduce==1) {
+  std::fflush(NULL);
+  amrex::ParallelDescriptor::Barrier();
+
+  for (int pid=0;pid<amrex::ParallelDescriptor::NProcs();pid++) {
+   amrex::ParallelDescriptor::Barrier();
+   if (amrex::ParallelDescriptor::MyProc()==pid) {
+    std::fflush(NULL);
+    for (int i=0;i<n;i++) {
+     std::cout << "AFTER proc= " << pid << " i= " << i << " data= " <<
+      sync_data[i] << '\n';
+    }
+    std::fflush(NULL);
+   }
+  }  // pid=0..NProcs-1
+ }
+
+} // end subroutine cpp_reduce_real_sum
+
+void
+fork_job(int fork_id) {
+
+
+ std::fflush(NULL);
+ amrex::ParallelDescriptor::Barrier();
+
+ for (int pid=0;pid<amrex::ParallelDescriptor::NProcs();pid++) {
+  amrex::ParallelDescriptor::Barrier();
+  if (amrex::ParallelDescriptor::MyProc()==pid) {
+   std::fflush(NULL);
+   std::cout << 
+     "fork_id= " << fork_id << " proc = " << 
+     amrex::ParallelDescriptor::MyProc() << "\n";
+   std::cout << 
+     "fork_id= " << fork_id << " NProcs()= " << 
+     amrex::ParallelDescriptor::NProcs() << '\n';
+   std::cout << 
+     "fork_id= " << fork_id << " PROC= " << 
+         amrex::ParallelDescriptor::MyProc() << 
+         " thread_class::nthreads= " << 
+         thread_class::nthreads << '\n';
+   std::fflush(NULL);
+  }
+ }  // pid=0..NProcs-1
+
+ amrex::ParallelDescriptor::Barrier();
+
+ const double run_strt = amrex::ParallelDescriptor::second();
+
+ int  max_step;  // int is 4 bytes
+ amrex::Real strt_time;
+ amrex::Real stop_time;
+
+ ParmParse pp;
+ ParmParse ppamr("amr");
+ ParmParse ppns("ns");
+
+// LSA = Linear Stability Analysis
+// ABEL OKOJUNU
+// LSA_nsteps_krylov_subspace_method=number of krylov_subspace method iterations.
+ int local_LSA_nsteps_krylov_subspace_method=0;
+ ppamr.queryAdd("LSA_nsteps_krylov_subspace_method",
+   local_LSA_nsteps_krylov_subspace_method);
+ if (local_LSA_nsteps_krylov_subspace_method>=0) {
+  //do nothing
+ } else
+  amrex::Error("expecting local_LSA_nsteps_krylov_subspace_method>=0(1)");
+
+ int local_LSA_activate=0;
+ ppamr.queryAdd("LSA_activate",local_LSA_activate);
+ if ((local_LSA_activate==0)||
+     (local_LSA_activate==1)||
+     (local_LSA_activate==2)) {
+  //do nothing
+ } else
+  amrex::Error("expecting local_LSA_activate=0,1,2");
+
+ int local_LSA_initial_levelSteps=0;
+ ppamr.queryAdd("LSA_initial_levelSteps",local_LSA_initial_levelSteps);
+
+ max_step  = -1;    
+ strt_time =  0.0;  
+ stop_time = -1.0;  
+
+ double sleepsec=0.0;
+
+ pp.queryAdd("max_step",max_step);
+
+ Real local_fixed_dt=0.0;
+ ppns.queryAdd("fixed_dt",local_fixed_dt);
+
+ if (local_LSA_nsteps_krylov_subspace_method>0) {
+
+  if ((local_LSA_activate==1)||
+      (local_LSA_activate==2)) {
+
+   //time step must be fixed if LSA.
+   if (local_fixed_dt>0.0) {
+    //do nothing
+   } else
+    amrex::Error("expecting ns.fixed_dt>0.0 if LSA");
+
+  } else if (local_LSA_activate==0) {
+   //do nothing
+  } else
+   amrex::Error("local_LSA_activate invalid");
+
+ } else if (local_LSA_nsteps_krylov_subspace_method==0) {
+  //do nothing
+ } else
+  amrex::Error("local_LSA_nsteps_krylov_subspace_method invalid");
+
+ if ((local_LSA_nsteps_krylov_subspace_method==0)||
+     (local_LSA_activate==0)) {
+
+  if (local_LSA_nsteps_krylov_subspace_method>0) {
+   if (max_step>=1) {
+    //do nothing
+   } else
+    amrex::Error("expecting 1<=max_step");
+  } else if (local_LSA_nsteps_krylov_subspace_method==0) {
+   //do nothing
+  } else
+   amrex::Error("local_LSA_nsteps_krylov_subspace_method invalid");
+
+ } else if ((local_LSA_nsteps_krylov_subspace_method>0)&&
+            (local_LSA_activate==1)) {
+
+   //ABEL OKOJUNO
+   //for LSA, max_step>=1, and 
+   //LSA_steps=(max_step-LSA_initial_levelSteps)>=1
+   //(LSA_initial_levelSteps=amrptr->levelSteps(0) for the initial restart)
+   //probably best to have 
+   //LSA_steps=(max_step-LSA_initial_levelSteps)>1 so that
+   //the first step is the "forcing step" and the next step(s) is/are the
+   //resultant "perturbed" state.
+  if (max_step>=1) {
+   //do nothing
+  } else
+   amrex::Error("expecting 1<=max_step");
+
+  std::string local_restart_file;
+  ppamr.queryAdd("restart",local_restart_file);
+  if (!local_restart_file.empty() && local_restart_file != "init") {
+   //do nothing
+  } else
+   amrex::Error("Krylov Subspace method LSA requires restart from base state");
+
+ } else if ((local_LSA_nsteps_krylov_subspace_method>0)&&
+            (local_LSA_activate==2)) {
+
+  if (max_step>=1) {
+   //do nothing
+  } else
+   amrex::Error("expecting 1<=max_step");
+
+  std::string local_restart_file;
+  ppamr.queryAdd("restart",local_restart_file);
+  if (!local_restart_file.empty() && local_restart_file != "init") {
+   //do nothing
+  } else
+   amrex::Error("Krylov Subspace method activate=2 requires restart from V1");
+
+ } else {
+  std::cout << "local_LSA_nsteps_krylov_subspace_method= " << 
+    local_LSA_nsteps_krylov_subspace_method <<'\n';
+  std::cout << "local_LSA_activate= " << 
+    local_LSA_activate <<'\n';
+  amrex::Error("expecting local_LSA_nsteps_krylov_subspace_method>=0 (2)");
+  amrex::Error("expecting local_LSA_activate==0,1,2");
+ }
+
+ pp.queryAdd("strt_time",strt_time);
+  //stop_time is initialized to -1.0 above.
+ pp.queryAdd("stop_time",stop_time);
+
+ pp.queryAdd("sleepsec",sleepsec);
+
+ if (strt_time < 0.0)
+  amrex::Abort("MUST SPECIFY a non-negative strt_time");
+
+  //stop_time is initialized to -1.0 above.
+  //max_step is initialized to -1 above.
+ if (max_step < 0 && stop_time < 0.0) {
+  amrex::Abort(
+   "Exiting because neither max_step nor stop_time is non-negative.");
+ }
+
+  // NavierStokes.cpp (fortran_parameters) ->
+  // PROB_CPP_PARMS.F90 (fort_override_MAIN_GLOBALS) ->
+  // PROB_CPP_PARMS.F90 (fort_override) ->
+  // PROB_CPP_PARMS.F90 (SUB_INIT_MODULE) 
+ fortran_parameters();
+
+   // 1. call AmrMesh()
+   //   a. AmrMesh() calls Geometry::Setup() 
+   //     (rb==nullptr, coord=-1, is_per=nullptr)
+   //   b. AmrMesh() calls InitAmrMesh
+   //     i. geom[i].define(index_domain)  i=0..max_level
+   //                      
+   // 2. Initialize()
+   // 3. InitAmr() 
+   //   a.  levelbld = getLevelBld();
+ int checkpoint_override=-1;
+ AmrCore* amrptr = new AmrCore(checkpoint_override);
+
+ amrex::ParallelDescriptor::Barrier();
+
+   // AmrCore::init 
+   //  a) if !restart_file.empty() and restart_file!="init" then:
+   //     "restart(restart_file)"
+   //  b) otherwise: "initialInit(strt_time,stop_time)"
+   //
+ amrptr->init(strt_time,stop_time);
+
+ amrex::ParallelDescriptor::Barrier();
+
+ if (local_LSA_nsteps_krylov_subspace_method>0) {
+
+  if ((local_LSA_activate==1)||
+      (local_LSA_activate==2)) {
+
+   Real test_cumTime=local_fixed_dt*amrptr->levelSteps(0);
+   if (std::abs(test_cumTime-amrptr->cumTime())<=1.0e-2*local_fixed_dt) {
+    //do nothing
+   } else {
+    std::cout << "local_fixed_dt= " << local_fixed_dt << '\n';
+    std::cout << "amrptr->levelSteps(0)= " << amrptr->levelSteps(0) << '\n';
+    std::cout << "test_cumTime= " << test_cumTime << '\n';
+    std::cout << "amrptr->cumTime()= " << amrptr->cumTime() << '\n';
+    amrex::Error("test_cumTime-amrptr->cumTime() not close to zero");
+   }
+
+  } else if (local_LSA_activate==0) {
+   //do nothing
+  } else
+   amrex::Error("local_LSA_activate invalid");
+
+ } else if (local_LSA_nsteps_krylov_subspace_method==0) {
+
+  //do nothing
+
+ } else {
+  amrex::Error("local_LSA_nsteps_krylov_subspace_method invalid");
+ }
+
+ if (local_LSA_initial_levelSteps<=amrptr->levelSteps(0)) {
+  //do nothing
+ } else
+  amrex::Error("expect local_LSA_initial_levelSteps<=amrptr->levelSteps(0)"); 
+
+ int LSA_steps=max_step-local_LSA_initial_levelSteps;
+
+ if (amrex::ParallelDescriptor::IOProcessor()) {
+  std::cout << "stop_time= " << stop_time <<'\n';
+  std::cout << "amrptr->cumTime()= " << amrptr->cumTime() <<'\n';
+  std::cout << "local_LSA_initial_levelSteps= " << 
+    local_LSA_initial_levelSteps <<'\n';
+  std::cout << "max_step= " << max_step <<'\n';
+  std::cout << "LSA_steps=max_step-local_LSA_initial_levelSteps= " << 
+    LSA_steps <<'\n';
+  std::cout << "LSA_activate= " << local_LSA_activate <<'\n';
+  std::cout << "amrptr->LSA_current_step= " << 
+    amrptr->LSA_current_step << '\n';
+ }
+
+ int initial_LSA_current_step=amrptr->LSA_current_step;
+
+ if ((local_LSA_nsteps_krylov_subspace_method==0)||
+     (local_LSA_activate==0)) {
+
+  if (local_LSA_nsteps_krylov_subspace_method==0) {
+
+   if (initial_LSA_current_step==0) {
+    //do nothing
+   } else
+    amrex::Error("initial_LSA_current_step invalid");
+
+  } else if (local_LSA_nsteps_krylov_subspace_method>0) {
+   //do nothing
+  } else
+   amrex::Error("local_LSA_nsteps_krylov_subspace_method invalid");
+
+ } else if ((local_LSA_nsteps_krylov_subspace_method>0)&&
+            (local_LSA_activate==1)) {
+
+  if (initial_LSA_current_step>=0) {
+   //do nothing
+  } else
+   amrex::Error("initial_LSA_current_step invalid");
+
+  if (amrptr->cumTime()>=0.0) {
+   //do nothing
+  } else
+   amrex::Error("LSA: expecting amrptr->cumTime()=>0.0");
+ 
+//ABEL OKOJUNO
+//LSA_steps=max_step-local_LSA_initial_levelSteps
+  if ((LSA_steps>0)&&(LSA_steps<9999)) {
+   //do nothing
+  } else {
+   std::cout << "max_step= " << max_step << '\n';
+   std::cout << "local_LSA_initial_levelSteps= " << 
+     local_LSA_initial_levelSteps << '\n';
+   std::cout << "LSA_steps= " << LSA_steps << '\n';
+   amrex::Error("LSA: expecting 0<LSA_steps<9999");
+  }
+
+
+ } else if ((local_LSA_nsteps_krylov_subspace_method>0)&&
+            (local_LSA_activate==2)) {
+
+  if (initial_LSA_current_step>=0) {
+   //do nothing
+  } else
+   amrex::Error("initial_LSA_current_step invalid");
+
+  if (amrptr->cumTime()>=0.0) {
+   //do nothing
+  } else
+   amrex::Error("LSA: expecting amrptr->cumTime()=>0.0");
+ 
+//ABEL OKOJUNO
+//LSA_steps=max_step-local_LSA_initial_levelSteps
+  if ((LSA_steps>0)&&(LSA_steps<9999)) {
+   //do nothing
+  } else {
+   std::cout << "max_step= " << max_step << '\n';
+   std::cout << "local_LSA_initial_levelSteps= " << 
+     local_LSA_initial_levelSteps << '\n';
+   std::cout << "LSA_steps= " << LSA_steps << '\n';
+   amrex::Error("LSA: expecting 0<LSA_steps<9999");
+  }
+
+  if (max_step==amrptr->levelSteps(0)) {
+   //do nothing
+  } else
+   amrex::Error("expecting max_step==amrptr->levelSteps(0)");
+
+ } else {
+  std::cout << "local_LSA_nsteps_krylov_subspace_method= " << 
+    local_LSA_nsteps_krylov_subspace_method <<'\n';
+  std::cout << "local_LSA_activate= " << 
+    local_LSA_activate <<'\n';
+  amrex::Error("expecting local_LSA_nsteps_krylov_subspace_method>=0(3)");
+  amrex::Error("expecting local_LSA_activate==0,1,2");
+ }
+
+//ABEL OKOJUNO:
+//1. read in the "steady data" at time t0: data(t0)
+//2. with no perturbations run to time t1: data(t1)
+//3. let x^{(0)} initialized
+//4. k=0
+//5. using data(t0)+eps * x^{(k)} run to time t1: data(t1)^{(k)}
+//6. let x^{(k+1)}=normalized(data(t1)^{(k)}-data(t1))
+//7. k=k+1
+//8. go back to step 5.
+
+ int end_loop=0;
+ if ((local_LSA_nsteps_krylov_subspace_method==0)||
+     (local_LSA_activate==0)) {
+  end_loop=0;
+ } else if ((local_LSA_nsteps_krylov_subspace_method>0)&&
+            (local_LSA_activate==1)) {
+  end_loop=local_LSA_nsteps_krylov_subspace_method;
+ } else if ((local_LSA_nsteps_krylov_subspace_method>0)&&
+            (local_LSA_activate==2)) {
+  end_loop=local_LSA_nsteps_krylov_subspace_method;
+ } else {
+  std::cout << "local_LSA_nsteps_krylov_subspace_method= " << 
+    local_LSA_nsteps_krylov_subspace_method <<'\n';
+  std::cout << "local_LSA_activate= " << 
+    local_LSA_activate <<'\n';
+  amrex::Error("expecting local_LSA_nsteps_krylov_subspace_method>=0(4)");
+  amrex::Error("expecting local_LSA_activate==0,1,2");
+ }
+
+ if ((local_LSA_nsteps_krylov_subspace_method==0)||
+     (local_LSA_activate==0)) {
+
+  int LSA_current_step=0;
+
+  while ((amrptr->okToContinue())          &&
+         (amrptr->levelSteps(0) < max_step || max_step < 0) &&
+         (amrptr->cumTime() < stop_time || stop_time < 0.0) ) {
+
+   amrex::ParallelDescriptor::Barrier();
+   std::fflush(NULL);
+   BL_PROFILE_INITIALIZE();
+   std::fflush(NULL);
+
+   if (end_loop==0) {
+    //do nothing
+   } else
+    amrex::Error("end_loop invalid");
+
+   // coarseTimeStep is in amrlib/AMReX_AmrCore.cpp
+   // timeStep is in amrlib/AMReX_AmrCore.cpp
+   amrptr->coarseTimeStep(stop_time,
+     LSA_current_step,local_LSA_initial_levelSteps);//synchronizes internally
+
+   amrex::ParallelDescriptor::Barrier();
+
+   std::fflush(NULL);
+   BL_PROFILE_FINALIZE();
+   std::fflush(NULL);
+   std::cout << "TIME= " << amrptr->cumTime() << " PROC= " <<
+    amrex::ParallelDescriptor::MyProc() << " sleepsec= " << sleepsec << '\n';
+   std::fflush(NULL);
+   amrex::Sleep(sleepsec);
+   amrex::ParallelDescriptor::Barrier();
+
+  } // while ( amrptr->okToContinue() etc. 
+
+  amrex::ParallelDescriptor::Barrier();
+
+ } else if (local_LSA_activate==1) {
+
+  for (int LSA_current_step=initial_LSA_current_step;
+       LSA_current_step<=end_loop;
+       LSA_current_step++) {
+
+   if (LSA_current_step==initial_LSA_current_step) {
+    //do nothing
+   } else if ((LSA_current_step>initial_LSA_current_step)&&
+              (LSA_current_step<=end_loop)) {
+    amrex::ParallelDescriptor::Barrier();
+     //level_steps=local_LSA_initial_levelSteps
+     //computeNewDt(dt_AMR)
+     //setTimeLevel(cumtime,dt_AMR)
+    Real initial_cumTime=local_fixed_dt*local_LSA_initial_levelSteps;
+
+    amrptr->rewindTimeStep(stop_time,LSA_current_step,
+     initial_cumTime,local_LSA_initial_levelSteps);
+    amrex::ParallelDescriptor::Barrier();
+   } else
+    amrex::Error("LSA_current_step invalid");
+
+    // if not subcycling then levelSteps(level) is independent of "level"
+    // initially, cumTime()==0.0
+    // if LSA_current_step>=1, then reset:
+    // cumTime,levelSteps,initial state
+   while ( amrptr->okToContinue()           &&
+          (amrptr->levelSteps(0) < max_step || max_step < 0) &&
+          (amrptr->cumTime() < stop_time || stop_time < 0.0) ) {
+    amrex::ParallelDescriptor::Barrier();
+    std::fflush(NULL);
+    BL_PROFILE_INITIALIZE();
+    std::fflush(NULL);
+
+    if (end_loop>0) {
+     std::fflush(NULL);
+     std::cout << "LSA_current_step = " << LSA_current_step << '\n';
+     std::cout << "amrptr->levelSteps(0) = " << amrptr->levelSteps(0) << '\n';
+    } else
+     amrex::Error("end_loop invalid");
+
+    // coarseTimeStep is in amrlib/AMReX_AmrCore.cpp
+    // timeStep is in amrlib/AMReX_AmrCore.cpp
+    amrptr->coarseTimeStep(stop_time,
+      LSA_current_step,local_LSA_initial_levelSteps);//synchronizes internally
+
+    amrex::ParallelDescriptor::Barrier();
+
+    std::fflush(NULL);
+    BL_PROFILE_FINALIZE();
+    std::fflush(NULL);
+    std::cout << "TIME= " << amrptr->cumTime() << " PROC= " <<
+     amrex::ParallelDescriptor::MyProc() << " sleepsec= " << sleepsec << '\n';
+    std::fflush(NULL);
+    amrex::Sleep(sleepsec);
+    amrex::ParallelDescriptor::Barrier();
+
+   } // while ( amrptr->okToContinue() etc. 
+
+   amrex::ParallelDescriptor::Barrier();
+
+  }  //LSA_current_step=0 .... end_loop
+
+ } else if (local_LSA_activate==2) {
+
+  int matrix_size=
+     local_LSA_nsteps_krylov_subspace_method*
+     local_LSA_nsteps_krylov_subspace_method;
+  int vector_size=local_LSA_nsteps_krylov_subspace_method;
+
+  Real* inner_product_matrix=new Real[matrix_size];
+  Real* X_dangerous=new Real[vector_size];
+		 
+  int k=0; 
+  for (int i=0;i<local_LSA_nsteps_krylov_subspace_method;i++) {
+
+   AmrCore* amrptr_first = new AmrCore(i);
+   amrex::ParallelDescriptor::Barrier();
+   amrptr_first->init(strt_time,stop_time);
+   amrex::ParallelDescriptor::Barrier();
+
+   for (int j=0;j<local_LSA_nsteps_krylov_subspace_method;j++) {
+
+    AmrCore* amrptr_second = new AmrCore(j);
+    amrex::ParallelDescriptor::Barrier();
+    amrptr_second->init(strt_time,stop_time);
+    amrex::ParallelDescriptor::Barrier();
+
+    Real local_dot_product=0.0;
+
+     //AMReX_AmrCore.cpp
+     //calls amr_level_inner_product at level==0
+     //amr_level_inner_product is declared in NavierStokes3.cpp
+    amrptr_first->inner_product(amrptr_second,local_dot_product);
+    inner_product_matrix[k]=local_dot_product;
+
+    if (k==local_LSA_nsteps_krylov_subspace_method*i+j) {
+     //do nothing
+    } else
+     amrex::Error("expecting k=N*i+j");
+
+    std::cout << "i,j,dot_product " << i << ' ' << j << ' ' <<
+	    local_dot_product << '\n';
+    k++;
+    amrex::ParallelDescriptor::Barrier();
+    delete amrptr_second;
+   } //j=0 ... local_nsteps_krylov_subspace_method-1
+   delete amrptr_first;
+  } //i=0 ... local_nsteps_krylov_subspace_method-1
+
+  int ktest=0;
+  for (int i=0;i<local_LSA_nsteps_krylov_subspace_method;i++) {
+   for (int j=0;j<local_LSA_nsteps_krylov_subspace_method;j++) {
+    int k_2d=local_LSA_nsteps_krylov_subspace_method*i+j;
+    if (ktest==k_2d) {
+     //do nothing
+    } else
+     amrex::Error("ktest==k_2d test failed");
+
+    Real Aij=inner_product_matrix[k_2d];
+    k_2d=local_LSA_nsteps_krylov_subspace_method*j+i;
+    Real Aji=inner_product_matrix[k_2d];
+    Real maxA=max(std::abs(Aij),std::abs(Aji));
+    maxA=max(1.0,maxA);
+    if (std::abs(Aij-Aji)<1.0e-10*maxA) {
+     //do nothing
+    } else
+     amrex::Error("Aij or Aji problem");
+
+    ktest++;
+   } //for (int j=0;j<local_LSA_nsteps_krylov_subspace_method;j++) 
+  } // for (int i=0;i<local_LSA_nsteps_krylov_subspace_method;i++) 
+
+  //use TNT libraries:
+  //N=LSA_nsteps_krylog_substpase_method
+  //B^{T}WB is N-1 x N-1
+  //\vec{a} is N-1 x 1
+  //\vec{b} is N-1 x 1
+  //solve: B^{T}WB\vec{a}=\vec{b} using SVD 
+  //form "S"
+  //S=X\Gamma X^{-1}
+  //X is a N-1 x N-1 matrix
+  //most dangerous mode: \vec{x}_{1}=first column of X which corresponds
+  //to largest eigenvalue of S.
+  //we form: B\vec{x}_{1} and checkpoint it in chk<substeps>LSA<N+1>, replacing
+  //LSA_EVEC_EXTRA with most dangerous mode and replacing LSA_current_step
+  //with LSA_nsteps_krylov_subspace_method + 1.
+  //restart using LSA_activate=3 (regridding will copy default values
+  //into the EXTRA states)
+
+  fortran_process_LSA(inner_product_matrix,X_dangerous,
+    matrix_size,vector_size);
+ 
+  for (int i=0;i<local_LSA_nsteps_krylov_subspace_method-1;i++) {
+   AmrCore* amrptr_first = new AmrCore(i);
+   amrex::ParallelDescriptor::Barrier();
+   amrptr_first->init(strt_time,stop_time);
+   amrex::ParallelDescriptor::Barrier();
+   Real x_local=X_dangerous[i];
+   amrptr->most_dangerous(amrptr_first,x_local,i);
+  }
+
+  delete[] inner_product_matrix;
+  delete[] X_dangerous;
+ } else
+  amrex::Error("local_LSA_activate invalid");
+
+ amrex::ParallelDescriptor::Barrier();
+
+ delete amrptr;
+
+ if (CArena* arena = dynamic_cast<CArena*>(amrex::The_Arena()))
+ {
+  //
+  // We're using a CArena -- output some FAB memory stats.
+  // This'll output total # of bytes of heap space in the Arena.
+  // It's actually the high water mark of heap space required by FABs.
+  //
+  char buf[256];
+
+  sprintf(buf,
+          "CPU(%d): Heap Space (bytes) used by Coalescing FAB Arena: %ld",
+          amrex::ParallelDescriptor::MyProc(),
+          arena->heap_space_used());
+
+  std::cout << buf << '\n';
+ }
+
+ const int IOProc   = amrex::ParallelDescriptor::IOProcessorNumber();
+ double    run_stop = amrex::ParallelDescriptor::second() - run_strt;
+
+ amrex::ParallelDescriptor::ReduceRealMax(run_stop,IOProc);
+
+ if (amrex::ParallelDescriptor::IOProcessor())
+     std::cout << "Run time = " << run_stop << '\n';
+
+  // NavierStokes.cpp (fortran_deallocate_parameters) ->
+  // PROB_CPP_PARMS.F90 (fort_deallocate_module) ->
+  // PROB_CPP_PARMS.F90 (SUB_DEALLOCATE_MODULE) 
+ fortran_deallocate_parameters();
+
+} //end subroutine fork_job
+
+int
+main (int   argc,
+      char* argv[])
+{
+
+    std::cout.imbue(std::locale("C"));
+
+    amrex::Initialize(argc,argv);  
+
+    thread_class::Initialize();
+
+    std::fflush(NULL);
+    amrex::ParallelDescriptor::Barrier();
+
+    for (int pid=0;pid<amrex::ParallelDescriptor::NProcs();pid++) {
+     amrex::ParallelDescriptor::Barrier();
+     if (amrex::ParallelDescriptor::MyProc()==pid) {
+      std::fflush(NULL);
+      std::cout << 
+	"Multimaterial November 12, 2026, 4:00pm on proc " << 
+        amrex::ParallelDescriptor::MyProc() << "\n";
+      std::cout << "NProcs()= " << 
+        amrex::ParallelDescriptor::NProcs() << '\n';
+      std::cout << "PROC= " << amrex::ParallelDescriptor::MyProc() << 
+	    " thread_class::nthreads= " << 
+	    thread_class::nthreads << '\n';
+#ifndef LIBLINEAR
+      std::cout << "liblinear.a is not linked" << '\n';
+#endif
+#ifdef LIBLINEAR
+      std::cout << "liblinear.a is linked" << '\n';
+#endif
+      std::fflush(NULL);
+     }
+    }  // pid=0..NProcs-1
+
+    amrex::ParallelDescriptor::Barrier();
+#ifdef LIBLINEAR
+    if (sizeof(amrex::Real)==sizeof(double)) {
+     //do nothing
+    } else
+     amrex::Error("must use double precision if liblinear.a used");
+#endif
+			   
+
+    if (amrex::ParallelDescriptor::IOProcessor()) {
+     std::cout << "after the barrier on IO processor " << 
+	    amrex::ParallelDescriptor::MyProc() << "\n";
+
+     if ((sizeof(amrex::Real)==sizeof(double))||
+         (sizeof(amrex::Real)==sizeof(float))) {
+      //do nothing
+     } else {
+      amrex::Error("amrex::Real invalid size");
+     }
+     int int_size=sizeof(int);
+     if ((int_size==4)||(int_size==8)) {
+      // do nothing
+     } else {
+      std::cout << "int_size= " << int_size << '\n';
+      amrex::Error("expecting int_size == 4 or 8");
+     }
+     std::cout << "real size= " << sizeof(amrex::Real) << '\n';
+     std::cout << "int size= " << int_size << '\n';
+    } //IOProcessor==TRUE
+
+    int fork_id=0;
+    fork_job(fork_id);
+
+     //amrex::Finalize calls AmrCore::Finalize() since 
+     //amrex::ExecOnFinalize(AmrCore::Finalize) is called in 
+     //AmrCore::Initialize()
+     // AmrCore::regrid_ba.clear();
+     // AmrCore::initial_ba.clear();
+     //amrex::Finalize() is declared in: AMReX.cpp
+    amrex::Finalize();
+
+    return 0;
+
+}
+
