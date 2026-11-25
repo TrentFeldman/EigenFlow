@@ -23,8 +23,45 @@
 #include <SOLIDFLUID_F.H>
 #include <DERIVE_F.H>
 #include <DIFFUSION_F.H>
+#include <cstring>
+#include <map>
+#include <vector>
 
 namespace amrex{
+
+ // ns.facefrac: saved inputs of the face fractions, one per level.  Plain
+ // memory, not FABs: DistributionMapping::LeastUsedCPUs (KNAPSACK) counts FAB
+ // bytes per rank, so a persistent MultiFab would move boxes between ranks.
+namespace {
+struct FaceFracKey {
+ std::vector<Real> recon,mask; bool valid=false;
+ BoxArray ba; DistributionMapping dm; int ngr=-1,ngm=-1,tess=-1,finest=-1; Real time=0.0;
+};
+std::map<int,FaceFracKey> facefrac_key; // by level
+std::size_t facefrac_count(const MultiFab& a) {
+ std::size_t n=0;
+ for (MFIter mfi(a); mfi.isValid(); ++mfi) n+=a[mfi].box().numPts()*a.nComp();
+ return n;
+}
+void facefrac_save(const MultiFab& a,std::vector<Real>& v) {
+ v.resize(facefrac_count(a)); std::size_t p=0;
+ for (MFIter mfi(a); mfi.isValid(); ++mfi) {
+  std::size_t n=a[mfi].box().numPts()*a.nComp();
+  std::memcpy(v.data()+p,a[mfi].dataPtr(),sizeof(Real)*n); p+=n;
+ }
+}
+bool facefrac_same(const MultiFab& a,const std::vector<Real>& v) {
+ if (v.size()!=facefrac_count(a)) return false;
+ std::size_t p=0;
+ for (MFIter mfi(a); mfi.isValid(); ++mfi) {
+  std::size_t n=a[mfi].box().numPts()*a.nComp();
+  if (std::memcmp(v.data()+p,a[mfi].dataPtr(),sizeof(Real)*n)!=0) return false;
+  p+=n;
+ }
+ return true;
+}
+}
+
 
 #define profile_solver 0
 
@@ -8178,13 +8215,73 @@ NavierStokes::ColorSum(
 
    //TESSELLATE_ALL|ALL_RASTER
    //makeFaceFrac declared in: NavierStokes.cpp
-  makeFaceFrac(tessellate,ngrow_distance,FACEFRAC_MM_MF);
-   //ProcessFaceFrac declared in: NavierStokes.cpp
-   //ngrow_dest=3
-  ProcessFaceFrac(tessellate,FACEFRAC_MM_MF,FACEFRAC_SOLVE_MM_MF,3);
-   //makeCellFrac declared in: NavierStokes.cpp
-   //ngrow=3
-  makeCellFrac(tessellate,3,CELLFRAC_MM_MF);
+  int facefrac_mode=(thread_class::facefrac==1 ? 0 : 1);
+  int facefrac_hit=0;
+  if (facefrac_mode>=1) {
+   VOF_Recon_resize(ngrow_distance); // the first thing makeFaceFrac does
+   resize_mask_nbr(ngrow_distance);
+   MultiFab& rec=*localMF[SLOPE_RECON_MF]; MultiFab& msk=*localMF[MASK_NBR_MF];
+   int ok=1;
+   if (localMF_grow[FACEFRAC_MM_MF]<0) ok=0;
+   for (int dir=0;dir<AMREX_SPACEDIM;dir++)
+    if (localMF_grow[FACEFRAC_SOLVE_MM_MF+dir]<0) ok=0;
+   if (localMF_grow[CELLFRAC_MM_MF]<0) ok=0;
+   FaceFracKey& key=facefrac_key[level];
+   if ((ok==1)&&(localMF[FACEFRAC_MM_MF]->nGrow()!=ngrow_distance)) ok=0;
+   if ((ok==1)&&((!key.valid)||(key.tess!=tessellate)||(key.finest!=finest_level)||
+       (key.time!=cur_time_slab)||(key.ngr!=rec.nGrow())||(key.ngm!=msk.nGrow())||
+       (key.ba!=rec.boxArray())||(key.dm!=rec.DistributionMap()))) ok=0;
+   if (ok==1)
+    if ((!facefrac_same(rec,key.recon))||(!facefrac_same(msk,key.mask))) ok=0;
+   ParallelDescriptor::ReduceIntMin(ok);
+   facefrac_hit=ok;
+   if (facefrac_hit==0) {
+    facefrac_save(rec,key.recon); facefrac_save(msk,key.mask); key.valid=true;
+    key.ba=rec.boxArray(); key.dm=rec.DistributionMap();
+    key.ngr=rec.nGrow(); key.ngm=msk.nGrow();
+    key.tess=tessellate; key.finest=finest_level; key.time=cur_time_slab;
+   }
+  }
+   // audit: rebuild this reuse too and compare byte for byte
+  int facefrac_do_audit=0;
+  if (facefrac_hit==1) {
+   if (thread_class::facefrac==3)
+    facefrac_do_audit=1;
+   else if ((thread_class::facefrac_audit>0)&&
+            (parent->levelSteps(0) % thread_class::facefrac_audit==0))
+    facefrac_do_audit=1;
+   if ((facefrac_do_audit==1)&&(thread_class::facefrac_selftest==1)&&
+       (ParallelDescriptor::MyProc()==0)) {
+    MFIter mfi(*localMF[FACEFRAC_SOLVE_MM_MF]);
+    if (mfi.isValid()) {
+     (*localMF[FACEFRAC_SOLVE_MM_MF])[mfi].dataPtr()[0]+=1.0e-12;
+     std::cout << "SELFTEST facefrac: changed one cached value\n";
+    }
+   }
+  }
+  if ((facefrac_hit==1)&&(facefrac_do_audit==0)) {
+   VOF_Recon_resize(3); // as ProcessFaceFrac and makeCellFrac do
+   resize_mask_nbr(3);
+  } else {
+   std::vector< std::vector<Real> > old_mf;
+   std::vector<int> old_id;
+   if (facefrac_hit==1) {
+    old_id.push_back(FACEFRAC_MM_MF); old_id.push_back(CELLFRAC_MM_MF);
+    for (int dir=0;dir<AMREX_SPACEDIM;dir++) old_id.push_back(FACEFRAC_SOLVE_MM_MF+dir);
+    old_mf.resize(old_id.size());
+    for (int i=0;i<(int)old_id.size();i++) facefrac_save(*localMF[old_id[i]],old_mf[i]);
+   }
+   makeFaceFrac(tessellate,ngrow_distance,FACEFRAC_MM_MF);
+    //ngrow_dest=3
+   ProcessFaceFrac(tessellate,FACEFRAC_MM_MF,FACEFRAC_SOLVE_MM_MF,3);
+    //ngrow=3
+   makeCellFrac(tessellate,3,CELLFRAC_MM_MF);
+   for (int i=0;i<(int)old_id.size();i++)
+    if (!facefrac_same(*localMF[old_id[i]],old_mf[i])) {
+     std::cout << "facefrac audit mismatch, MF " << old_id[i] << '\n';
+     amrex::Error("facefrac audit: cached face fractions differ from a rebuild");
+    }
+  }
  } else if (sweep_num==1) {
   // do nothing
  } else if (sweep_num==2) {

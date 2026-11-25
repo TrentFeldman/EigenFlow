@@ -178,6 +178,8 @@ Vector<Real> NavierStokes::NS_coflow_R_of_Z;
 Vector<Real> NavierStokes::NS_DRAG_integrated_quantities; 
 Vector<int> NavierStokes::NS_DRAG_integrated_quantities_sweep;
 
+static int inner_totals_skip=0;   // set by volWgtSumALL for volWgtSum
+static Vector<Real> inner_totals_last; // latest in-step totals
 Vector<Real> NavierStokes::NS_sumdata; 
 Vector<int> NavierStokes::NS_sumdata_type; 
 Vector<int> NavierStokes::NS_sumdata_sweep; 
@@ -7356,7 +7358,7 @@ void NavierStokes::debug_ngrow(int idxMF,int ngrow,
    ngrow << '\n';
  }
 
- if (! mf->ok()) {
+ if (! thread_class::mf_ok(mf,idxMF)) {
   std::cout << "caller_string= " << caller_string << '\n';
   std::cout << "idxMF= " << idxMF << '\n';
   amrex::Error("mf not ok");
@@ -7408,11 +7410,11 @@ void NavierStokes::debug_ixType(int idxMF,int grid_type,
 
  MultiFab* mf=localMF[idxMF];
 
- if (! mf->ok()) {
+ if (! thread_class::mf_ok(mf,idxMF)) {
   std::cout << "caller_string= " << caller_string << '\n';
   std::cout << "idxMF= " << idxMF << '\n';
   amrex::Error("mf not ok");
- } else if (mf->ok()) {
+ } else if (thread_class::mf_ok(mf,idxMF)) {
   debug_ixType_raw(mf,grid_type,caller_string);
  } else {
   std::cout << "caller_string= " << caller_string << '\n';
@@ -7425,10 +7427,10 @@ void NavierStokes::debug_ixType(int idxMF,int grid_type,
 void NavierStokes::debug_ixType_raw(MultiFab* mf,int grid_type,
  const std::string& caller_string) {
 
- if (! mf->ok()) {
+ if (! thread_class::mf_ok(mf,grid_type-50)) {
   std::cout << "caller_string= " << caller_string << '\n';
   amrex::Error("mf not ok");
- } else if (mf->ok()) {
+ } else if (thread_class::mf_ok(mf,grid_type-50)) {
 
   if (1==0) {
    std::fflush(NULL);
@@ -7485,10 +7487,10 @@ void NavierStokes::debug_ixType_raw(MultiFab* mf,int grid_type,
 void NavierStokes::debug_boxArray(MultiFab* mf,int grid_type,
  const std::string& caller_string) {
 
- if (! mf->ok()) {
+ if (! thread_class::mf_ok(mf,grid_type-50)) {
   std::cout << "caller_string= " << caller_string << '\n';
   amrex::Error("mf not ok");
- } else if (mf->ok()) {
+ } else if (thread_class::mf_ok(mf,grid_type-50)) {
   IndexType compare_typ;
   if (grid_type==-1) {
    compare_typ=IndexType::TheCellType();
@@ -23305,6 +23307,13 @@ void NavierStokes::volWgtSum(int isweep,int fast_mode) {
  if (localMF[DRAG_MF]->nComp()!=N_DRAG)
   amrex::Error("drag ncomp invalid");
 
+  // ns.inner_totals: these totals are not due at this call (volWgtSumALL)
+ if ((fast_mode==1)&&(inner_totals_skip==1)) {
+  delete error_heat_map_mf;
+  delete den_recon;
+  return;
+ }
+
   // velocity and pressure
  MultiFab* vel=getState(1,STATECOMP_VEL,
    STATE_NCOMP_VEL+STATE_NCOMP_PRES,upper_slab_time);
@@ -23536,6 +23545,37 @@ void NavierStokes::volWgtSum(int isweep,int fast_mode) {
   }  // isweep==0
  } // tid
 
+ if ((fast_mode==1)&&(thread_class::inner_totals!=1)) { // one reduction per kind
+
+  NS_sumdata[IQ_FILLER_SUM_COMP]=0.0;
+  for (int kind=1;kind<=3;kind++) { // 1=sum 2=min 3=max
+   Vector<int> idx;
+   Vector<Real> buf;
+   for (int idest=1;idest<IQ_TOTAL_SUM_COMP;idest++)
+    if ((NS_sumdata_sweep[idest]==isweep)&&(NS_sumdata_type[idest]==kind)) {
+     idx.push_back(idest);
+     buf.push_back(local_result[0][idest]);
+    }
+   if (idx.size()==0) continue;
+   if (kind==1)
+    ParallelDescriptor::ReduceRealSum(buf.dataPtr(),buf.size());
+   else if (kind==2)
+    ParallelDescriptor::ReduceRealMin(buf.dataPtr(),buf.size());
+   else
+    ParallelDescriptor::ReduceRealMax(buf.dataPtr(),buf.size());
+   for (int i=0;i<idx.size();i++) {
+    Real& d=NS_sumdata[idx[i]];
+    if (kind==1)
+     d+=buf[i];
+    else if (kind==2)
+     d=(buf[i]<d ? buf[i] : d);
+    else
+     d=(buf[i]>d ? buf[i] : d);
+   }
+  }
+
+ } else {
+
  ParallelDescriptor::Barrier();
 
  NS_sumdata[IQ_FILLER_SUM_COMP]=0.0;
@@ -23568,6 +23608,8 @@ void NavierStokes::volWgtSum(int isweep,int fast_mode) {
 
  } // idest
  
+ }
+
  if (isweep==0) { 
   for (int iz=0;iz<=num_cells;iz++) {
    ParallelDescriptor::ReduceRealMax(local_coflow_Z[0][iz]);
@@ -26816,7 +26858,25 @@ NavierStokes::volWgtSumALL(
   NS_coflow_R_of_Z[jfine]=0.0;
  }
 
+  // ns.inner_totals: are the in-step totals due at this call?
+ inner_totals_skip=0;
+ int inner_totals_ran=1;
+ if ((fast_mode==1)&&(thread_class::inner_totals!=1)) {
+  static int tot_step=-1,tot_call=0,tot_ncalls=0;
+  int step=parent->levelSteps(0);
+  if (step!=tot_step) { tot_ncalls=tot_call; tot_call=0; tot_step=step; }
+  int mine=tot_call++;
+  int n_rigid=0;
+  for (int im=0;im<num_materials;im++) n_rigid+=ns_is_rigid(im);
+  bool read_inside=((n_rigid>0)||(im_solid_map.size()>0)||(ncomp_sum_int_user12>0));
+  bool due=read_inside;
+  if (thread_class::inner_totals==2)
+   if ((tot_ncalls==0)||(mine==step % tot_ncalls)) due=true;
+  if (!due) { inner_totals_skip=1; inner_totals_ran=0; }
+ }
  for (int isweep=0;isweep<2;isweep++) {
+
+  if ((inner_totals_ran==0)&&(isweep==1)) continue;
 
   for (int ilev = 0; ilev <= finest_level; ilev++) {
 
@@ -26924,6 +26984,15 @@ NavierStokes::volWgtSumALL(
 
  delete_array(CELLTENSOR_MF);
  delete_array(FACETENSOR_MF);
+
+ if ((fast_mode==1)&&(thread_class::inner_totals!=1)) {
+  if (inner_totals_ran==1) {
+   inner_totals_last=NS_sumdata;
+  } else {
+   if (inner_totals_last.size()==NS_sumdata.size()) NS_sumdata=inner_totals_last;
+  }
+  inner_totals_skip=0;
+ }
 
 }  // end subroutine volWgtSumALL
 

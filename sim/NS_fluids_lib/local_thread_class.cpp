@@ -1,6 +1,7 @@
 #include <local_thread_class.H>
 #include <AMReX_FileSystem.H>
 #include <AMReX_ParallelDescriptor.H>
+#include <AMReX_MultiFab.H>
 #include <AMReX.H>
 #include <AMReX_BaseFab.H>
 #include <AMReX_Box.H>
@@ -50,6 +51,84 @@ double thread_class::batch_expect=0.0;
 double thread_class::batch_wexpect7=0.0;
 double thread_class::batch_wexpect11=0.0;
 double thread_class::batch_nloops=0.0;
+int thread_class::inner_totals=2; // ns.inner_totals=reserved
+int thread_class::mf_check=2;     // ns.mf_check=reserved
+int thread_class::facefrac=2;     // ns.facefrac=reserved
+int thread_class::facefrac_audit=20;
+int thread_class::mf_check_selftest=0;
+int thread_class::facefrac_selftest=0;
+double thread_class::mfc_count=0.0;
+double thread_class::mfc_hash=0.0;
+
+static int reserved_mode(amrex::ParmParse& pp,const char* name,const char* third,int third_val) {
+ std::string s="reserved";
+ pp.queryAdd(name,s);
+ if (s=="full") return 1;
+ if (s=="reserved") return 2;
+ if (s==third) return third_val;
+ amrex::Error(std::string("ns.")+name+" must be full, reserved or "+third);
+ return 1;
+}
+
+void
+thread_class::init_reserved_modes() {
+ amrex::ParmParse pp("ns");
+ inner_totals=reserved_mode(pp,"inner_totals","off",0);
+ mf_check=reserved_mode(pp,"mf_check","off",0);
+ facefrac=reserved_mode(pp,"facefrac","check",3);
+ pp.queryAdd("facefrac_audit",facefrac_audit);
+ pp.queryAdd("mf_check_selftest",mf_check_selftest);
+ pp.queryAdd("facefrac_selftest",facefrac_selftest);
+ if (amrex::ParallelDescriptor::IOProcessor())
+  std::cout << "thread_class: inner_totals=" << inner_totals << " mf_check=" << mf_check <<
+   " facefrac=" << facefrac << " facefrac_audit=" << facefrac_audit << '\n';
+}
+
+ // FabArray::ok() without its MPI all-reduce (mf_check=reserved), or with it (full).
+bool
+thread_class::mf_ok(const amrex::MultiFab* mf,int id) {
+ if (mf_check==1) return mf->ok();
+ if (mf_check==0) return true;
+ bool good=(!mf->empty());
+ if (good) {
+  for (amrex::MFIter fai(*mf); fai.isValid(); ++fai) {
+   if (!mf->defined(fai)) { good=false; break; }
+   if (mf->get(fai).box()!=mf->fabbox(fai.index())) { good=false; break; }
+  }
+ }
+ static double total=0.0;
+ total+=1.0;
+ int w=1;
+ if (mf_check_selftest>0) {
+  if ((total==(double) mf_check_selftest)&&(amrex::ParallelDescriptor::MyProc()==0)) {
+   w=2; std::cout << "SELFTEST mf_check: rank 0 counts check " << total << " twice\n";
+  }
+ } else if (mf_check_selftest<0) {
+  if ((total==(double) (-mf_check_selftest))&&(amrex::ParallelDescriptor::MyProc()==1)) {
+   good=false; std::cerr << "SELFTEST mf_check: rank 1 fails check " << total << '\n';
+  }
+ }
+ mfc_count+=w;
+ mfc_hash=std::fmod(mfc_hash*31.0+(double) (id+100),1000003.0); // exact in double
+ return good;
+}
+
+ // one reduction per coarse step: did all ranks make the same checks in the same order?
+void
+thread_class::flush_mf_check() {
+ if (mf_check!=2) return;
+ double v[4]={mfc_count,-mfc_count,mfc_hash,-mfc_hash};
+ amrex::ParallelDescriptor::ReduceRealMax(v,4);
+ if ((v[0]!=-v[1])||(v[2]!=-v[3])) {
+  if (amrex::ParallelDescriptor::IOProcessor()) {
+   std::cout << "flush_mf_check: the ranks did not make the same MultiFab checks (count max/min " <<
+    v[0] << ' ' << -v[1] << "). Rerun with ns.mf_check=full to find where.\n";
+   std::fflush(NULL);
+  }
+  amrex::Error("flush_mf_check: ranks disagree\n");
+ }
+ mfc_count=0.0; mfc_hash=0.0;
+}
 
 void 
 thread_class::Initialize() {
@@ -108,6 +187,7 @@ thread_class::Initialize() {
     " (check_numPts=" << check_numPts <<
     " fillpatch_barriers=" << fillpatch_barriers <<
     ") loop_check_selftest=" << check_selftest << '\n';
+ init_reserved_modes();
 
 } // end subroutine thread_class::Initialize
 
@@ -158,6 +238,8 @@ thread_class::finish_loop(int caller_loop_id,
  // Called by every rank at the same point (AmrCore::coarseTimeStep).
 void
 thread_class::flush_loop_check() {
+
+ flush_mf_check();
 
  if (check_numPts!=2)
   return;
